@@ -82,6 +82,17 @@ public actor AudioChunker {
         )
     }
 
+    /// Explicit Ask must include even a sub-500ms trailing word. Keep its
+    /// real samples and timeline; do not pad Whisper input with synthetic silence.
+    public func flushForLiveAnswer() -> AudioChunk? {
+        guard !buffer.isEmpty else { return nil }
+        let samples = buffer
+        let startMs = currentPositionMs
+        totalSamplesProcessed += samples.count
+        buffer = []
+        return AudioChunk(samples: samples, startMs: startMs, endMs: currentPositionMs)
+    }
+
     public func reset() {
         buffer = []
         totalSamplesProcessed = 0

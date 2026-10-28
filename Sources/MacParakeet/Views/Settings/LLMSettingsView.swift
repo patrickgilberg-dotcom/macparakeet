@@ -47,6 +47,10 @@ struct LLMSettingsView: View {
 
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
+            ChatGPTConnectionView()
+
+            Divider()
+
             setupStatusSection
 
             Divider()
@@ -62,7 +66,7 @@ struct LLMSettingsView: View {
                         .font(DesignSystem.Typography.caption)
                         .foregroundStyle(DesignSystem.Colors.warningAmber)
                     Text(
-                        "In Keychain Access, find com.macparakeet.llm and allow this copy of MacParakeet access. Your saved key has not been removed."
+                        "In Keychain Access, find com.patrickgilberg.macparakeet-live.llm and allow MacParakeet Live access. Your saved key has not been removed."
                     )
                     .font(DesignSystem.Typography.caption)
                     .foregroundStyle(.secondary)

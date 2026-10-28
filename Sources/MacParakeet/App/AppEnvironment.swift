@@ -277,7 +277,7 @@ final class AppEnvironment {
         }()
 
         let licensingConfig = LicensingConfig(checkoutURL: checkoutURL, expectedVariantID: expectedVariantID)
-        let serviceName = Bundle.main.bundleIdentifier ?? "com.macparakeet"
+        let serviceName = LiveAppIdentity.keychainService("licensing")
         let keychain = KeychainKeyValueStore(service: serviceName)
         entitlementsService = EntitlementsService(
             config: licensingConfig,

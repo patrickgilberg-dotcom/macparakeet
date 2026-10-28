@@ -10,16 +10,43 @@ case "$CONFIG" in
   Debug|Release) ;;
   *) echo "MACPARAKEET_CONFIG must be Debug or Release." >&2; exit 1 ;;
 esac
-DERIVED_DATA_DIR="$ROOT_DIR/.build/xcode-dev"
+# The wrapper selects Live. Default Dev remains available for isolated QA.
+APP_FLAVOR="${MACPARAKEET_APP_FLAVOR:-Dev}"
+case "$APP_FLAVOR" in
+  Live)
+    APP_NAME="MacParakeet Live"
+    BUNDLE_FILENAME="MacParakeet Live.app"
+    BUNDLE_ID="com.patrickgilberg.macparakeet-live"
+    URL_SCHEME="macparakeet-live"
+    STATE_FOLDER="MacParakeet-Live"
+    BUILD_FOLDER="xcode-live"
+    ;;
+  Dev)
+    APP_NAME="MacParakeet Live Dev"
+    BUNDLE_FILENAME="MacParakeet-Dev.app"
+    BUNDLE_ID="com.macparakeet.dev"
+    URL_SCHEME="macparakeet-live"
+    STATE_FOLDER="MacParakeet-Live-Dev"
+    BUILD_FOLDER="xcode-dev"
+    ;;
+  *) echo "MACPARAKEET_APP_FLAVOR must be Live or Dev." >&2; exit 1 ;;
+esac
+DERIVED_DATA_DIR="$ROOT_DIR/.build/$BUILD_FOLDER"
 PRODUCT_DIR="$DERIVED_DATA_DIR/Build/Products/$CONFIG"
 APP_BIN="$PRODUCT_DIR/MacParakeet"
-APP_BUNDLE="$PRODUCT_DIR/MacParakeet-Dev.app"
-LOG_FILE="${TMPDIR:-/tmp}/macparakeet-dev.log"
-BUILD_LOG_FILE="${TMPDIR:-/tmp}/macparakeet-dev-build.log"
+APP_BUNDLE="$PRODUCT_DIR/$BUNDLE_FILENAME"
+APP_OWNERSHIP_ROOT="$ROOT_DIR"
+if [[ "$APP_FLAVOR" == Live ]]; then
+  source "$ROOT_DIR/scripts/dev/live_bundle_paths.sh"
+  APP_OWNERSHIP_ROOT="$(macparakeet_live_build_root "$ROOT_DIR")"
+  APP_BUNDLE="$(macparakeet_live_bundle_path "$ROOT_DIR" "$CONFIG")"
+fi
+LOG_FILE="${TMPDIR:-/tmp}/macparakeet-live-${APP_FLAVOR}.log"
+BUILD_LOG_FILE="${TMPDIR:-/tmp}/macparakeet-live-${APP_FLAVOR}-build.log"
 APP_MACOS_BIN="$APP_BUNDLE/Contents/MacOS/MacParakeet"
 # Keep every Dev bundle off the stable app's database and media directories.
 # The override is honored in both Debug and optimized Release configurations.
-APP_STATE_DIR="${MACPARAKEET_DEBUG_APP_STATE_DIR:-$HOME/Library/Application Support/MacParakeet-Dev}"
+APP_STATE_DIR="${MACPARAKEET_DEBUG_APP_STATE_DIR:-$HOME/Library/Application Support/$STATE_FOLDER}"
 
 pick_codesign_identity() {
   local preferred="${MACPARAKEET_CODESIGN_IDENTITY:-}"
@@ -88,7 +115,12 @@ binary_has_rpath() {
 
 echo "[1/5] Requesting ordinary quit for this worktree's dev build…"
 source "$ROOT_DIR/scripts/dev/stop_app_processes.sh"
-stop_app_processes 10 "$ROOT_DIR" "$APP_BIN" "$APP_MACOS_BIN"
+if [[ "$APP_OWNERSHIP_ROOT" == "$ROOT_DIR" ]]; then
+  stop_app_processes 10 "$ROOT_DIR" "$APP_BIN" "$APP_MACOS_BIN"
+else
+  stop_app_processes 10 "$ROOT_DIR" "$APP_BIN"
+  stop_app_processes 10 "$APP_OWNERSHIP_ROOT" "$APP_MACOS_BIN"
+fi
 
 echo "[2/5] Building $CONFIG app bundle (xcodebuild, target signing disabled)…"
 if ! xcodebuild build \
@@ -149,6 +181,9 @@ mkdir -p "$RESOURCES_DIR/Legal"
 cp "$ROOT_DIR/Sources/MacParakeet/Resources/Legal/MarkdownDependencies.txt" "$RESOURCES_DIR/Legal/MarkdownDependencies.txt"
 cp "$ROOT_DIR/Sources/MacParakeet/Resources/Legal/NemotronDiarization.txt" "$RESOURCES_DIR/Legal/NemotronDiarization.txt"
 cp "$ROOT_DIR/THIRD_PARTY_LICENSES.md" "$RESOURCES_DIR/Legal/THIRD_PARTY_LICENSES.md"
+cp "$ROOT_DIR/LICENSE" "$RESOURCES_DIR/Legal/LICENSE"
+cp "$ROOT_DIR/Assets/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
+"$ROOT_DIR/scripts/dev/bundle_ffmpeg.sh" "$RESOURCES_DIR/ffmpeg"
 
 # Only opted-in Debug launches need the experimental Ask runtime. Ordinary
 # development must not require Node/npm or reinstall helper dependencies.
@@ -232,6 +267,24 @@ cat > "$APP_BUNDLE/Contents/Info.plist" << 'PLIST'
 </plist>
 PLIST
 
+# Bake identity into the bundle; Finder launches and installed copies do not
+# inherit this script's environment. Never embed the upstream update feed.
+GIT_COMMIT="$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+BUILD_DATE_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+BUILD_SOURCE="live-xcodebuild-$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
+INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleName $APP_NAME" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string $APP_NAME" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLSchemes:0 $URL_SCHEME" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleURLTypes:0:CFBundleURLName $BUNDLE_ID.meeting" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :MacParakeetGitCommit string $GIT_COMMIT" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :MacParakeetBuildDateUTC string $BUILD_DATE_UTC" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :MacParakeetBuildSource string $BUILD_SOURCE" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool false" "$INFO_PLIST"
+/usr/libexec/PlistBuddy -c "Add :SUAutomaticallyUpdate bool false" "$INFO_PLIST"
+
 # Re-sign the bundle so TCC can identify the dev build consistently. Use the
 # release app entitlements so permission smoke tests exercise the same TCC
 # capability surface as the signed distribution build. Ad-hoc signatures carry
@@ -254,18 +307,22 @@ if [[ "$CODESIGN_IDENTITY" == "-" ]]; then
       "Set :com.apple.security.cs.disable-library-validation true" \
       "$SIGN_ENTITLEMENTS"
 fi
+# Finder/iCloud can attach these attributes to copied resource bundles. They
+# invalidate codesigning and belong only to this generated output, not source.
+xattr -dr com.apple.FinderInfo "$APP_BUNDLE" 2>/dev/null || true
+xattr -dr com.apple.ResourceFork "$APP_BUNDLE" 2>/dev/null || true
+codesign --force --sign "$CODESIGN_IDENTITY" --options runtime "$RESOURCES_DIR/ffmpeg"
+"$RESOURCES_DIR/ffmpeg" -version >/dev/null
 codesign --force --sign "$CODESIGN_IDENTITY" --options runtime \
   --entitlements "$SIGN_ENTITLEMENTS" --deep "$APP_BUNDLE"
 
-GIT_COMMIT="$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
-BUILD_DATE_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-BUILD_SOURCE="dev-run-xcodebuild-$(echo "$CONFIG" | tr '[:upper:]' '[:lower:]')"
-
-echo "[4/5] Launching ${CONFIG} app…"
-open -n "$APP_BUNDLE" --env MACPARAKEET_DEBUG_APP_STATE_DIR="$APP_STATE_DIR" \
-  --env MACPARAKEET_GIT_COMMIT="$GIT_COMMIT" \
-  --env MACPARAKEET_BUILD_DATE_UTC="$BUILD_DATE_UTC" \
-  --env MACPARAKEET_BUILD_SOURCE="$BUILD_SOURCE" --args "$@" >"$LOG_FILE" 2>&1
+if [[ "${MACPARAKEET_BUILD_ONLY:-0}" == 1 ]]; then
+  echo "[4/5] Build only; launch skipped"
+else
+  echo "[4/5] Launching ${CONFIG} app…"
+  open -n "$APP_BUNDLE" --env MACPARAKEET_DEBUG_APP_STATE_DIR="$APP_STATE_DIR" \
+    --args "$@" >"$LOG_FILE" 2>&1
+fi
 
 echo "[5/5] Launch requested"
 echo "  bundle: $APP_BUNDLE"

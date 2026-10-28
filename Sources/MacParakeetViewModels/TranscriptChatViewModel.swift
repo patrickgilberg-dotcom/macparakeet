@@ -35,6 +35,12 @@ public final class TranscriptChatViewModel {
     public var errorMessage: String?
     public var onConversationsChanged: ((UUID, Bool) -> Void)?
     public var onModelChanged: (() -> Void)?
+    /// Local-only account/meeting facts prepared before the call. Sent only on an explicit Ask.
+    public var livePreparationContext: String = ""
+    public private(set) var liveAnswerTiming: LiveAnswerTiming?
+    public private(set) var usesDirectLiveAnswers = false
+    public var liveAnswerGlobalShortcutAvailable = false
+    public var liveTranscriptHasEarlierGap = false
 
     // Multi-conversation state
     public var conversations: [ChatConversation] = []
@@ -74,6 +80,8 @@ public final class TranscriptChatViewModel {
     /// task is detached, and typical implementations read MainActor-isolated
     /// state (e.g. `MeetingNotesViewModel.notesText`).
     private var userNotesProvider: (@MainActor () -> String?)?
+    private var prepareLiveTranscript: (@MainActor () async throws -> Void)?
+    private var directLiveStream: (@Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>)?
     private var chatHistory: [ChatMessage] = []
     private var streamingTask: Task<Void, Never>?
     private var modelListTask: Task<Void, Never>?
@@ -82,10 +90,31 @@ public final class TranscriptChatViewModel {
     private let logger = Logger(subsystem: "com.macparakeet.viewmodels", category: "TranscriptChatViewModel")
 
     public var canSendMessage: Bool {
-        llmService != nil
+        llmService != nil || directLiveStream != nil
+    }
+
+    /// A direct stream intentionally bypasses all provider fallback and agent/tool loops.
+    public func configureDirectLiveAnswers(
+        prepareTranscript: @escaping @MainActor () async throws -> Void,
+        stream: @escaping @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>
+    ) {
+        usesDirectLiveAnswers = true
+        prepareLiveTranscript = prepareTranscript
+        directLiveStream = stream
+    }
+
+    public func helpMeAnswer(requestedAt: ContinuousClock.Instant = ContinuousClock.now) {
+        guard canSendMessage else { return }
+        cancelStreaming()
+        inputText = "Help me answer this"
+        sendMessage(
+            richPrompt:
+                "Help me answer the latest question the other person asked. Give me a concise, natural reply I can say aloud now.",
+            requestedAt: requestedAt)
     }
 
     public var modelDisplayName: String {
+        if usesDirectLiveAnswers { return "ChatGPT plan" }
         guard !currentModelName.isEmpty else { return "" }
         // Strip provider prefix for OpenRouter models (e.g. "anthropic/claude-sonnet-4.6" -> "claude-sonnet-4.6")
         if currentProviderID == .openrouter, let slashIndex = currentModelName.firstIndex(of: "/") {
@@ -158,7 +187,7 @@ public final class TranscriptChatViewModel {
     }
 
     public var canSelectModel: Bool {
-        configStore != nil && currentProviderID != nil
+        !usesDirectLiveAnswers && configStore != nil && currentProviderID != nil
             && currentProviderID != .localCLI && currentProviderID != .appleIntelligence
             && !isStreaming
     }
@@ -202,9 +231,9 @@ public final class TranscriptChatViewModel {
     ///   the visible `inputText`. Used by pills where the label is short ("Tell me
     ///   more") but the actual prompt deserves to be more comprehensive. The
     ///   user-visible bubble and persisted history both show `inputText`.
-    public func sendMessage(richPrompt: String? = nil) {
+    public func sendMessage(richPrompt: String? = nil, requestedAt: ContinuousClock.Instant = ContinuousClock.now) {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, !isStreaming, llmService != nil else { return }
+        guard !text.isEmpty, !isStreaming, canSendMessage else { return }
         let llmQuestion: String
         if let rich = richPrompt?.trimmingCharacters(in: .whitespacesAndNewlines), !rich.isEmpty {
             llmQuestion = rich
@@ -255,7 +284,7 @@ public final class TranscriptChatViewModel {
         chatHistory.append(ChatMessage(role: .user, content: text, modelPromptOverride: modelPromptOverride))
         persistChatMessages()
 
-        startStreamingAssistant(question: llmQuestion, historyForRequest: historyForRequest)
+        startStreamingAssistant(question: llmQuestion, historyForRequest: historyForRequest, requestedAt: requestedAt)
     }
 
     /// Tail-only regenerate: drops the last completed assistant turn and re-issues
@@ -263,7 +292,7 @@ public final class TranscriptChatViewModel {
     /// regeneration would force a branching/forking model into a surface that's
     /// purposefully linear; we deliberately don't support it.
     public func regenerateLastResponse() {
-        guard !isStreaming, llmService != nil else { return }
+        guard !isStreaming, canSendMessage else { return }
         guard let last = messages.last,
             last.role == .assistant,
             !last.isStreaming
@@ -292,8 +321,16 @@ public final class TranscriptChatViewModel {
     /// Shared streaming kernel for both first-send and regenerate. Appends a
     /// streaming-state assistant turn, then runs the LLM stream with the same
     /// detach/cancel/error semantics in both code paths.
-    private func startStreamingAssistant(question: String, historyForRequest: [ChatMessage]) {
-        guard let llmService else { return }
+    private func startStreamingAssistant(
+        question: String, historyForRequest: [ChatMessage],
+        requestedAt: ContinuousClock.Instant = ContinuousClock.now
+    ) {
+        guard canSendMessage else { return }
+        let llmService = llmService
+        let directLiveStream = directLiveStream
+        let prepareLiveTranscript = prepareLiveTranscript
+        let requestStarted = requestedAt
+        if directLiveStream != nil { liveAnswerTiming = LiveAnswerTiming() }
 
         let assistantID = UUID()
         let assistantMessage = ChatDisplayMessage(id: assistantID, role: .assistant, content: "", isStreaming: true)
@@ -301,8 +338,10 @@ public final class TranscriptChatViewModel {
         isStreaming = true
         streamingAssistantID = assistantID
 
-        let transcript = transcriptText
-        let userNotes = userNotesProvider?()
+        // Saved transcript chat retains its established send-time snapshot.
+        // Direct Live Ask re-reads only after its explicit freshness barrier.
+        let capturedTranscript = transcriptText
+        let capturedNotes = userNotesProvider?()
 
         // Capture context so the task can persist independently if detached (e.g. user clicks New Chat)
         let capturedConversationId = currentConversation?.id
@@ -315,16 +354,48 @@ public final class TranscriptChatViewModel {
             var accumulated = ""
             var coalescer = StreamingTextCoalescer(interval: .milliseconds(33))
             do {
-                let stream = llmService.chatStream(
-                    question: question,
-                    transcript: transcript,
-                    userNotes: userNotes,
-                    history: historyForRequest,
-                    source: chatSource,
-                    conversationID: requestConversationID
-                )
+                if directLiveStream != nil {
+                    try await prepareLiveTranscript?()
+                    try Task.checkCancellation()
+                    guard streamingAssistantID == assistantID else { return }
+                    liveAnswerTiming?.transcriptReadyMs = LiveAnswerTiming.milliseconds(
+                        requestStarted.duration(to: .now))
+                    liveAnswerTiming?.outcome = "streaming"
+                }
+                // Read after the audio barrier, so the pending end of the question is included.
+                let transcript = directLiveStream == nil ? capturedTranscript : transcriptText
+                let userNotes = directLiveStream == nil ? capturedNotes : userNotesProvider?()
+                let stream: AsyncThrowingStream<String, Error>
+                if let directLiveStream {
+                    let contextMessages = LiveAnswerContext.messages(
+                        question: question, transcript: transcript, notes: userNotes,
+                        preparation: livePreparationContext, history: historyForRequest
+                    )
+                    liveAnswerTiming?.requestStartedMs = LiveAnswerTiming.milliseconds(
+                        requestStarted.duration(to: .now))
+                    stream = directLiveStream(contextMessages)
+                } else if let llmService {
+                    stream = llmService.chatStream(
+                        question: question, transcript: transcript, userNotes: userNotes,
+                        history: historyForRequest, source: chatSource, conversationID: requestConversationID
+                    )
+                } else {
+                    return
+                }
                 for try await token in stream {
+                    try Task.checkCancellation()
                     accumulated += token
+                    if directLiveStream != nil, streamingAssistantID == assistantID {
+                        let elapsed = LiveAnswerTiming.milliseconds(requestStarted.duration(to: .now))
+                        if liveAnswerTiming?.firstTextMs == nil,
+                            LiveAnswerTiming.containsMeaningfulText(accumulated)
+                        {
+                            liveAnswerTiming?.firstTextMs = elapsed
+                        }
+                        if liveAnswerTiming?.firstSentenceMs == nil, LiveAnswerTiming.containsSentence(accumulated) {
+                            liveAnswerTiming?.firstSentenceMs = elapsed
+                        }
+                    }
                     // Keep every token in the authoritative response, but bound
                     // message-list/Markdown invalidation just as generated results do.
                     if coalescer.append(token, at: .now) != nil,
@@ -360,6 +431,12 @@ public final class TranscriptChatViewModel {
                     persistChatMessages()
                     streamingAssistantID = nil
                     isStreaming = false
+                    if directLiveStream != nil {
+                        liveAnswerTiming?.completionMs = LiveAnswerTiming.milliseconds(
+                            requestStarted.duration(to: .now))
+                        liveAnswerTiming?.outcome = "completed"
+                        recordLiveTiming()
+                    }
                 } else if let convId = capturedConversationId, !accumulated.isEmpty {
                     // Detached — user switched away. Persist directly to repo.
                     // Only write if the conversation hasn't been modified since detach,
@@ -380,12 +457,24 @@ public final class TranscriptChatViewModel {
                 if streamingAssistantID == assistantID {
                     removeStreamingAssistantMessage()
                     isStreaming = false
+                    liveAnswerTiming?.outcome = "cancelled"
+                    recordLiveTiming()
                 }
             } catch {
                 if streamingAssistantID == assistantID {
-                    removeStreamingAssistantMessage()
+                    if directLiveStream != nil, !accumulated.isEmpty,
+                        let idx = messages.firstIndex(where: { $0.id == assistantID })
+                    {
+                        messages[idx].content = accumulated + "\n\n[Incomplete response]"
+                        messages[idx].isStreaming = false
+                        streamingAssistantID = nil
+                    } else {
+                        removeStreamingAssistantMessage()
+                    }
                     isStreaming = false
                     errorMessage = error.localizedDescription
+                    liveAnswerTiming?.outcome = "failed"
+                    recordLiveTiming()
                 }
             }
         }
@@ -396,6 +485,20 @@ public final class TranscriptChatViewModel {
         streamingTask = nil
         isStreaming = false
         removeStreamingAssistantMessage()
+        if liveAnswerTiming?.outcome == "streaming" || liveAnswerTiming?.outcome == "preparing" {
+            liveAnswerTiming?.outcome = "cancelled"
+            recordLiveTiming()
+        }
+    }
+
+    private func recordLiveTiming() {
+        guard let timing = liveAnswerTiming else { return }
+        func value(_ milliseconds: Double?) -> String {
+            milliseconds.map { String(format: "%.1f", $0) } ?? "none"
+        }
+        AudioCaptureDiagnostics.appendAsync(
+            "live_answer_timing request=\(timing.requestID.uuidString) outcome=\(timing.outcome) transcript_ready_ms=\(value(timing.transcriptReadyMs)) hotkey_to_request_ms=\(value(timing.requestStartedMs)) request_to_first_text_ms=\(value(timing.requestToFirstTextMs)) first_text_ms=\(value(timing.firstTextMs)) first_sentence_ms=\(value(timing.firstSentenceMs)) completion_ms=\(value(timing.completionMs))"
+        )
     }
 
     public func updateTranscript(_ text: String) {

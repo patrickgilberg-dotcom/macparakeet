@@ -10,7 +10,12 @@ import Foundation
 protocol MeetingLiveAudioChunking: Sendable {
     func addSamples(_ samples: [Float]) async -> [AudioChunker.AudioChunk]
     func flush() async -> AudioChunker.AudioChunk?
+    func flushForLiveAnswer() async -> AudioChunker.AudioChunk?
     func reset() async
+}
+
+extension MeetingLiveAudioChunking {
+    func flushForLiveAnswer() async -> AudioChunker.AudioChunk? { await flush() }
 }
 
 /// Thin adapter that preserves the fixed 5s / 1s-overlap behavior by delegating
@@ -30,6 +35,10 @@ actor FixedMeetingLiveAudioChunker: MeetingLiveAudioChunking {
 
     func flush() async -> AudioChunker.AudioChunk? {
         await chunker.flush()
+    }
+
+    func flushForLiveAnswer() async -> AudioChunker.AudioChunk? {
+        await chunker.flushForLiveAnswer()
     }
 
     func reset() async {

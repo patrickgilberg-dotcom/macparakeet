@@ -136,7 +136,9 @@ public final class AutoSaveService {
             case .json: try exportService.exportToJSON(transcription: transcription, url: fileURL)
             }
 
-            logger.info("auto_save_completed scope=\(scope.rawValue, privacy: .public) format=\(format.rawValue, privacy: .public) outcome=success")
+            logger.info(
+                "auto_save_completed scope=\(scope.rawValue, privacy: .public) format=\(format.rawValue, privacy: .public) outcome=success"
+            )
             sendAutoSaveOperation(
                 operationContext: operationContext,
                 scope: scope,
@@ -146,7 +148,9 @@ public final class AutoSaveService {
             return .saved
         } catch {
             let errorType = Observability.errorType(for: error)
-            logger.error("auto_save_failed scope=\(scope.rawValue, privacy: .public) format=\(format.rawValue, privacy: .public) outcome=failure error_type=\(errorType, privacy: .public)")
+            logger.error(
+                "auto_save_failed scope=\(scope.rawValue, privacy: .public) format=\(format.rawValue, privacy: .public) outcome=failure error_type=\(errorType, privacy: .public)"
+            )
             sendAutoSaveOperation(
                 operationContext: operationContext,
                 scope: scope,
@@ -174,10 +178,12 @@ public final class AutoSaveService {
     ) -> URL? {
         guard let bookmarkData = defaults.data(forKey: scope.folderBookmarkKey) else { return nil }
         var isStale = false
-        guard let url = try? URL(
-            resolvingBookmarkData: bookmarkData,
-            bookmarkDataIsStale: &isStale
-        ) else { return nil }
+        guard
+            let url = try? URL(
+                resolvingBookmarkData: bookmarkData,
+                bookmarkDataIsStale: &isStale
+            )
+        else { return nil }
 
         if isStale {
             if let refreshed = try? url.bookmarkData() {
@@ -204,7 +210,7 @@ public final class AutoSaveService {
         await Task.detached(priority: .utility) {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-                  isDirectory.boolValue
+                isDirectory.boolValue
             else {
                 return false
             }
@@ -223,7 +229,7 @@ public final class AutoSaveService {
 
     private static func copyIfMissing(from sourceKey: String, to destinationKey: String, defaults: UserDefaults) {
         guard defaults.object(forKey: destinationKey) == nil,
-              let value = defaults.object(forKey: sourceKey)
+            let value = defaults.object(forKey: sourceKey)
         else { return }
         defaults.set(value, forKey: destinationKey)
     }
@@ -248,20 +254,23 @@ public final class AutoSaveService {
         outcome: ObservabilityOutcome,
         errorType: String? = nil
     ) {
-        Telemetry.send(.autoSaveOperation(
-            operationID: operationContext.operationID,
-            operationContext: operationContext,
-            scope: scope,
-            format: format,
-            outcome: outcome,
-            durationSeconds: Observability.durationSeconds(since: operationContext.startedAt),
-            errorType: errorType
-        ))
+        Telemetry.send(
+            .autoSaveOperation(
+                operationID: operationContext.operationID,
+                operationContext: operationContext,
+                scope: scope,
+                format: format,
+                outcome: outcome,
+                durationSeconds: Observability.durationSeconds(since: operationContext.startedAt),
+                errorType: errorType
+            ))
     }
 
     /// Store a folder URL as bookmark data. Returns the display path on success.
     @discardableResult
-    public static func storeFolder(_ url: URL, scope: AutoSaveScope = .transcription, defaults: UserDefaults = .standard) -> String? {
+    public static func storeFolder(
+        _ url: URL, scope: AutoSaveScope = .transcription, defaults: UserDefaults = .standard
+    ) -> String? {
         guard let data = try? url.bookmarkData() else { return nil }
         defaults.set(data, forKey: scope.folderBookmarkKey)
         return url.path
@@ -273,15 +282,16 @@ public final class AutoSaveService {
     }
 
     /// The default destination for auto-saved files when the user hasn't
-    /// chosen one. Lives under `~/Documents/MacParakeet/{Transcriptions|Meetings}`
+    /// chosen one. Lives under `~/Documents/MacParakeet-Live/{Transcriptions|Meetings}`
     /// so the user can find their output via Finder / Spotlight without
     /// digging into `~/Library`.
     public static func defaultFolder(for scope: AutoSaveScope) -> URL {
-        let docs = FileManager.default
+        let docs =
+            FileManager.default
             .urls(for: .documentDirectory, in: .userDomainMask)
             .first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Documents")
-        let parent = docs.appendingPathComponent("MacParakeet", isDirectory: true)
+        let parent = docs.appendingPathComponent(LiveAppIdentity.applicationSupportFolder, isDirectory: true)
         switch scope {
         case .transcription: return parent.appendingPathComponent("Transcriptions", isDirectory: true)
         case .meeting: return parent.appendingPathComponent("Meetings", isDirectory: true)
@@ -324,7 +334,9 @@ public final class AutoSaveService {
     /// the user can deliberately revert to default after picking a custom
     /// destination.
     @discardableResult
-    public static func resetFolderToDefault(scope: AutoSaveScope = .transcription, defaults: UserDefaults = .standard) -> URL? {
+    public static func resetFolderToDefault(scope: AutoSaveScope = .transcription, defaults: UserDefaults = .standard)
+        -> URL?
+    {
         let defaultURL = defaultFolder(for: scope)
         do {
             try FileManager.default.createDirectory(at: defaultURL, withIntermediateDirectories: true)

@@ -2,6 +2,71 @@ import XCTest
 @testable import MacParakeetCore
 
 final class LiveChunkTranscriberTests: XCTestCase {
+    func testOldFailureCallbackCannotSkipTheNewSessionsFirstChunk() async throws {
+        let submitted = expectation(description: "three requests submitted")
+        submitted.expectedFulfillmentCount = 3
+        let oldFailureEntered = expectation(description: "old failure callback suspended")
+        let prematureResult = expectation(description: "new successor must wait for its own first chunk")
+        prematureResult.isInverted = true
+        let hold = LiveFailureEventHold()
+        let fixture = try await makeFixture { _ in submitted.fulfill() }
+        addTeardownBlock { await hold.release() }
+        await fixture.transcriber.startSession(
+            .init(id: UUID(), chunkFolderURL: fixture.folder, speechEngine: .init(engine: .parakeet))
+        ) { event in
+            if case .transcriptionFailed = event {
+                oldFailureEntered.fulfill()
+                await hold.wait()
+            }
+        }
+        await fixture.transcriber.enqueue(chunk: chunk(0), source: .system)
+        // Synchronize the first request without consuming the 3-count expectation.
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while !(await fixture.client.hasPending("system-0-100.wav")), ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        guard await fixture.client.hasPending("system-0-100.wav") else {
+            return XCTFail("First recognition did not start")
+        }
+        await fixture.client.complete("system-0-100.wav", with: .failure(STTError.transcriptionFailed("old failure")))
+        await fulfillment(of: [oldFailureEntered], timeout: 5)
+        await fixture.transcriber.finishSession()
+        await fixture.transcriber.startSession(
+            .init(id: UUID(), chunkFolderURL: fixture.folder, speechEngine: .init(engine: .parakeet))
+        ) { event in
+            await fixture.events.record(event)
+            if case .orderedResults = event, !(await hold.hasReleasedFirstNewChunk) {
+                prematureResult.fulfill()
+            }
+        }
+        await fixture.transcriber.enqueue(chunk: chunk(0), source: .system)
+        await fixture.transcriber.enqueue(chunk: chunk(1), source: .system)
+        await fulfillment(of: [submitted], timeout: 5)
+        await fixture.client.complete("system-100-200.wav", with: .success(STTResult(text: "second")))
+        await hold.release()
+        await fulfillment(of: [prematureResult], timeout: 0.3)
+        await hold.allowFirstNewChunk()
+        await fixture.client.complete("system-0-100.wav", with: .success(STTResult(text: "first")))
+        await assertDrained(fixture.transcriber)
+        let events = await fixture.events.snapshot()
+        XCTAssertEqual(events.results.map(\.text), ["first", "second"])
+    }
+
+    func testLiveAnswerDrainTimeoutLeavesRecognitionOwnedAndRecordingWorkIntact() async throws {
+        let submitted = expectation(description: "held recognition submitted")
+        let fixture = try await makeFixture { _ in submitted.fulfill() }
+        await fixture.transcriber.enqueue(chunk: chunk(0), source: .system)
+        await fulfillment(of: [submitted], timeout: 5)
+        let timedOut = try await fixture.transcriber.waitForCurrentTasksToDrain(timeout: .milliseconds(20))
+        XCTAssertFalse(timedOut)
+        await fixture.client.complete("system-0-100.wav", with: .success(STTResult(text: "final word")))
+        let drained = try await fixture.transcriber.waitForCurrentTasksToDrain(timeout: .seconds(1))
+        XCTAssertTrue(drained)
+        let events = await fixture.events.snapshot()
+        XCTAssertEqual(events.results.map(\.text), ["final word"])
+        try assertNoChunkFiles(fixture)
+    }
+
     func testIndividuallyCancelledChunkDoesNotBlockLaterResults() async throws {
         let first = expectation(description: "first chunk submitted")
         let later = expectation(description: "later chunks submitted")
@@ -247,12 +312,30 @@ private actor ControlledLiveChunkSTT: SpeechEngineRoutedTranscribing {
         continuation.resume(with: result)
     }
 
+    func hasPending(_ name: String) -> Bool { pending[name] != nil }
+
     func shutdown() {
         closed = true
         let continuations = pending.values
         pending = [:]
         for continuation in continuations { continuation.resume(throwing: CancellationError()) }
     }
+}
+
+private actor LiveFailureEventHold {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+    private(set) var hasReleasedFirstNewChunk = false
+    func wait() async {
+        if released { return }
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
+    }
+    func allowFirstNewChunk() { hasReleasedFirstNewChunk = true }
 }
 
 private actor LiveChunkEventRecorder {
@@ -279,6 +362,7 @@ private actor LiveChunkEventRecorder {
                 })
         case .transcriptionFailed: value.failures += 1
         case .backpressureDrop: value.drops += 1
+        case .previewLoss: break
         }
     }
 

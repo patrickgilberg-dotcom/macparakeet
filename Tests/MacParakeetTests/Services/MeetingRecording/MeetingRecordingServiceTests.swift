@@ -4,6 +4,137 @@ import XCTest
 @testable import MacParakeetCore
 
 final class MeetingRecordingServiceTests: XCTestCase {
+    func testIngressGapCannotRecoverFromOldSpeechHeldInChunkerBeforeTheGap() async throws {
+        let hold = PreviewIngestHold()
+        defer { hold.release() }
+        let frames = 4_000
+        let capture = MockMeetingAudioCaptureService(startReport: .init(sourceMode: .microphoneOnly))
+        let service = MeetingRecordingService(
+            audioCaptureService: capture, audioConverter: MockMeetingAudioFileConverter(),
+            sttTranscriber: PrefixScriptedMeetingSTTClient(microphoneSteps: [
+                .result(STTResult(text: "old speech before the dropped question", words: []))
+            ]),
+            micConditionerFactory: { PassthroughMicConditioner() },
+            audioHostTimeNow: { AVAudioTime.hostTime(forSeconds: 100) },
+            previewIngressMaxRetainedBytes: frames * MemoryLayout<Float>.stride,
+            previewIngestDelay: { await hold.enterAndWait() }
+        )
+        try await service.startRecording()
+        let buffer = try XCTUnwrap(makeMonoFloatBuffer(frameCount: frames, sampleValue: 0.25))
+        await capture.yield(.microphoneBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 100))))
+        await hold.waitUntilEntered()
+        // One batch is in flight, one fits the queue, and the next is refused.
+        await capture.yield(.microphoneBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 101))))
+        await capture.yield(.microphoneBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 102))))
+        try await containmentBeforeDeadline {
+            while !(await service.liveAnswerPreviewLossIsUnresolved()) {
+                try await Task.sleep(for: .milliseconds(5))
+            }
+        }
+        hold.release()
+        do {
+            _ = try await service.prepareLiveAnswerTranscript()
+            XCTFail("Flushing old held speech after a preview gap must not qualify as recovered latest speech")
+        } catch MeetingRecordingService.LiveAnswerTranscriptError.catchingUp {}
+        let recording = await service.isRecording
+        XCTAssertTrue(recording)
+        await service.cancelRecording()
+    }
+
+    func testPreexistingPreviewLossRejectsEmptyFlushThenRecoversOnlyWithNewSpeech() async throws {
+        let capture = MockMeetingAudioCaptureService(startReport: .init(sourceMode: .microphoneOnly))
+        let stt = PrefixScriptedMeetingSTTClient(microphoneSteps: [
+            .dropBackpressure,
+            .result(STTResult(text: "", words: [])),
+            .result(STTResult(text: "What happens next?", words: [])),
+        ])
+        let service = MeetingRecordingService(
+            audioCaptureService: capture, audioConverter: MockMeetingAudioFileConverter(),
+            sttTranscriber: stt, micConditionerFactory: { PassthroughMicConditioner() },
+            audioHostTimeNow: { AVAudioTime.hostTime(forSeconds: 100) }
+        )
+        try await service.startRecording()
+        let first = try XCTUnwrap(makeMonoFloatBuffer(frameCount: 80_000, sampleValue: 0.25))
+        await capture.yield(.microphoneBuffer(first, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 100))))
+        try await containmentBeforeDeadline {
+            while !(await service.liveAnswerPreviewLossIsUnresolved()) {
+                try await Task.sleep(for: .milliseconds(5))
+            }
+        }
+        do {
+            _ = try await service.prepareLiveAnswerTranscript()
+            XCTFail("A failure before invocation plus empty recognition must not return older context")
+        } catch MeetingRecordingService.LiveAnswerTranscriptError.catchingUp {}
+        let next = try XCTUnwrap(makeMonoFloatBuffer(frameCount: 80_000, sampleValue: 0.25))
+        await capture.yield(.microphoneBuffer(next, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 101))))
+        try await containmentBeforeDeadline {
+            while await service.liveAnswerPreviewLossIsUnresolved() {
+                try await Task.sleep(for: .milliseconds(5))
+            }
+        }
+        let update = try await service.prepareLiveAnswerTranscript()
+        XCTAssertEqual(update?.hasEarlierPreviewGap, true)
+        XCTAssertEqual(update?.words.map(\.word), ["What", "happens", "next?"])
+        let recording = await service.isRecording
+        XCTAssertTrue(recording)
+        await service.cancelRecording()
+        try await service.startRecording()
+        let unresolvedAfterRestart = await service.liveAnswerPreviewLossIsUnresolved()
+        XCTAssertFalse(unresolvedAfterRestart)
+        await service.cancelRecording()
+    }
+
+    func testLiveAnswerFlushIncludesPendingShortQuestionWithoutStoppingCapture() async throws {
+        let capture = MockMeetingAudioCaptureService(startReport: .init(sourceMode: .microphoneOnly))
+        let stt = PrefixScriptedMeetingSTTClient(microphoneSteps: [
+            .result(STTResult(text: "pending final question", words: []))
+        ])
+        let service = MeetingRecordingService(
+            audioCaptureService: capture,
+            audioConverter: MockMeetingAudioFileConverter(),
+            sttTranscriber: stt,
+            micConditionerFactory: { PassthroughMicConditioner() },
+            audioHostTimeNow: { AVAudioTime.hostTime(forSeconds: 100) }
+        )
+        try await service.startRecording()
+        let buffer = try XCTUnwrap(makeMonoFloatBuffer(frameCount: 4_000, sampleValue: 0.25))
+        await capture.yield(.microphoneBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 100))))
+        try await containmentBeforeDeadline {
+            while await service.micLevel == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        }
+        let maybeUpdate = try await service.prepareLiveAnswerTranscript()
+        let update = try XCTUnwrap(maybeUpdate)
+        XCTAssertEqual(update.words.map(\.word), ["pending", "final", "question"])
+        let recording = await service.isRecording
+        XCTAssertTrue(recording)
+        await service.cancelRecording()
+    }
+
+    func testLiveAnswerFlushDeclinesFailedTranscriptionAndKeepsRecording() async throws {
+        let capture = MockMeetingAudioCaptureService(startReport: .init(sourceMode: .microphoneOnly))
+        let stt = PrefixScriptedMeetingSTTClient(microphoneSteps: [.dropBackpressure])
+        let service = MeetingRecordingService(
+            audioCaptureService: capture,
+            audioConverter: MockMeetingAudioFileConverter(),
+            sttTranscriber: stt,
+            micConditionerFactory: { PassthroughMicConditioner() },
+            audioHostTimeNow: { AVAudioTime.hostTime(forSeconds: 100) }
+        )
+        try await service.startRecording()
+        let buffer = try XCTUnwrap(makeMonoFloatBuffer(frameCount: 8_000, sampleValue: 0.25))
+        await capture.yield(.microphoneBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 100))))
+        try await containmentBeforeDeadline {
+            while await service.micLevel == 0 { try await Task.sleep(for: .milliseconds(5)) }
+        }
+        do {
+            _ = try await service.prepareLiveAnswerTranscript()
+            XCTFail("Must not pass stale context after a preview failure")
+        } catch MeetingRecordingService.LiveAnswerTranscriptError.catchingUp {}
+        let recording = await service.isRecording
+        XCTAssertTrue(recording)
+        await service.cancelRecording()
+    }
+
     func testStopOwnsSettlementAndConcurrentDiscardCannotDeleteSavedAudio() async throws {
         let capture = MockMeetingAudioCaptureService(holdStop: true)
         let lockStore = RecordingLockFileStore()

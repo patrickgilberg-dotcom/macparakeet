@@ -3,6 +3,21 @@ import XCTest
 @testable import MacParakeetCore
 
 final class AudioChunkerTests: XCTestCase {
+    func testLiveAnswerFlushPreservesTinyTailAndMonotonicTimeline() async {
+        let chunker = AudioChunker()
+        _ = await chunker.addSamples([Float](repeating: 0.25, count: 4_000))
+        let tail = await chunker.flushForLiveAnswer()
+        XCTAssertEqual(tail?.samples.count, 4_000)
+        XCTAssertEqual(tail?.startMs, 0)
+        XCTAssertEqual(tail?.endMs, 250)
+        _ = await chunker.addSamples([Float](repeating: 0.25, count: 8_000))
+        let next = await chunker.flushForLiveAnswer()
+        XCTAssertEqual(next?.startMs, 250)
+        XCTAssertEqual(next?.endMs, 750)
+        let empty = await chunker.flushForLiveAnswer()
+        XCTAssertNil(empty)
+    }
+
     func testEmitsFiveSecondChunkAndRetainsOneSecondOverlap() async {
         let chunker = AudioChunker()
         let samples = [Float](repeating: 0.25, count: 80_000)
@@ -51,12 +66,14 @@ final class AudioChunkerTests: XCTestCase {
     }
 
     func testExtractAndResampleAcceptsInt16PCMBuffer() {
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: 16_000,
-            channels: 1,
-            interleaved: false
-        ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4) else {
+        guard
+            let format = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: 16_000,
+                channels: 1,
+                interleaved: false
+            ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)
+        else {
             return XCTFail("Failed to create Int16 PCM buffer")
         }
 
@@ -80,12 +97,14 @@ final class AudioChunkerTests: XCTestCase {
     }
 
     func testExtractSamplesDownmixesFloatStereoBuffers() {
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatFloat32,
-            sampleRate: 16_000,
-            channels: 2,
-            interleaved: false
-        ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4) else {
+        guard
+            let format = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: 16_000,
+                channels: 2,
+                interleaved: false
+            ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)
+        else {
             return XCTFail("Failed to create Float32 stereo buffer")
         }
 
@@ -114,12 +133,14 @@ final class AudioChunkerTests: XCTestCase {
     }
 
     func testExtractSamplesDownmixesInt16StereoBuffers() {
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: 16_000,
-            channels: 2,
-            interleaved: false
-        ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4) else {
+        guard
+            let format = AVAudioFormat(
+                commonFormat: .pcmFormatInt16,
+                sampleRate: 16_000,
+                channels: 2,
+                interleaved: false
+            ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)
+        else {
             return XCTFail("Failed to create Int16 stereo buffer")
         }
 
@@ -148,12 +169,14 @@ final class AudioChunkerTests: XCTestCase {
     }
 
     func testExtractSamplesDownmixesInt32StereoBuffers() {
-        guard let format = AVAudioFormat(
-            commonFormat: .pcmFormatInt32,
-            sampleRate: 16_000,
-            channels: 2,
-            interleaved: false
-        ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4) else {
+        guard
+            let format = AVAudioFormat(
+                commonFormat: .pcmFormatInt32,
+                sampleRate: 16_000,
+                channels: 2,
+                interleaved: false
+            ), let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4)
+        else {
             return XCTFail("Failed to create Int32 stereo buffer")
         }
 

@@ -153,6 +153,8 @@ final class MeetingRecordingFlowCoordinator {
     private var currentMeetingTrigger: TelemetryMeetingOperationTrigger?
     private var pendingAudioSourceMode: MeetingAudioSourceMode?
     private var pendingLivePanelPresentation = false
+    private var liveAnswerHotkey: GlobalShortcutManager?
+    private var chatGPTPreparationTask: Task<Void, Never>?
 
     init(
         meetingRecordingService: MeetingRecordingServiceProtocol,
@@ -320,17 +322,19 @@ final class MeetingRecordingFlowCoordinator {
         pauseToggleTask = Task { @MainActor [meetingRecordingService, weak self] in
             await previous?.value
             guard !Task.isCancelled, let self,
-                  self.stateMachine.generation == generation,
-                  self.stateMachine.state == .recording else { return }
+                self.stateMachine.generation == generation,
+                self.stateMachine.state == .recording
+            else { return }
             if wantPause {
                 await meetingRecordingService.pauseRecording()
             } else {
                 await meetingRecordingService.resumeRecording()
             }
             guard !Task.isCancelled,
-                  self.stateMachine.generation == generation,
-                  self.stateMachine.state == .recording,
-                  self.pillViewModel.canTogglePause else { return }
+                self.stateMachine.generation == generation,
+                self.stateMachine.state == .recording,
+                self.pillViewModel.canTogglePause
+            else { return }
             self.pendingPauseTarget = nil
             self.pausePublicationRevision &+= 1
             self.pillViewModel.state = wantPause ? .paused : .recording
@@ -718,6 +722,55 @@ final class MeetingRecordingFlowCoordinator {
                 configStore: configStore,
                 cliConfigStore: cliConfigStore
             )
+            if LiveAppIdentity.isLive {
+                panelVM.chatViewModel.livePreparationContext =
+                    AppPaths.sharedAppDefaults().string(forKey: "livePreparationContext") ?? ""
+                panelVM.chatViewModel.configureDirectLiveAnswers(
+                    prepareTranscript: { [weak self, weak panelVM] in
+                        guard let self, let panelVM, self.stateMachine.state == .recording else {
+                            throw MeetingRecordingService.LiveAnswerTranscriptError.sessionChanged
+                        }
+                        if let update = try await self.meetingRecordingService.prepareLiveAnswerTranscript() {
+                            let lines = await Task.detached(priority: .userInitiated) {
+                                Self.makePreviewLines(from: update)
+                            }.value
+                            try Task.checkCancellation()
+                            guard self.stateMachine.state == .recording else {
+                                throw MeetingRecordingService.LiveAnswerTranscriptError.sessionChanged
+                            }
+                            panelVM.updatePreviewLines(lines, isTranscriptionLagging: update.isTranscriptionLagging)
+                            panelVM.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
+                            if update.hasEarlierPreviewGap {
+                                panelVM.chatViewModel.updateTranscriptText(
+                                    "[Some earlier live-preview audio was missed. Newer speech is available; missing words were not reconstructed. The full recording is preserved for final transcription.]\n"
+                                        + panelVM.chatTranscript
+                                )
+                            }
+                        }
+                    },
+                    stream: { messages in ChatGPTLiveClient.shared.stream(messages: messages) }
+                )
+                chatGPTPreparationTask?.cancel()
+                let chatViewModel = panelVM.chatViewModel
+                chatGPTPreparationTask = Task.detached(priority: .userInitiated) { [weak chatViewModel] in
+                    do {
+                        try await ChatGPTLiveClient.shared.warmUp()
+                    } catch is CancellationError {
+                        // Optional connection preparation never interrupts capture.
+                    } catch {
+                        guard !Task.isCancelled, let chatViewModel else { return }
+                        AudioCaptureDiagnostics.appendAsync(
+                            "meeting_chatgpt_prepare_failed error_type=\(String(reflecting: type(of: error)))"
+                        )
+                        let message = "ChatGPT is not ready yet. \(error.localizedDescription)"
+                        await MainActor.run {
+                            if chatViewModel.liveAnswerTiming == nil {
+                                chatViewModel.errorMessage = message
+                            }
+                        }
+                    }
+                }
+            }
             panelVM.quickPromptsViewModel.configure(repo: quickPromptRepo)
             // Wire the notepad's debounced persistence target through the
             // recording service. The service serializes lock-file writes and
@@ -731,6 +784,7 @@ final class MeetingRecordingFlowCoordinator {
                 await self?.meetingRecordingService.updateNotes(notes)
             }
             panelViewModel = panelVM
+            startLiveAnswerHotkey()
 
             if pillController == nil {
                 pillController = MeetingRecordingPillController(viewModel: vm)
@@ -1342,10 +1396,37 @@ final class MeetingRecordingFlowCoordinator {
     /// repeatedly (the saved-completion path tears the panel down before the pill,
     /// then the pill teardown calls this again as a no-op).
     private func teardownMeetingPanel() {
+        chatGPTPreparationTask?.cancel()
+        chatGPTPreparationTask = nil
+        liveAnswerHotkey?.stop()
+        liveAnswerHotkey = nil
+        panelViewModel?.chatViewModel.cancelStreaming()
         panelController?.close()
         panelController = nil
         panelViewModel = nil
         pendingLivePanelPresentation = false
+    }
+
+    private func startLiveAnswerHotkey() {
+        liveAnswerHotkey?.stop()
+        liveAnswerHotkey = nil
+        panelViewModel?.chatViewModel.liveAnswerGlobalShortcutAvailable = false
+        // Native test hosts without an application must not install event taps.
+        guard LiveAppIdentity.isLive, NSApp != nil else { return }
+        let manager = GlobalShortcutManager(trigger: .chord(modifiers: ["command", "option"], keyCode: 49))
+        manager.onTrigger = { [weak self] in
+            let requestedAt = ContinuousClock.now
+            Task { @MainActor in
+                guard let self, self.stateMachine.state == .recording else { return }
+                self.panelViewModel?.selectedTab = .ask
+                self.showMeetingPanel()
+                self.panelViewModel?.chatViewModel.helpMeAnswer(requestedAt: requestedAt)
+            }
+        }
+        if manager.start() {
+            liveAnswerHotkey = manager
+            panelViewModel?.chatViewModel.liveAnswerGlobalShortcutAvailable = true
+        }
     }
 
     private func presentStartBusyNoticeOnce() {

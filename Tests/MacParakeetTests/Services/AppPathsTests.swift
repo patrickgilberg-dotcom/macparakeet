@@ -5,7 +5,7 @@ import FluidAudio
 final class AppPathsTests: XCTestCase {
 
     func testAppSupportDirContainsMacParakeet() {
-        XCTAssertTrue(AppPaths.appSupportDir.hasSuffix("MacParakeet"))
+        XCTAssertTrue(AppPaths.appSupportDir.hasSuffix("MacParakeet-Live"))
     }
 
     func testDatabasePathIsInsideAppSupport() {
@@ -38,11 +38,15 @@ final class AppPathsTests: XCTestCase {
         XCTAssertTrue(AppPaths.defaultMeetingRecordingsDir.hasSuffix("meeting-recordings"))
     }
 
-    func testFluidAudioModelsDirUsesFluidAudioDefaultWithoutDebugOverride() {
+    func testFluidAudioModelsDirUsesForkStorageWithoutDebugOverride() {
         XCTAssertEqual(
             AppPaths.resolvedFluidAudioModelsDir(environment: [:]),
-            MLModelConfigurationUtils.defaultModelsDirectory()
+            URL(fileURLWithPath: AppPaths.resolvedAppSupportDir(environment: [:]), isDirectory: true)
+                .appendingPathComponent("FluidAudio", isDirectory: true)
+                .appendingPathComponent("Models", isDirectory: true)
         )
+        XCTAssertNotEqual(
+            AppPaths.resolvedFluidAudioModelsDir(environment: [:]), MLModelConfigurationUtils.defaultModelsDirectory())
     }
 
     func testMeetingRecordingsDirCanBeConfiguredFromDefaults() {
@@ -68,7 +72,9 @@ final class AppPathsTests: XCTestCase {
         let environment = [AppPaths.debugAppStateDirEnvironmentKey: root.path]
 
         XCTAssertEqual(AppPaths.resolvedAppSupportDir(environment: environment), root.path)
-        XCTAssertEqual(AppPaths.defaultMeetingRecordingsDir(environment: environment), root.appendingPathComponent("meeting-recordings").path)
+        XCTAssertEqual(
+            AppPaths.defaultMeetingRecordingsDir(environment: environment),
+            root.appendingPathComponent("meeting-recordings").path)
     }
 
     func testDevBundleWithoutOverrideUsesDevStateNotStableData() {
@@ -79,14 +85,14 @@ final class AppPathsTests: XCTestCase {
                 environment: [:],
                 bundleIdentifier: AppPaths.developmentBundleIdentifier
             ),
-            applicationSupport + "/MacParakeet-Dev"
+            applicationSupport + "/MacParakeet-Live-Dev"
         )
         XCTAssertEqual(
             AppPaths.resolvedAppSupportDir(
                 environment: [:],
                 bundleIdentifier: "com.macparakeet.MacParakeet"
             ),
-            applicationSupport + "/MacParakeet"
+            applicationSupport + "/MacParakeet-Live"
         )
 
         // An explicit override still wins for the Dev bundle.
@@ -107,7 +113,8 @@ final class AppPathsTests: XCTestCase {
             .appendingPathComponent("macparakeet-debug-state-\(UUID().uuidString)", isDirectory: true)
             .standardizedFileURL
         let environment = [AppPaths.debugAppStateDirEnvironmentKey: root.path]
-        let expectedModelsDir = root
+        let expectedModelsDir =
+            root
             .appendingPathComponent("FluidAudio", isDirectory: true)
             .appendingPathComponent("Models", isDirectory: true)
 
@@ -143,7 +150,7 @@ final class AppPathsTests: XCTestCase {
     }
     func testLogsDirIsInsideUserLogs() {
         XCTAssertTrue(AppPaths.logsDir.contains("Library/Logs"))
-        XCTAssertTrue(AppPaths.logsDir.hasSuffix("MacParakeet"))
+        XCTAssertTrue(AppPaths.logsDir.hasSuffix("MacParakeet-Live"))
     }
 
     func testVoiceControlLogsDirIsInsideLogsDir() {

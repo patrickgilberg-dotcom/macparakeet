@@ -1,5 +1,11 @@
 # Changelog -- macparakeet-cli
 
+## MacParakeet Live personal fork
+
+- This fork's CLI reads Live preferences and credentials and writes Live data
+  under `MacParakeet-Live`. It does not share the upstream app's settings,
+  keys, recordings or speech-model cache. Command schemas remain unchanged.
+
 All notable changes to the **`macparakeet-cli` surface** are documented here.
 
 This file tracks the CLI specifically -- the commands, flags, output schemas,
