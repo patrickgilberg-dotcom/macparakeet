@@ -173,6 +173,7 @@ actor ChatGPTWebSocketTransport {
     private let deadline: Duration
     private let healthCheckTimeout: Duration
     private let maximumAge: TimeInterval
+    private let maximumIdle: TimeInterval
     private var connection: Connection?
     private var owner: UUID?
     private var waiters: [(UUID, CheckedContinuation<Void, Error>)] = []
@@ -186,16 +187,18 @@ actor ChatGPTWebSocketTransport {
         let model: String
         let tokenFingerprint: Data
         let reuseUntil: Date
+        var lastActivity: Date
         let socket: any ChatGPTWebSocket
     }
 
     init(
         connector: any ChatGPTWebSocketConnecting = NativeChatGPTWebSocketConnector(),
         now: @escaping @Sendable () -> Date = { Date() }, deadline: Duration = .seconds(90),
-        maximumAge: TimeInterval = 55 * 60, healthCheckTimeout: Duration = .seconds(2)
+        maximumAge: TimeInterval = 55 * 60, healthCheckTimeout: Duration = .seconds(2), maximumIdle: TimeInterval = 10
     ) {
         self.connector = connector; self.now = now; self.deadline = deadline; self.maximumAge = maximumAge
         self.healthCheckTimeout = healthCheckTimeout
+        self.maximumIdle = maximumIdle
     }
 
     nonisolated func cancelAll() { control.cancel() }
@@ -222,9 +225,16 @@ actor ChatGPTWebSocketTransport {
             try control.claim(connectionID: current.id, requestID: requestID, generation: generation)
             do {
                 if current.id == cachedID {
+                    let pingStarted = ProcessInfo.processInfo.systemUptime
                     do {
                         try await checkLiveness(current, requestID: requestID)
+                        AudioCaptureDiagnostics.appendAsync(
+                            "chatgpt_ws_ping result=pong duration_ms=\(Int((ProcessInfo.processInfo.systemUptime - pingStarted) * 1_000))",
+                            correlation: nil)
                     } catch {
+                        AudioCaptureDiagnostics.appendAsync(
+                            "chatgpt_ws_ping result=failed duration_ms=\(Int((ProcessInfo.processInfo.systemUptime - pingStarted) * 1_000))",
+                            correlation: nil)
                         // Only a control-frame failure is recoverable here. No
                         // response.create has been attempted on this request.
                         try Task.checkCancellation()
@@ -236,12 +246,16 @@ actor ChatGPTWebSocketTransport {
                         try Task.checkCancellation()
                         guard generation == control.generation else { throw CancellationError() }
                         current = try prepare(
-                            accountID: accountID, model: model, token: replacementToken, generation: generation)
+                            accountID: accountID, model: model, token: replacementToken, generation: generation,
+                            freshReason: "ping-replacement")
                         try control.claim(connectionID: current.id, requestID: requestID, generation: generation)
                     }
                 }
                 try Task.checkCancellation()
                 try await receiveResponse(current, requestID: requestID, payload: payload, yield: yield)
+                try Task.checkCancellation()
+                try control.check(connectionID: current.id, requestID: requestID, generation: generation)
+                if connection?.id == current.id { connection?.lastActivity = now() }
             } catch {
                 // Never replay after send was attempted, even if no delta arrived.
                 control.cancel(requestID: requestID)
@@ -284,16 +298,21 @@ actor ChatGPTWebSocketTransport {
         }
     }
 
-    private func prepare(accountID: String, model: String, token: String, generation: UInt64) throws -> Connection {
+    private func prepare(
+        accountID: String, model: String, token: String, generation: UInt64, freshReason: String = "fresh"
+    ) throws -> Connection {
         let fingerprint = Data(SHA256.hash(data: Data(token.utf8)))
         let date = now()
         if let connection, connection.accountID == accountID, connection.model == model,
             connection.tokenFingerprint == fingerprint, connection.reuseUntil > date,
+            date.timeIntervalSince(connection.lastActivity) < maximumIdle,
             connection.socket.isReusable,
             control.isCurrent(connectionID: connection.id, generation: connection.generation)
         {
+            AudioCaptureDiagnostics.appendAsync("chatgpt_ws_connection mode=reused", correlation: nil)
             return connection
         }
+        let idleExpired = connection.map { date.timeIntervalSince($0.lastActivity) >= maximumIdle } ?? false
         // Retiring an old connection here does not cancel the current task's lease.
         let retired = connection
         connection = nil
@@ -309,8 +328,10 @@ actor ChatGPTWebSocketTransport {
         }
         let result = Connection(
             id: id, generation: generation, accountID: accountID, model: model,
-            tokenFingerprint: fingerprint, reuseUntil: reuseUntil, socket: socket)
+            tokenFingerprint: fingerprint, reuseUntil: reuseUntil, lastActivity: date, socket: socket)
         connection = result
+        AudioCaptureDiagnostics.appendAsync(
+            "chatgpt_ws_connection mode=\(idleExpired ? "idle-expired" : freshReason)", correlation: nil)
         return result
     }
 

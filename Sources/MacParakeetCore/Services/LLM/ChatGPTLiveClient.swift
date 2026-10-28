@@ -314,6 +314,16 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         return try JSONSerialization.data(withJSONObject: body)
     }
 
+    private static func diagnosticValue(_ value: String) -> String {
+        guard !value.isEmpty, value.utf8.count <= 128,
+            value.utf8.allSatisfy({
+                (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+                    || $0 == 45 || $0 == 46 || $0 == 47 || $0 == 95
+            })
+        else { return "unrecognized" }
+        return value
+    }
+
     static func webSocketRequestBody(messages: [ChatMessage], model: String, effort: String?) throws -> Data {
         let data = try requestBody(messages: messages, model: model, effort: effort)
         var body = try JSONSerialization.jsonObject(with: data) as! [String: Any]
@@ -352,6 +362,9 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
                     let selected = try await self.selection()
                     let chosenModel = model ?? selected.model
                     let effort = reasoningEffort ?? (model == nil ? selected.reasoningEffort : nil)
+                    AudioCaptureDiagnostics.appendAsync(
+                        "chatgpt_live_request model=\(Self.diagnosticValue(chosenModel)) effort=\(Self.diagnosticValue(effort ?? "provider-default")) transport=\(self.transport.rawValue)",
+                        correlation: nil)
                     if self.transport == .webSocket {
                         let payload = try Self.webSocketRequestBody(
                             messages: messages, model: chosenModel, effort: effort)

@@ -248,6 +248,101 @@ final class ChatGPTWebSocketTransportTests: XCTestCase {
         XCTAssertGreaterThan(closed.cancelCount, 0)
     }
 
+    func testUnusedWarmupIdle180OpensFreshSocketWithoutPingingOldSocket() async throws {
+        let clock = SocketTestValues()
+        let unused = SocketFixture([])
+        unused.holdPongs()
+        let fresh = SocketFixture([socketResponse("fresh")])
+        let connector = SocketConnectorFixture([unused, fresh])
+        let transport = ChatGPTWebSocketTransport(connector: connector, now: { clock.now() })
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        clock.advance(180)
+        try await transport.run(
+            accountID: "a", model: "m", payload: "first-model-request", authorization: { "fixture" }, yield: { _ in })
+        XCTAssertEqual(unused.pingCount, 0)
+        XCTAssertEqual(unused.sendCount, 0)
+        XCTAssertGreaterThan(unused.cancelCount, 0)
+        XCTAssertEqual(fresh.payloads, ["first-model-request"])
+        XCTAssertEqual(connector.count, 2)
+    }
+
+    func testRecentWarmupReusesSocketWithPing() async throws {
+        let clock = SocketTestValues()
+        let socket = SocketFixture([socketResponse("recent")])
+        let connector = SocketConnectorFixture([socket])
+        let transport = ChatGPTWebSocketTransport(connector: connector, now: { clock.now() })
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        clock.advance(9)
+        try await transport.run(
+            accountID: "a", model: "m", payload: "recent", authorization: { "fixture" }, yield: { _ in })
+        XCTAssertEqual(socket.pingCount, 1)
+        XCTAssertEqual(socket.sendCount, 1)
+        XCTAssertEqual(connector.count, 1)
+    }
+
+    func testOnlyCompletedResponseRefreshesIdleActivity() async throws {
+        let clock = SocketTestValues()
+        let socket = SocketFixture([nil, socketResponse("second")])
+        let connector = SocketConnectorFixture([socket])
+        let transport = ChatGPTWebSocketTransport(connector: connector, now: { clock.now() })
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        clock.advance(8)
+        let first = Task {
+            try await transport.run(
+                accountID: "a", model: "m", payload: "first", authorization: { "fixture" }, yield: { _ in })
+        }
+        try await waitUntil { socket.sendCount == 1 }
+        clock.advance(8)
+        socket.push(socketResponse("first"))
+        try await first.value
+        clock.advance(8)
+        try await transport.run(
+            accountID: "a", model: "m", payload: "second", authorization: { "fixture" }, yield: { _ in })
+        XCTAssertEqual(connector.count, 1, "Idle age must use successful completion, not creation, ping or send time")
+        XCTAssertEqual(socket.pingCount, 2)
+    }
+
+    func testRepeatedWarmupDoesNotExtendUnusedSocketIdleBound() async throws {
+        let clock = SocketTestValues()
+        let unused = SocketFixture([])
+        let fresh = SocketFixture([socketResponse("fresh")])
+        let connector = SocketConnectorFixture([unused, fresh])
+        let transport = ChatGPTWebSocketTransport(connector: connector, now: { clock.now() })
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        clock.advance(8)
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        clock.advance(3)
+        try await transport.run(
+            accountID: "a", model: "m", payload: "fresh", authorization: { "fixture" }, yield: { _ in })
+        XCTAssertEqual(unused.pingCount, 0)
+        XCTAssertEqual(unused.sendCount, 0)
+        XCTAssertEqual(connector.count, 2)
+    }
+
+    func testIdleExpiryAndAccountInvalidationCannotPublishReplacement() async throws {
+        let clock = SocketTestValues()
+        let unused = SocketFixture([])
+        let connector = SocketConnectorFixture([unused, SocketFixture([socketResponse("never-send")])])
+        let transport = ChatGPTWebSocketTransport(connector: connector, now: { clock.now() })
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        clock.advance(180)
+        let gate = SocketAuthorizationGate()
+        let task = Task {
+            try await transport.run(
+                accountID: "a", model: "m", payload: "never-send",
+                authorization: {
+                    await gate.wait(); return "fixture"
+                }, yield: { _ in XCTFail("An invalidated idle request cannot yield text") })
+        }
+        try await waitUntil { await gate.entered }
+        transport.cancelAll()
+        await gate.open()
+        do { try await task.value; XCTFail("An invalidated idle lease must fail") } catch {}
+        XCTAssertEqual(connector.count, 1)
+        XCTAssertEqual(unused.pingCount, 0)
+        XCTAssertEqual(unused.sendCount, 0)
+    }
+
     func testHalfOpenWarmupSocketIsReplacedBeforeAnyModelSend() async throws {
         let stale = SocketFixture([])
         stale.simulateHalfOpen()
@@ -472,7 +567,7 @@ final class ChatGPTWebSocketTransportTests: XCTestCase {
             let first = SocketFixture([socketResponse("first")])
             let second = SocketFixture([socketResponse("second")])
             let connector = SocketConnectorFixture([first, second])
-            let transport = ChatGPTWebSocketTransport(connector: connector, now: { values.now() })
+            let transport = ChatGPTWebSocketTransport(connector: connector, now: { values.now() }, maximumIdle: 10_000)
             let token = fixtureToken(expiry: values.now().addingTimeInterval(useTokenExpiry ? 120 : 7_200))
             try await transport.run(
                 accountID: "a", model: "m", payload: "first", authorization: { token }, yield: { _ in })

@@ -48,7 +48,9 @@ The default native transport is a persistent WebSocket to
 Unsupported sampling/token/storage fields are omitted in both modes. Reasoning
 effort is sent only when explicitly selected by a successful capability
 experiment; the catalog does not promise a reasoning-effort schema. Redirects
-are refused. No transport automatically replays a failed or possibly accepted
+are refused. Content-free diagnostics record the resolved model/effort/transport,
+fresh/reused/idle-expired/ping-replacement connection mode, and ping duration.
+These records omit account IDs, tokens, URLs, prompts, transcripts and output. No transport automatically replays a failed or possibly accepted
 request, and neither can switch to a different billing path.
 
 The socket actor grants one exclusive FIFO request lease on the implicit default
@@ -57,10 +59,18 @@ lanes with HTTP 400 while the otherwise equivalent unnamed control completed.
 General Responses multiplexing documentation does not establish that optional
 field's compatibility with this route. Each turn obtains current credentials after acquiring that lease. Reuse
 requires the same account, model, access-token fingerprint, and live connection
-generation, plus a native task that is still running with no close code. A known
+generation, plus a native task that is still running with no close code. Cached
+connections are also retired after 10 seconds without a completed response; an
+unused warm-up socket uses its creation time. Only terminal success refreshes
+this idle activity, while token expiry and the 55-minute hard age remain fixed.
+Idle-expired sockets are replaced before pinging or sending model input. This
+is a conservative client latency policy, not a claim about the server's idle timeout. A known
 closed idle socket is retired before sending the next request, without replaying
 a request against it. A cached socket also receives a WebSocket ping with a
-two-second deadline before model input is sent. If that control check fails or
+two-second deadline before model input is sent. Native pong callbacks pass through
+an exactly-once mutex-protected continuation gate; duplicate or late callbacks
+from closing a socket cannot resume a completed Swift task again. If that control
+check fails or
 times out, the still-owned lease retires the old socket, rechecks authorization,
 and opens one fresh socket before its single model request. Cancellation or an
 invalidated account epoch prevents this replacement. A failure after sending
