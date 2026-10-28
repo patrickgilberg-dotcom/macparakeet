@@ -17,6 +17,8 @@ require_live_bundle() {
 }
 
 require_live_bundle "$SOURCE_APP"
+source "$SCRIPT_DIR/live_signing.sh"
+macparakeet_require_persistent_live_bundle "$SOURCE_APP"
 # File-provider metadata may reappear on generated bundles in Documents after
 # signing. Removing only these signing-invalid attributes preserves content.
 xattr -dr com.apple.FinderInfo "$SOURCE_APP" 2>/dev/null || true
@@ -45,6 +47,7 @@ ditto "$SOURCE_APP" "$STAGING_DIR/MacParakeet Live.app"
 xattr -dr com.apple.FinderInfo "$STAGING_DIR/MacParakeet Live.app" 2>/dev/null || true
 xattr -dr com.apple.ResourceFork "$STAGING_DIR/MacParakeet Live.app" 2>/dev/null || true
 codesign --verify --deep --strict "$STAGING_DIR/MacParakeet Live.app"
+macparakeet_require_persistent_live_bundle "$STAGING_DIR/MacParakeet Live.app"
 if [[ -e "$DESTINATION_APP" ]]; then
   mv "$DESTINATION_APP" "$STAGING_DIR/Previous.app"
 fi

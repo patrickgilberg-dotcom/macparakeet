@@ -48,37 +48,9 @@ APP_MACOS_BIN="$APP_BUNDLE/Contents/MacOS/MacParakeet"
 # The override is honored in both Debug and optimized Release configurations.
 APP_STATE_DIR="${MACPARAKEET_DEBUG_APP_STATE_DIR:-$HOME/Library/Application Support/$STATE_FOLDER}"
 
-pick_codesign_identity() {
-  local preferred="${MACPARAKEET_CODESIGN_IDENTITY:-}"
-  if [[ -n "$preferred" ]]; then
-    printf '%s\n' "$preferred"
-    return
-  fi
-
-  local identities
-  identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
-
-  while IFS= read -r candidate; do
-    if grep -Fq "\"$candidate" <<<"$identities"; then
-      printf '%s\n' "$candidate"
-      return
-    fi
-  done < <(printf '%s\n' "Apple Development" "Mac Development")
-
-  local developer_id
-  developer_id="$(sed -n 's/.*"\(Developer ID Application:.*\)".*/\1/p' <<<"$identities" | head -n 1)"
-  if [[ -n "$developer_id" ]]; then
-    printf '%s\n' "$developer_id"
-    return
-  fi
-
-  # Ad-hoc signing keeps the bundle launchable even on machines without a
-  # development certificate. It is enough for local debugging, but TCC may be
-  # less sticky across rebuilds than a real signing identity.
-  printf '%s\n' "-"
-}
-
-CODESIGN_IDENTITY="$(pick_codesign_identity)"
+source "$ROOT_DIR/scripts/dev/live_signing.sh"
+CODESIGN_IDENTITY="$(macparakeet_pick_codesign_identity)"
+macparakeet_require_live_build_identity "$CODESIGN_IDENTITY" "$APP_FLAVOR"
 APP_ENTITLEMENTS="$ROOT_DIR/scripts/dist/MacParakeet.entitlements"
 
 sync_frameworks_into_bundle() {
@@ -315,6 +287,9 @@ codesign --force --sign "$CODESIGN_IDENTITY" --options runtime "$RESOURCES_DIR/f
 "$RESOURCES_DIR/ffmpeg" -version >/dev/null
 codesign --force --sign "$CODESIGN_IDENTITY" --options runtime \
   --entitlements "$SIGN_ENTITLEMENTS" --deep "$APP_BUNDLE"
+if [[ "$APP_FLAVOR" == Live ]]; then
+  macparakeet_require_persistent_live_bundle "$APP_BUNDLE"
+fi
 
 if [[ "${MACPARAKEET_BUILD_ONLY:-0}" == 1 ]]; then
   echo "[4/5] Build only; launch skipped"

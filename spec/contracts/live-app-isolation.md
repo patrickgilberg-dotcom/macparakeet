@@ -35,7 +35,11 @@ inside the bundle.
 Build using `scripts/dev/run_live_app.sh` (Release by default). Set
 `MACPARAKEET_BUILD_ONLY=1` to package and sign without launching. The wrapper
 uses the supported Xcode workflow, including `-skipMacroValidation` and local
-signing. `scripts/dev/install_live_app.sh` validates the Live bundle identity
+signing. Live builds require a persistent valid local signing identity before
+compiling. The installer refuses ad-hoc Live signatures by default. Intentional
+throwaway QA must explicitly set `MACPARAKEET_ALLOW_ADHOC=1`; ordinary Dev
+builds retain their ad-hoc fallback. No signing helper edits TCC permissions.
+`scripts/dev/install_live_app.sh` validates the Live bundle identity
 and signature, quits only the exact installed Live executable before replacing
 it, and installs under `~/Applications` by default. Override
 `MACPARAKEET_INSTALL_DIR=/Applications` when that directory is writable. It
