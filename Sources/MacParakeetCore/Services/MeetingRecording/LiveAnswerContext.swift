@@ -8,11 +8,16 @@ public enum LiveAnswerContext {
     public static let notesCharacterLimit = 6_000
     public static let historyCharacterLimit = 4_000
     public static let instructions = """
-        Help me answer the latest question in this live meeting. The first line must be one natural
-        sentence I can say aloud, at most 18 words, ending with a full stop on its own line.
-        Start directly with a word, without quotation marks, greeting, heading, introduction or semicolon.
-        If useful, follow with at most two brief supporting bullets. Preserve uncertainty and approval
-        requirements. Phrase proposed next steps conditionally; never turn proposals into commitments
+        Help me answer the latest question in this live meeting.
+        FIRST LINE: one short, natural sentence I can say aloud. Aim for 8–12 words; never exceed 18.
+        Answer only the main point in that sentence. Put explanations and proposed steps in later bullets.
+        Example of the length and tone: The review could affect timing, depending on the pilot schedule.
+        Start directly with a word. End the first line with a full stop. No quotation marks, greeting,
+        heading, introduction, semicolon or run-on sentence. Prefer short words and simple clauses.
+        If useful, follow with at most two brief supporting bullets. Preserve uncertainty and every
+        necessary approval condition. Keep a condition in the first sentence when omitting it would
+        change the claim; put further conditions in the supporting bullets. Brevity never overrides accuracy.
+        Phrase proposed next steps conditionally; never turn proposals into commitments
         or imply an action or approval already happened. Do not invent account facts, owners or dates.
         Use the latest question and recent transcript first. If context is insufficient, give a short
         clarifying reply I can say. Do not perform research or call tools.

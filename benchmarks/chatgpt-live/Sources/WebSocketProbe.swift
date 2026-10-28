@@ -86,7 +86,7 @@ enum WebSocketProbe {
         guard (1...50).contains(trials) else { throw ProbeError(code: "trials_must_be_1_to_50") }
         try contractChecks()
         let auth = ChatGPTAuth.shared
-        let client = ChatGPTLiveClient.shared
+        let client = ChatGPTLiveClient(transport: .httpSSE)
         guard let account = await auth.activeAccount(), account.planUsageEnabled else {
             throw ProbeError(code: "chatgpt_plan_not_connected")
         }
@@ -136,7 +136,7 @@ enum WebSocketProbe {
                     throw ProbeError(code: "account_changed")
                 }
                 let http = await ChatGPTLiveBenchmark.trial(
-                    model: model, effort: selected.reasoningEffort, condition: condition)
+                    client: client, model: model, effort: selected.reasoningEffort, condition: condition)
                 let httpRecord = Trial(
                     transport: "http-sse", condition: condition,
                     firstTextMs: http.firstTextMs, firstSentenceMs: http.firstSentenceMs,

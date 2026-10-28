@@ -156,8 +156,15 @@ struct LiveAskPaneView: View {
                     Label("Help me answer this", systemImage: "bolt.fill")
                 }
                 .parakeetAction(.primary)
-                .keyboardShortcut(.space, modifiers: [.command, .option])
-                .help("⌥⌘Space from any app during this recording. Requires Accessibility permission.")
+                .keyboardShortcut(
+                    .space,
+                    modifiers: viewModel.liveAnswerGlobalShortcutIncludesControl
+                        ? [.control, .command, .option] : [.command, .option]
+                )
+                .help(
+                    viewModel.liveAnswerGlobalShortcutAvailable
+                        ? "\(viewModel.liveAnswerGlobalShortcutLabel) from any app during this recording."
+                        : "Use this button to request an answer.")
                 Spacer()
                 Button(showingPreparation ? "Hide context" : "Prepare context") {
                     showingPreparation.toggle()
@@ -165,22 +172,15 @@ struct LiveAskPaneView: View {
                 .parakeetAction(.secondary)
                 .controlSize(.small)
             }
-            if !viewModel.liveAnswerGlobalShortcutAvailable {
-                HStack {
-                    Text("Global shortcut unavailable. The button works here.")
-                        .font(.caption)
-                        .foregroundStyle(DesignSystem.Colors.textSecondary)
-                    Button("Enable shortcut…") {
-                        if let url = URL(
-                            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                        {
-                            NSWorkspace.shared.open(url)
-                        }
-                    }
-                    .parakeetAction(.secondary)
-                    .controlSize(.small)
-                }
-            }
+            Text(
+                viewModel.liveAnswerGlobalShortcutAvailable
+                    ? (viewModel.liveAnswerGlobalShortcutIncludesControl
+                        ? "⌥⌘Space is in use. Use \(viewModel.liveAnswerGlobalShortcutLabel) from any app."
+                        : "\(viewModel.liveAnswerGlobalShortcutLabel) from any app during this recording.")
+                    : "Global shortcut unavailable. The button works here."
+            )
+            .font(.caption)
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
             if showingPreparation {
                 Text("Account facts and meeting goals · saved only on this Mac")
                     .font(.caption)

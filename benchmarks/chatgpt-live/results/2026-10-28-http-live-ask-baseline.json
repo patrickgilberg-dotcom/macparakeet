@@ -1,0 +1,218 @@
+{
+  "source_commit": "02c58b29d9dc",
+  "transport": "http-sse",
+  "condition": "Installed signed Release app; controlled system-only generated speech; native Help button and custom question; prior to final shortcut/WebSocket changes",
+  "trials": [
+    {
+      "timestamp": "2026-10-28T20:43:46.392Z",
+      "event": "live_answer_timing",
+      "fields": {
+        "request": "1DE481E9-567E-45D1-83C0-1A3318C2D81D",
+        "outcome": "completed",
+        "transcript_ready_ms": "396.0",
+        "hotkey_to_request_ms": "396.7",
+        "request_to_first_text_ms": "1682.0",
+        "first_text_ms": "2078.7",
+        "first_sentence_ms": "2780.1",
+        "completion_ms": "2806.7",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912166906026625",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:45:55.064Z",
+      "event": "live_answer_timing",
+      "fields": {
+        "request": "096854B1-05D9-423D-AE27-84B8580767BC",
+        "outcome": "completed",
+        "transcript_ready_ms": "277.4",
+        "hotkey_to_request_ms": "278.1",
+        "request_to_first_text_ms": "1963.0",
+        "first_text_ms": "2241.1",
+        "first_sentence_ms": "2549.4",
+        "completion_ms": "2855.9",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912295576424666",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:46:32.984Z",
+      "event": "live_answer_timing",
+      "fields": {
+        "request": "7CBEC3A6-B234-442D-B5C2-A5E2F9A292C1",
+        "outcome": "cancelled",
+        "transcript_ready_ms": "131.4",
+        "hotkey_to_request_ms": "131.8",
+        "request_to_first_text_ms": "none",
+        "first_text_ms": "none",
+        "first_sentence_ms": "none",
+        "completion_ms": "none",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912333495908625",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:46:46.908Z",
+      "event": "live_answer_timing",
+      "fields": {
+        "request": "46F800D2-3696-4B8C-8AAE-F6455AB8686E",
+        "outcome": "completed",
+        "transcript_ready_ms": "106.1",
+        "hotkey_to_request_ms": "106.1",
+        "request_to_first_text_ms": "2077.1",
+        "first_text_ms": "2183.2",
+        "first_sentence_ms": "2267.4",
+        "completion_ms": "2312.8",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912347419154333",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    }
+  ],
+  "summary": {
+    "transcript_ready_ms": {
+      "n": 3,
+      "median_ms": 277.4,
+      "p95_ms": 396.0
+    },
+    "hotkey_to_request_ms": {
+      "n": 3,
+      "median_ms": 278.1,
+      "p95_ms": 396.7
+    },
+    "request_to_first_text_ms": {
+      "n": 3,
+      "median_ms": 1963.0,
+      "p95_ms": 2077.1
+    },
+    "first_text_ms": {
+      "n": 3,
+      "median_ms": 2183.2,
+      "p95_ms": 2241.1
+    },
+    "first_sentence_ms": {
+      "n": 3,
+      "median_ms": 2549.4,
+      "p95_ms": 2780.1
+    },
+    "completion_ms": {
+      "n": 3,
+      "median_ms": 2806.7,
+      "p95_ms": 2855.9
+    }
+  },
+  "completed": 3,
+  "cancelled": 1,
+  "checks": {
+    "latest_tangerine_word_visible_in_live_transcript": true,
+    "new_rollout_question_changed_answer_appropriately": true,
+    "cancelled_before_text": true,
+    "new_custom_request_succeeded_after_cancel": true,
+    "saved_transcript_completed": true,
+    "live_note_persisted": true,
+    "saved_chat_conversations": 1,
+    "saved_chat_messages": 7,
+    "saved_chat_visible_in_library": true,
+    "usual_microphone_and_system_mode_restored": true
+  },
+  "events": [
+    {
+      "timestamp": "2026-10-28T20:39:02.182Z",
+      "event": "meeting_recording_started",
+      "fields": {
+        "session": "24A5B0A1-CEB8-4113-9874-B0143078B880",
+        "source_mode": "Optional(MacParakeetCore.MeetingAudioSourceMode.systemOnly)",
+        "requested_mic_mode": "raw",
+        "effective_mic_mode": "raw",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1911882698920333",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:43:43.981Z",
+      "event": "meeting_live_answer_flush",
+      "fields": {
+        "elapsed_ms": "96.8",
+        "outcome": "ready",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912164494702583",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:45:52.484Z",
+      "event": "meeting_live_answer_flush",
+      "fields": {
+        "elapsed_ms": "77.6",
+        "outcome": "ready",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912292996324208",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:46:32.118Z",
+      "event": "meeting_live_answer_flush",
+      "fields": {
+        "elapsed_ms": "68.9",
+        "outcome": "ready",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912332629849375",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:46:44.701Z",
+      "event": "meeting_live_answer_flush",
+      "fields": {
+        "elapsed_ms": "66.4",
+        "outcome": "ready",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912345212261416",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T20:48:16.577Z",
+      "event": "meeting_recording_stopped",
+      "fields": {
+        "session": "24A5B0A1-CEB8-4113-9874-B0143078B880",
+        "duration_s": "554.280",
+        "process_id": "24268",
+        "process_session": "050ec9aa-141c-40f3-a9b8-276bf3d31daf",
+        "uptime_ns": "1912437087151583",
+        "workflow_id": "5B57F63C-3C16-4A63-97EB-5BABE0ABD49D",
+        "consumer": "meeting"
+      }
+    }
+  ],
+  "limitations": [
+    "Button invocation, not working global-hotkey delivery: macOS filtered the old event tap; final fix is separately qualified.",
+    "Three successful requests is a small sample; first sentence is a punctuation proxy reviewed for relevance.",
+    "These include transcript preparation; provider-only benchmark timings are reported separately.",
+    "No exact acoustic speech-end measurement. Tool round trips delayed the first two invocations by about 5.64s/3.14s after afplay completion; resulting playback-exit-to-sentence proxies were 8.42s/5.69s, dominated by the harness delay.",
+    "The per-request model was not logged; the account selection had been changed to gpt-6-luna by the earlier native benchmark. Final production qualification verifies selection explicitly."
+  ]
+}

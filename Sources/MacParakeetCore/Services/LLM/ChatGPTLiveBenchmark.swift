@@ -3,6 +3,7 @@ import Darwin
 
 public struct ChatGPTBenchmarkTrial: Codable, Sendable {
     public let model: String
+    public let transport: ChatGPTTransport
     public let reasoningEffort: String?
     public let condition: String
     public let inputCharacters: Int
@@ -12,10 +13,13 @@ public struct ChatGPTBenchmarkTrial: Codable, Sendable {
     public let completed: Bool
     public let output: String
     public let error: String?
+    public let errorStatus: Int?
+    public let errorCode: String?
 }
 
 public struct ChatGPTBenchmarkSummary: Codable, Sendable {
     public let model: String
+    public let transport: ChatGPTTransport
     public let condition: String
     public let trials: Int
     public let failures: Int
@@ -56,6 +60,8 @@ public enum ChatGPTLiveBenchmark {
         var firstSentence: Double?
         var output = ""
         var failure: String?
+        var errorStatus: Int?
+        var errorCode: String?
         var completed = false
         do {
             for try await event in client.detailedStream(messages: messages, model: model, reasoningEffort: effort) {
@@ -68,13 +74,22 @@ public enum ChatGPTLiveBenchmark {
                 case .completed: completed = true
                 }
             }
-        } catch { failure = error.localizedDescription }
+        } catch {
+            failure = error.localizedDescription
+            if let liveError = error as? ChatGPTLiveError {
+                switch liveError {
+                case .http(let status, let code): errorStatus = status; errorCode = code
+                case .failed(let code): errorCode = code
+                default: break
+                }
+            }
+        }
         return ChatGPTBenchmarkTrial(
-            model: model, reasoningEffort: effort, condition: condition,
+            model: model, transport: client.transport, reasoningEffort: effort, condition: condition,
             inputCharacters: messages.reduce(0) { $0 + $1.modelContent.count },
             firstTextMs: firstText, firstSentenceMs: firstSentence,
             completionMs: (ProcessInfo.processInfo.systemUptime - start) * 1_000,
-            completed: completed, output: output, error: failure)
+            completed: completed, output: output, error: failure, errorStatus: errorStatus, errorCode: errorCode)
     }
 
     public static func messages(condition: String) -> [ChatMessage] {
@@ -86,12 +101,12 @@ public enum ChatGPTLiveBenchmark {
     }
 
     public static func report(_ trials: [ChatGPTBenchmarkTrial]) -> ChatGPTBenchmarkReport {
-        let groups = Dictionary(grouping: trials, by: { $0.model + "|" + $0.condition })
+        let groups = Dictionary(grouping: trials, by: { $0.model + "|" + $0.transport.rawValue + "|" + $0.condition })
         let summaries = groups.keys.sorted().compactMap { key -> ChatGPTBenchmarkSummary? in
             guard let group = groups[key], let first = group.first else { return nil }
             let completed = group.filter(\.completed)
             return ChatGPTBenchmarkSummary(
-                model: first.model, condition: first.condition,
+                model: first.model, transport: first.transport, condition: first.condition,
                 trials: group.count, failures: group.count - completed.count,
                 medianFirstTextMs: percentile(completed.compactMap(\.firstTextMs), 0.5),
                 p95FirstTextMs: percentile(completed.compactMap(\.firstTextMs), 0.95),
@@ -106,7 +121,8 @@ public enum ChatGPTLiveBenchmark {
             memoryGB: ProcessInfo.processInfo.physicalMemory / 1_073_741_824, trials: trials, summaries: summaries,
             notes: [
                 "First sentence timing uses punctuation after 12 characters; inspect stored outputs for usefulness.",
-                "First-process requests are labeled cold; this does not reset the server's cache or OS network cache.",
+                "First-process requests follow catalog retrieval and any rejected effort probes; they do not establish untouched network/server cold latency.",
+                "Transport is explicit in each trial and summary. WebSocket reuses one socket after a completed response, with full bounded input on each turn.",
                 "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
                 "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee.",
             ])

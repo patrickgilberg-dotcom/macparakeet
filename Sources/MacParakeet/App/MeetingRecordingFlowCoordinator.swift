@@ -153,7 +153,7 @@ final class MeetingRecordingFlowCoordinator {
     private var currentMeetingTrigger: TelemetryMeetingOperationTrigger?
     private var pendingAudioSourceMode: MeetingAudioSourceMode?
     private var pendingLivePanelPresentation = false
-    private var liveAnswerHotkey: GlobalShortcutManager?
+    private var liveAnswerHotkey: LiveAnswerHotkey?
     private var chatGPTPreparationTask: Task<Void, Never>?
 
     init(
@@ -1411,22 +1411,26 @@ final class MeetingRecordingFlowCoordinator {
         liveAnswerHotkey?.stop()
         liveAnswerHotkey = nil
         panelViewModel?.chatViewModel.liveAnswerGlobalShortcutAvailable = false
-        // Native test hosts without an application must not install event taps.
+        panelViewModel?.chatViewModel.liveAnswerGlobalShortcutIncludesControl = false
+        // Native test hosts without an application must not register hotkeys.
         guard LiveAppIdentity.isLive, NSApp != nil else { return }
-        let manager = GlobalShortcutManager(trigger: .chord(modifiers: ["command", "option"], keyCode: 49))
-        manager.onTrigger = { [weak self] in
-            let requestedAt = ContinuousClock.now
-            Task { @MainActor in
-                guard let self, self.stateMachine.state == .recording else { return }
-                self.panelViewModel?.selectedTab = .ask
-                self.showMeetingPanel()
-                self.panelViewModel?.chatViewModel.helpMeAnswer(requestedAt: requestedAt)
-            }
+        let manager = LiveAnswerHotkey()
+        manager.onTrigger = { [weak self] requestedAt in
+            guard let self, self.stateMachine.state == .recording else { return }
+            AudioCaptureDiagnostics.appendAsync("live_answer_hotkey outcome=triggered")
+            self.panelViewModel?.selectedTab = .ask
+            self.showMeetingPanel()
+            self.panelViewModel?.chatViewModel.helpMeAnswer(requestedAt: requestedAt)
         }
         if manager.start() {
             liveAnswerHotkey = manager
             panelViewModel?.chatViewModel.liveAnswerGlobalShortcutAvailable = true
+            panelViewModel?.chatViewModel.liveAnswerGlobalShortcutIncludesControl =
+                manager.registeredChord == .controlOptionCommandSpace
         }
+        AudioCaptureDiagnostics.appendAsync(
+            "live_answer_hotkey_registration outcome=\(manager.registeredChord == nil ? "unavailable" : "registered") control=\(manager.registeredChord == .controlOptionCommandSpace) status=\(manager.registrationStatus)"
+        )
     }
 
     private func presentStartBusyNoticeOnce() {

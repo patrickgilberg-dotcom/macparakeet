@@ -14,7 +14,11 @@ struct ChatGPTBenchmarkCommand {
         let arguments = Array(CommandLine.arguments.dropFirst())
         let command = arguments.first ?? "help"
         let auth = ChatGPTAuth.shared
-        let client = ChatGPTLiveClient.shared
+        let transportName = stringOption("--transport", in: arguments) ?? ChatGPTTransport.webSocket.rawValue
+        guard let transport = ChatGPTTransport(rawValue: transportName) else {
+            throw CommandError.message("Use --transport websocket or --transport http-sse.")
+        }
+        let client = transport == .webSocket ? ChatGPTLiveClient.shared : ChatGPTLiveClient(transport: transport)
         switch command {
         case "unlock":
             try await auth.unlockCredentialAccess()
@@ -32,7 +36,8 @@ struct ChatGPTBenchmarkCommand {
             // Login alone is never reported as completed inference.
             let selected = try await client.selection()
             let trial = await ChatGPTLiveBenchmark.trial(
-                model: selected.model, effort: nil, condition: "first-process-cold")
+                client: client, model: selected.model, effort: selected.reasoningEffort,
+                condition: "first-inference-this-process")
             try save([trial], to: "/tmp/macparakeet-live-first-inference.json")
             guard trial.completed, !trial.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw CommandError.message(trial.error ?? "Subscription inference returned no completed text.")
@@ -71,6 +76,7 @@ struct ChatGPTBenchmarkCommand {
             guard !shortlist.isEmpty else { throw ChatGPTLiveError.noModels }
             var trials: [ChatGPTBenchmarkTrial] = []
             var choices: [(ChatGPTModelSelection, Double)] = []
+            print("Transport: \(transport.rawValue)")
             for model in shortlist {
                 print("Testing \(model.displayName) [\(model.slug)]")
                 var accepted: ChatGPTModelSelection?
@@ -79,7 +85,7 @@ struct ChatGPTBenchmarkCommand {
                 for effort: String? in ["none", "minimal", "low", nil] {
                     try Task.checkCancellation()
                     let result = await ChatGPTLiveBenchmark.trial(
-                        model: model.slug, effort: effort,
+                        client: client, model: model.slug, effort: effort,
                         condition:
                             "\(trials.isEmpty ? "first-inference-this-process-" : "")capability-probe-\(effort ?? "default")"
                     )
@@ -89,15 +95,20 @@ struct ChatGPTBenchmarkCommand {
                     if result.completed, result.firstSentenceMs != nil {
                         accepted = ChatGPTModelSelection(model: model.slug, reasoningEffort: effort); break
                     }
-                    // Only invalid-request errors warrant trying another effort.
-                    guard result.error?.contains("HTTP 400") == true else { break }
+                    // Capability experiments may advance after a structured
+                    // unsupported-effort error even when WS omits HTTP status.
+                    let unsupported = [
+                        "unsupported_value", "unsupported_reasoning_effort",
+                        "subscription_sharing_unsupported_capability",
+                    ]
+                    guard result.errorStatus == 400 || result.errorCode.map(unsupported.contains) == true else { break }
                 }
                 guard let accepted else { continue }
                 for condition in ["warm-recent", "warm-long-meeting"] {
                     for _ in 0..<trialsCount {
                         try Task.checkCancellation()
                         let result = await ChatGPTLiveBenchmark.trial(
-                            model: model.slug, effort: accepted.reasoningEffort, condition: condition)
+                            client: client, model: model.slug, effort: accepted.reasoningEffort, condition: condition)
                         trials.append(result)
                         printTrial(result)
                         try save(trials, to: outputPath)
@@ -125,7 +136,7 @@ struct ChatGPTBenchmarkCommand {
         case "disconnect": try await auth.disconnect(); print("Disconnected locally.")
         default:
             print(
-                "chatgpt-live-benchmark login|status|models|benchmark|disconnect\nbenchmark options: --trials 5 --models 3 [--model slug] --output /absolute/report.json"
+                "chatgpt-live-benchmark login|unlock|status|models|benchmark|websocket|disconnect\nbenchmark options: --transport websocket|http-sse --trials 5 --models 3 [--model slug] --output /absolute/report.json\nwebsocket options: [--model selected-slug] --trials 5 (isolated socket versus explicit HTTP comparison)"
             )
         }
     }
@@ -139,7 +150,7 @@ struct ChatGPTBenchmarkCommand {
 
     static func printTrial(_ trial: ChatGPTBenchmarkTrial) {
         print(
-            "  \(trial.condition): \(trial.completed ? "completed" : "FAILED"); text \(trial.firstTextMs.map { String(Int($0)) } ?? "—")ms; sentence \(trial.firstSentenceMs.map { String(Int($0)) } ?? "—")ms; total \(Int(trial.completionMs))ms\(trial.error.map { "; \($0)" } ?? "")"
+            "  \(trial.transport.rawValue) \(trial.condition): \(trial.completed ? "completed" : "FAILED"); text \(trial.firstTextMs.map { String(Int($0)) } ?? "—")ms; sentence \(trial.firstSentenceMs.map { String(Int($0)) } ?? "—")ms; total \(Int(trial.completionMs))ms\(trial.error.map { "; \($0)" } ?? "")"
         )
     }
     static func stringOption(_ name: String, in arguments: [String]) -> String? {

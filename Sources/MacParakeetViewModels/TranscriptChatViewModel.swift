@@ -40,6 +40,10 @@ public final class TranscriptChatViewModel {
     public private(set) var liveAnswerTiming: LiveAnswerTiming?
     public private(set) var usesDirectLiveAnswers = false
     public var liveAnswerGlobalShortcutAvailable = false
+    public var liveAnswerGlobalShortcutIncludesControl = false
+    public var liveAnswerGlobalShortcutLabel: String {
+        liveAnswerGlobalShortcutIncludesControl ? "⌃⌥⌘Space" : "⌥⌘Space"
+    }
     public var liveTranscriptHasEarlierGap = false
 
     // Multi-conversation state

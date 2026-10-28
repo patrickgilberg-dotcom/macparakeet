@@ -51,11 +51,21 @@ and final transcription remain independent.
 
 `LiveAnswerContext` bounds recent text, extracts older anchors, retains compact
 history and accepts local preparation/notes. Stable instructions stay separate
-from quoted meeting data. `ChatGPTLiveClient` then uses the app's own OAuth bearer
-token with native persistent URLSession HTTP/SSE, without a CLI or tools in the
-live request. Text is emitted at complete SSE event boundaries; only
-`response.completed` is accepted as terminal success. The first sentence is
-requested in at most 18 words, followed by up to two supporting bullets.
+from quoted meeting data. `ChatGPTLiveClient` uses the app's own OAuth bearer
+token with a persistent native URLSession WebSocket. One serialized default lane
+sends full bounded input on each turn, with `store:false` and no previous-response
+reference. Account, model, token or expiry changes retire the socket. Cancellation,
+incomplete responses and errors close it; sent requests are never silently replayed.
+Only a nonempty `response.completed` is terminal success. Explicit HTTP/SSE mode
+remains available for comparisons (`store:false`, `stream:true`). Live requests
+use neither a CLI nor tools. The opening sentence targets 8–12 words, at most 18,
+followed by up to two supporting bullets; conditions take precedence over brevity.
+
+Live's global answer shortcut now uses macOS registered hotkeys rather than a
+keyboard event monitor. The old tap could be created while macOS removed its
+key-down/up event mask, falsely suggesting availability. The replacement registers
+Option-Command-Space exclusively; a conflict selects Control-Option-Command-Space,
+with the actual chord shown in Ask. Registration failure is shown explicitly.
 
 ## Authentication and cloud verification
 
@@ -76,7 +86,11 @@ requested in at most 18 words, followed by up to two supporting bullets.
 
 ## Automated verification
 
-- Final focused run: **367 tests passed**, zero failures.
+- Earlier affected-area focused run: **367 tests passed**, zero failures.
+- Final integrated transport/hotkey run: **194 tests passed**, zero failures.
+  It includes real-module authentication/session, SSE, WebSocket, hotkey, live
+  answer, transcript-chat publication and meeting-flow coverage. New socket tests
+  use injected fixtures and never access real credentials or the network.
 - Authentication/session qualification includes 25 tests covering PKCE,
   callback validation, signature/claims, reduced/revoked scopes, atomic rotating
   refresh checkpoints, temporary failures, concurrent refresh across two actors,
@@ -88,7 +102,8 @@ requested in at most 18 words, followed by up to two supporting bullets.
   one expected the old optional Ask provider and three expected upstream export
   folders. These fixtures were updated for the direct simulated stream and Live
   directories. All **49 meeting-flow tests** and **175 matching settings tests**
-  then passed. Production code did not change after that broad run.
+  then passed. The later WebSocket/registered-hotkey changes are covered by the
+  final focused run rather than a second broad run.
 - The complete broad suite was not repeated, following the repository's explicit
   once-per-task limit. The corrected areas were rerun with focused filters.
 - Independent security, concurrency, freshness, data-preservation and build
@@ -147,27 +162,52 @@ The first subscription inference took 3,215 ms to text and 4,319 ms to the first
 sentence; it followed authorization and model discovery and is not a clean
 network/DNS cold-start measurement.
 
-The provisional model is GPT-6.1 Terra with `none` reasoning. In the initial
-five-repetition-per-context trials it completed all ten warm responses; sentence
-median/p95 was 2.47/3.01 seconds for recent context and 3.09/3.12 seconds for the
-initial long fixture. Luna was quicker in median results, with one subscription
-route HTTP 503, and introduced an unsupported schedule consequence in a fixture.
-These samples do not establish model reliability differences.
+A later comparison discovered all eight account-visible models and tested their
+lowest accepted reasoning setting. Across 59 Responses attempts, 55 completed and
+four rejected unsupported-effort probes were retained; no accepted request failed.
+The selected model is **GPT-6 Luna with `none` reasoning**. In five repeated trials
+per context, HTTP first-sentence median/p95 was 1.752/2.557 seconds for recent
+context and 1.610/3.262 seconds for the actual bounded long-meeting fixture.
+
+The isolated WebSocket comparison completed all ten socket and ten paired HTTP
+responses. Warm socket sentence median/p95 was 1.123/2.715 seconds for recent
+context (four samples) and 1.160/1.547 seconds for long context (five samples).
+The first socket request, including handshake, took 2.086 seconds to a sentence.
+These are provider-only timings. The socket always preceded paired HTTP, and small
+samples/cache/order effects limit causal claims. All outputs retained security and
+approval conditions, but most openings exceeded the original 18-word instruction.
+The production prompt was tightened without mechanically truncating conditions.
+Final production transport verification is reported separately below.
+A native protocol check found HTTP 400 responses when sending the optional
+`stream_id` field with this account's subscription route. Omitting it restored
+successful default-lane responses. The production client therefore uses the proven
+serialized default lane. These Debug protocol checks are excluded from speed claims.
+
+Three completed installed-app HTTP button/custom-question trials had invocation-to-
+sentence median/p95 2.549/2.780 seconds, including transcript preparation (median
+277 ms). A fourth response was cancelled before text; a new request then completed.
+The second spoken question changed the answer from pilot preparation to rejecting
+an unapproved rollout promise. The final question word was visible in the live
+transcript. Notes and all seven chat messages persisted, and saved answers remained
+visible in Library. These tests exposed the old global shortcut failure; they do
+not qualify shortcut delivery. Playback-end proxies were dominated by tool round-trip
+trigger gaps, so they cannot establish the speech-end latency target.
 
 The final harness uses the actual Live context builder, a raw long-meeting fixture
 that exceeds the context bound, letter/number-based first text, explicit failed
 trials, hardware metadata, nearest-rank median/p95 and saved outputs. Sentence
 timing is a punctuation proxy; usefulness requires inspecting the answer.
 
-Pending at this report revision: final live-panel hotkey/freshness/cancellation,
-final context/model/transport timings. Final signed-app capture, live transcription,
-normal-stop artifacts and saved-note persistence have passed.
-The signed app and benchmark helper are awaiting macOS Keychain approval to reuse
-the existing ChatGPT grant. Persistent signing, installation and capture permissions
-are complete. No paid developer
-membership, self-signed root, weakened code requirement or TCC database change
-is used. Neither the approximately one-second text nor two-second useful-sentence
-target has been established.
+Pending at this report revision: signed Release qualification of the registered
+hotkey and production WebSocket, final live timing,
+and exact acoustic speech-end timing. The installed prior build's capture,
+transcription, normal-stop artifacts, notes and saved chat passed. Both app and
+benchmark Keychain grants now work. No paid developer membership, self-signed root,
+weakened code requirement or TCC database change is used. Small benchmarks do not
+establish consistent one-second text or two-second useful-sentence guarantees.
+
+Official transport references: [SIWC preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations),
+[Responses WebSocket mode](https://developers.openai.com/api/docs/guides/websocket-mode).
 
 Apple references: [ad-hoc rebuild permission behavior](https://developer.apple.com/forums/thread/819406),
 [code requirements](https://developer.apple.com/documentation/technotes/tn3127-inside-code-signing-requirements),

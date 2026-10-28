@@ -202,14 +202,19 @@ private actor ChatGPTModelCache {
 /// OAuth-only provider. There is deliberately no API-key, CLI, or paid fallback.
 public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
     public static let shared = ChatGPTLiveClient()
+    public let transport: ChatGPTTransport
     private let session: URLSession
     private let auth: ChatGPTAuth
+    private let webSocket = ChatGPTWebSocketTransport()
     private let cache = ChatGPTModelCache()
     private let redirectDelegate = ChatGPTNoRedirect()
     private let requests = ChatGPTRequestRegistry()
 
-    public init(auth: ChatGPTAuth = .shared, session: URLSession? = nil) {
+    public init(
+        auth: ChatGPTAuth = .shared, session: URLSession? = nil, transport: ChatGPTTransport = .webSocket
+    ) {
         self.auth = auth
+        self.transport = transport
         if let session {
             self.session = session
         } else {
@@ -266,9 +271,29 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         try await cache.save(selection, for: account.id)
     }
 
-    public func warmUp() async throws { _ = try await auth.accessToken(); _ = try await models() }
+    public func warmUp() async throws {
+        guard let account = await auth.activeAccount(), account.planUsageEnabled else {
+            throw ChatGPTLiveError.disconnected
+        }
+        let selected = try await selection()
+        if transport == .webSocket {
+            try await webSocket.warmUp(accountID: account.id, model: selected.model) { [auth] in
+                let token = try await auth.accessToken(expectedAccountID: account.id)
+                guard let current = await auth.activeAccount(), current.id == account.id, current.planUsageEnabled
+                else {
+                    throw CancellationError()
+                }
+                return token
+            }
+        } else {
+            _ = try await auth.accessToken(expectedAccountID: account.id)
+        }
+    }
 
-    public func cancelAll() { requests.cancelAll() }
+    public func cancelAll() {
+        requests.cancelAll()
+        webSocket.cancelAll()
+    }
 
     public func configuration() async throws -> LLMProviderConfig {
         let selection = try await selection()
@@ -286,6 +311,14 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         var body: [String: Any] = ["model": model, "input": input, "store": false, "stream": true]
         if !instructions.isEmpty { body["instructions"] = instructions }
         if let effort { body["reasoning"] = ["effort": effort] }
+        return try JSONSerialization.data(withJSONObject: body)
+    }
+
+    static func webSocketRequestBody(messages: [ChatMessage], model: String, effort: String?) throws -> Data {
+        let data = try requestBody(messages: messages, model: model, effort: effort)
+        var body = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        body.removeValue(forKey: "stream")
+        body["type"] = "response.create"
         return try JSONSerialization.data(withJSONObject: body)
     }
 
@@ -319,6 +352,24 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
                     let selected = try await self.selection()
                     let chosenModel = model ?? selected.model
                     let effort = reasoningEffort ?? (model == nil ? selected.reasoningEffort : nil)
+                    if self.transport == .webSocket {
+                        let payload = try Self.webSocketRequestBody(
+                            messages: messages, model: chosenModel, effort: effort)
+                        try await self.webSocket.run(
+                            accountID: account.id, model: chosenModel,
+                            payload: String(decoding: payload, as: UTF8.self),
+                            authorization: { [auth = self.auth] in
+                                let token = try await auth.accessToken(expectedAccountID: account.id)
+                                guard let current = await auth.activeAccount(), current.id == account.id,
+                                    current.planUsageEnabled
+                                else { throw CancellationError() }
+                                return token
+                            }, yield: { continuation.yield(.text($0)) })
+                        try Task.checkCancellation()
+                        continuation.yield(.completed(LLMStreamTerminal(provider: "chatgpt-plan", model: chosenModel)))
+                        continuation.finish()
+                        return
+                    }
                     let token = try await self.auth.accessToken(expectedAccountID: account.id)
                     try Task.checkCancellation()
                     var request = URLRequest(url: URL(string: "https://api.openai.com/v1/responses")!)
