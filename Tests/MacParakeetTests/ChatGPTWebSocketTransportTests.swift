@@ -10,7 +10,9 @@ private final class SocketFixture: ChatGPTWebSocket, @unchecked Sendable {
     private var sent: [String] = []
     private var cancellations = 0
     init(_ batches: [[Data]?]) { self.batches = batches }
+    var isReusable: Bool { lock.withLock { !closed } }
     var sendCount: Int { lock.withLock { sent.count } }
+    func closeWhileIdle() { lock.withLock { closed = true } }
     var cancelCount: Int { lock.withLock { cancellations } }
     var payloads: [String] { lock.withLock { sent } }
     func send(_ text: String) async throws {
@@ -165,6 +167,26 @@ final class ChatGPTWebSocketTransportTests: XCTestCase {
         XCTAssertEqual(connector.count, 1)
         XCTAssertEqual(socket.payloads, ["first", "second"])
         XCTAssertEqual(values.output, ["First answer.", "Second answer."])
+    }
+
+    func testKnownIdleClosedSocketReconnectsBeforeSendingNextRequest() async throws {
+        let closed = SocketFixture([socketResponse("first")])
+        let fresh = SocketFixture([socketResponse("second", "Fresh answer.")])
+        let connector = SocketConnectorFixture([closed, fresh])
+        let transport = ChatGPTWebSocketTransport(connector: connector)
+        let values = SocketTestValues()
+        try await transport.run(
+            accountID: "a", model: "m", payload: "first", authorization: { "fixture" }, yield: { _ in })
+        closed.closeWhileIdle()
+        try await transport.run(
+            accountID: "a", model: "m", payload: "second", authorization: { "fixture" },
+            yield: { values.append($0) })
+        XCTAssertEqual(connector.count, 2)
+        XCTAssertEqual(
+            closed.payloads, ["first"], "A known closed idle socket must never receive the next model request")
+        XCTAssertEqual(fresh.payloads, ["second"])
+        XCTAssertEqual(values.output, ["Fresh answer."])
+        XCTAssertGreaterThan(closed.cancelCount, 0)
     }
 
     func testCancellingQueuedTurnDoesNotCloseActiveTurn() async throws {

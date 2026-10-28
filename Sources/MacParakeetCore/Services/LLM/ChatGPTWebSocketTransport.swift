@@ -9,6 +9,7 @@ public enum ChatGPTTransport: String, Codable, Sendable, CaseIterable {
 
 /// Small injectable boundary: tests never open a socket or read credentials.
 protocol ChatGPTWebSocket: Sendable {
+    var isReusable: Bool { get }
     func send(_ text: String) async throws
     func receive() async throws -> Data
     func cancel()
@@ -21,6 +22,7 @@ protocol ChatGPTWebSocketConnecting: Sendable {
 private final class NativeChatGPTWebSocket: ChatGPTWebSocket, Sendable {
     let task: URLSessionWebSocketTask
     init(_ task: URLSessionWebSocketTask) { self.task = task }
+    var isReusable: Bool { task.state == .running && task.closeCode == .invalid }
     func send(_ text: String) async throws {
         do { try await task.send(.string(text)) } catch {
             throw ChatGPTWebSocketFailure.map(error, response: task.response)
@@ -237,6 +239,7 @@ actor ChatGPTWebSocketTransport {
         let date = now()
         if let connection, connection.accountID == accountID, connection.model == model,
             connection.tokenFingerprint == fingerprint, connection.reuseUntil > date,
+            connection.socket.isReusable,
             control.isCurrent(connectionID: connection.id, generation: connection.generation)
         {
             return connection

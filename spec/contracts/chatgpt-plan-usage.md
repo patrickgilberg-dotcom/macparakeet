@@ -57,7 +57,9 @@ lanes with HTTP 400 while the otherwise equivalent unnamed control completed.
 General Responses multiplexing documentation does not establish that optional
 field's compatibility with this route. Each turn obtains current credentials after acquiring that lease. Reuse
 requires the same account, model, access-token fingerprint, and live connection
-generation. Token rotation, the conservative token-expiry reuse margin, or a
+generation, plus a native task that is still running with no close code. A known
+closed idle socket is retired before sending the next request, without replaying
+a request against it. Token rotation, the conservative token-expiry reuse margin, or a
 55-minute connection age causes a new handshake before the next request.
 Cancellation, account change, deadline, incomplete output, and other failures
 close the owned socket; old readers cannot deliver into a new lease. Cancelling
