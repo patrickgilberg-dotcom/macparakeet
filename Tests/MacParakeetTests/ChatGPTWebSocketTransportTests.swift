@@ -141,6 +141,39 @@ final class ChatGPTWebSocketTransportTests: XCTestCase {
         XCTAssertTrue(fulfilled)
     }
 
+    func testPingSettlementSuccessIgnoresLateErrorAndDuplicateSuccess() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let settlement = ChatGPTPingSettlement(continuation)
+            settlement.settle(error: nil)
+            settlement.settle(error: URLError(.networkConnectionLost))
+            settlement.settle(error: nil)
+        }
+    }
+
+    func testPingSettlementFirstErrorWinsOverDuplicateErrorsAndSuccess() async {
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let settlement = ChatGPTPingSettlement(continuation)
+                settlement.settle(error: URLError(.networkConnectionLost))
+                settlement.settle(error: URLError(.cancelled))
+                settlement.settle(error: nil)
+            }
+            XCTFail("The first callback error must remain the result")
+        } catch { XCTAssertEqual((error as? URLError)?.code, .networkConnectionLost) }
+    }
+
+    func testPingSettlementConcurrentCallbacksResumeExactlyOnce() async {
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                let settlement = ChatGPTPingSettlement(continuation)
+                DispatchQueue.concurrentPerform(iterations: 64) { _ in
+                    settlement.settle(error: URLError(.networkConnectionLost))
+                }
+            }
+            XCTFail("Concurrent callbacks all reported failure")
+        } catch { XCTAssertEqual((error as? URLError)?.code, .networkConnectionLost) }
+    }
+
     func testWireBodyKeepsFullHistoryAndOmitsUnsupportedFields() throws {
         let messages = [
             ChatMessage(role: .system, content: "Keep the approval condition."),

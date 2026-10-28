@@ -20,6 +20,23 @@ protocol ChatGPTWebSocketConnecting: Sendable {
     func connect(token: String) throws -> any ChatGPTWebSocket
 }
 
+/// Native pong callbacks can be delivered again while a task is closing. Take
+/// the continuation once under the mutex, then resume outside the critical section.
+final class ChatGPTPingSettlement: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+    init(_ continuation: CheckedContinuation<Void, Error>) { self.continuation = continuation }
+    func settle(error: Error?) {
+        let pending = lock.withLock {
+            let pending = continuation
+            continuation = nil
+            return pending
+        }
+        guard let pending else { return }
+        if let error { pending.resume(throwing: error) } else { pending.resume() }
+    }
+}
+
 private final class NativeChatGPTWebSocket: ChatGPTWebSocket, Sendable {
     let task: URLSessionWebSocketTask
     init(_ task: URLSessionWebSocketTask) { self.task = task }
@@ -27,9 +44,8 @@ private final class NativeChatGPTWebSocket: ChatGPTWebSocket, Sendable {
     func ping() async throws {
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                task.sendPing { error in
-                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
-                }
+                let settlement = ChatGPTPingSettlement(continuation)
+                task.sendPing { error in settlement.settle(error: error) }
             }
         } catch { throw ChatGPTWebSocketFailure.map(error, response: task.response) }
     }
