@@ -54,6 +54,44 @@ struct ChatGPTBenchmarkCommand {
             try await WebSocketProbe.run(
                 model: stringOption("--model", in: arguments) ?? selected.model,
                 trials: intOption("--trials", in: arguments) ?? 3)
+        case "idlecheck":
+            guard transport == .webSocket else {
+                throw CommandError.message("Idle qualification uses --transport websocket.")
+            }
+            let secondsValue = stringOption("--seconds", in: arguments)
+            guard !arguments.contains("--seconds") || secondsValue != nil,
+                let seconds = Int(secondsValue ?? "180"), (30...600).contains(seconds)
+            else { throw CommandError.message("Use --seconds with a whole number from 30 through 600.") }
+            let outputPath = stringOption("--output", in: arguments) ?? "/tmp/macparakeet-live-idlecheck.json"
+            let selected = try await client.selection()
+            var warmupCompleted = false
+            var trials: [ChatGPTBenchmarkTrial] = []
+            do {
+                try await client.warmUp()
+                warmupCompleted = true
+                print(
+                    "Production WebSocket warm-up started without a model request. Waiting \(seconds) seconds unused.")
+                try await Task.sleep(for: .seconds(seconds))
+                try Task.checkCancellation()
+                let trial = await ChatGPTLiveBenchmark.trial(
+                    client: client, model: selected.model, effort: selected.reasoningEffort,
+                    condition: "unused-warmup-idle-\(seconds)s")
+                trials = [trial]
+                printTrial(trial)
+                guard trial.completed, !trial.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    throw CommandError.message(
+                        trial.error ?? "The first request after unused warm-up did not complete.")
+                }
+                try saveIdleCheck(
+                    trials, seconds: seconds, selection: selected, warmupCompleted: warmupCompleted,
+                    error: nil, to: outputPath)
+                print("Idle qualification completed. Report: \(outputPath)")
+            } catch {
+                try saveIdleCheck(
+                    trials, seconds: seconds, selection: selected, warmupCompleted: warmupCompleted,
+                    error: error.localizedDescription, to: outputPath)
+                throw error
+            }
         case "status":
             if let account = await auth.activeAccount() {
                 print(
@@ -136,7 +174,7 @@ struct ChatGPTBenchmarkCommand {
         case "disconnect": try await auth.disconnect(); print("Disconnected locally.")
         default:
             print(
-                "chatgpt-live-benchmark login|unlock|status|models|benchmark|websocket|disconnect\nbenchmark options: --transport websocket|http-sse --trials 5 --models 3 [--model slug] --output /absolute/report.json\nwebsocket options: [--model selected-slug] --trials 5 (isolated socket versus explicit HTTP comparison)"
+                "chatgpt-live-benchmark login|unlock|status|models|benchmark|websocket|idlecheck|disconnect\nbenchmark options: --transport websocket|http-sse --trials 5 --models 3 [--model slug] --output /absolute/report.json\nwebsocket options: [--model selected-slug] --trials 5 (isolated socket versus explicit HTTP comparison)\nidlecheck options: --seconds 180 (30–600) --output /absolute/report.json; production warmUp, unused idle, then one synthetic request"
             )
         }
     }
@@ -146,6 +184,25 @@ struct ChatGPTBenchmarkCommand {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         try encoder.encode(ChatGPTLiveBenchmark.report(trials)).write(to: URL(fileURLWithPath: path), options: .atomic)
+    }
+
+    static func saveIdleCheck(
+        _ trials: [ChatGPTBenchmarkTrial], seconds: Int, selection: ChatGPTModelSelection,
+        warmupCompleted: Bool, error: String?, to path: String
+    ) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(ChatGPTLiveBenchmark.report(trials))
+        var report = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        var qualification: [String: Any] = [
+            "idleSeconds": seconds, "model": selection.model,
+            "reasoningEffort": selection.reasoningEffort ?? "provider-default",
+            "warmupCallCompleted": warmupCompleted,
+        ]
+        if let error { qualification["error"] = error }
+        report["idleCheck"] = qualification
+        try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
+            .write(to: URL(fileURLWithPath: path), options: .atomic)
     }
 
     static func printTrial(_ trial: ChatGPTBenchmarkTrial) {

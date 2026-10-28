@@ -52,18 +52,25 @@ struct ChatGPTConnectionView: View {
                     .disabled(busy)
                 }
                 if !models.isEmpty {
-                    Picker("Answer model", selection: $selectedModel) {
+                    Picker(
+                        "Answer model",
+                        selection: Binding(
+                            get: { selectedModel },
+                            set: { model in
+                                guard !model.isEmpty, model != selectedModel else { return }
+                                selectedModel = model
+                                // Persist only an explicit Picker edit. Reloads
+                                // update local state without writing preferences.
+                                perform {
+                                    let previous = try await ChatGPTLiveClient.shared.selection()
+                                    guard previous.model != model else { return }
+                                    try await ChatGPTLiveClient.shared.selectModel(ChatGPTModelSelection(model: model))
+                                }
+                            })
+                    ) {
                         ForEach(models) { Text($0.displayName).tag($0.slug) }
                     }
                     .disabled(busy)
-                    .onChange(of: selectedModel) { _, model in
-                        guard !model.isEmpty else { return }
-                        perform {
-                            let previous = try await ChatGPTLiveClient.shared.selection()
-                            guard previous.model != model else { return }
-                            try await ChatGPTLiveClient.shared.selectModel(ChatGPTModelSelection(model: model))
-                        }
-                    }
                 }
             }
             HStack {

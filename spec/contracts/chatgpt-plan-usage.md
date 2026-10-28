@@ -59,7 +59,12 @@ field's compatibility with this route. Each turn obtains current credentials aft
 requires the same account, model, access-token fingerprint, and live connection
 generation, plus a native task that is still running with no close code. A known
 closed idle socket is retired before sending the next request, without replaying
-a request against it. Token rotation, the conservative token-expiry reuse margin, or a
+a request against it. A cached socket also receives a WebSocket ping with a
+two-second deadline before model input is sent. If that control check fails or
+times out, the still-owned lease retires the old socket, rechecks authorization,
+and opens one fresh socket before its single model request. Cancellation or an
+invalidated account epoch prevents this replacement. A failure after sending
+`response.create` is never retried or replayed. Token rotation, the conservative token-expiry reuse margin, or a
 55-minute connection age causes a new handshake before the next request.
 Cancellation, account change, deadline, incomplete output, and other failures
 close the owned socket; old readers cannot deliver into a new lease. Cancelling
@@ -95,6 +100,15 @@ records its transport; the isolated `websocket --trials 5` experiment also
 constructs its HTTP lane explicitly. Reports cannot infer transport from the
 application default. The isolated experiment excludes its first socket handshake
 from warm groups and always sends WebSocket before paired HTTP, an ordering caveat.
+
+`idlecheck --seconds 180 --output /tmp/macparakeet-live-idlecheck.json` qualifies
+an unused warm-up socket in one benchmark process. The idle interval is bounded
+to 30–600 seconds. It uses the selected model/effort, calls production `warmUp()`
+without a model request, waits, then sends exactly one synthetic recent-context
+trial. A failed or empty response exits nonzero without retry. The standard report
+retains its trials plus `idleCheck` metadata, including a safe failure message if
+warm-up or the trial fails. This command is a qualification harness, never the
+per-question application transport; no meeting data is read or sent.
 
 Reports include model, transport, effort, OS, processor count, first text, punctuation-based
 first sentence, completion, outputs, failures, median and nearest-rank p95. The

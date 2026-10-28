@@ -10,6 +10,7 @@ public enum ChatGPTTransport: String, Codable, Sendable, CaseIterable {
 /// Small injectable boundary: tests never open a socket or read credentials.
 protocol ChatGPTWebSocket: Sendable {
     var isReusable: Bool { get }
+    func ping() async throws
     func send(_ text: String) async throws
     func receive() async throws -> Data
     func cancel()
@@ -23,6 +24,15 @@ private final class NativeChatGPTWebSocket: ChatGPTWebSocket, Sendable {
     let task: URLSessionWebSocketTask
     init(_ task: URLSessionWebSocketTask) { self.task = task }
     var isReusable: Bool { task.state == .running && task.closeCode == .invalid }
+    func ping() async throws {
+        do {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                task.sendPing { error in
+                    if let error { continuation.resume(throwing: error) } else { continuation.resume() }
+                }
+            }
+        } catch { throw ChatGPTWebSocketFailure.map(error, response: task.response) }
+    }
     func send(_ text: String) async throws {
         do { try await task.send(.string(text)) } catch {
             throw ChatGPTWebSocketFailure.map(error, response: task.response)
@@ -145,10 +155,13 @@ actor ChatGPTWebSocketTransport {
     private let connector: any ChatGPTWebSocketConnecting
     private let now: @Sendable () -> Date
     private let deadline: Duration
+    private let healthCheckTimeout: Duration
     private let maximumAge: TimeInterval
     private var connection: Connection?
     private var owner: UUID?
     private var waiters: [(UUID, CheckedContinuation<Void, Error>)] = []
+
+    private enum HealthResult: Sendable { case pong, timedOut }
 
     private struct Connection: Sendable {
         let id: UUID
@@ -163,9 +176,10 @@ actor ChatGPTWebSocketTransport {
     init(
         connector: any ChatGPTWebSocketConnecting = NativeChatGPTWebSocketConnector(),
         now: @escaping @Sendable () -> Date = { Date() }, deadline: Duration = .seconds(90),
-        maximumAge: TimeInterval = 55 * 60
+        maximumAge: TimeInterval = 55 * 60, healthCheckTimeout: Duration = .seconds(2)
     ) {
         self.connector = connector; self.now = now; self.deadline = deadline; self.maximumAge = maximumAge
+        self.healthCheckTimeout = healthCheckTimeout
     }
 
     nonisolated func cancelAll() { control.cancel() }
@@ -187,9 +201,29 @@ actor ChatGPTWebSocketTransport {
             let token = try await authorization()
             try Task.checkCancellation()
             guard generation == control.generation else { throw CancellationError() }
-            let current = try prepare(accountID: accountID, model: model, token: token, generation: generation)
+            let cachedID = connection?.id
+            var current = try prepare(accountID: accountID, model: model, token: token, generation: generation)
             try control.claim(connectionID: current.id, requestID: requestID, generation: generation)
             do {
+                if current.id == cachedID {
+                    do {
+                        try await checkLiveness(current, requestID: requestID)
+                    } catch {
+                        // Only a control-frame failure is recoverable here. No
+                        // response.create has been attempted on this request.
+                        try Task.checkCancellation()
+                        try control.check(
+                            connectionID: current.id, requestID: requestID, generation: generation)
+                        current.socket.cancel()
+                        connection = nil
+                        let replacementToken = try await authorization()
+                        try Task.checkCancellation()
+                        guard generation == control.generation else { throw CancellationError() }
+                        current = try prepare(
+                            accountID: accountID, model: model, token: replacementToken, generation: generation)
+                        try control.claim(connectionID: current.id, requestID: requestID, generation: generation)
+                    }
+                }
                 try Task.checkCancellation()
                 try await receiveResponse(current, requestID: requestID, payload: payload, yield: yield)
             } catch {
@@ -262,6 +296,37 @@ actor ChatGPTWebSocketTransport {
             tokenFingerprint: fingerprint, reuseUntil: reuseUntil, socket: socket)
         connection = result
         return result
+    }
+
+    private func checkLiveness(_ connection: Connection, requestID: UUID) async throws {
+        let control = control
+        let timeout = healthCheckTimeout
+        try await withThrowingTaskGroup(of: HealthResult.self) { group in
+            group.addTask {
+                try Task.checkCancellation()
+                try control.check(
+                    connectionID: connection.id, requestID: requestID, generation: connection.generation)
+                try await connection.socket.ping()
+                try Task.checkCancellation()
+                try control.check(
+                    connectionID: connection.id, requestID: requestID, generation: connection.generation)
+                return .pong
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                return .timedOut
+            }
+            defer { group.cancelAll() }
+            guard let result = try await group.next() else { throw ChatGPTLiveError.interrupted }
+            if case .timedOut = result {
+                try control.check(
+                    connectionID: connection.id, requestID: requestID, generation: connection.generation)
+                // Only the parent's selected timeout may close the captured old
+                // socket. An already-awake losing timer has no side effects.
+                connection.socket.cancel()
+                throw ChatGPTLiveError.failed("websocket_health_check_timed_out")
+            }
+        }
     }
 
     private func receiveResponse(

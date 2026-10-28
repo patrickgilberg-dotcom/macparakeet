@@ -6,15 +6,38 @@ private final class SocketFixture: ChatGPTWebSocket, @unchecked Sendable {
     private let batches: [[Data]?]
     private var queue: [Data] = []
     private var receiver: CheckedContinuation<Data, Error>?
+    private var pong: CheckedContinuation<Void, Error>?
+    private var pingCalls = 0
+    private var failPing = false
+    private var holdPing = false
     private var closed = false
     private var sent: [String] = []
     private var cancellations = 0
     init(_ batches: [[Data]?]) { self.batches = batches }
     var isReusable: Bool { lock.withLock { !closed } }
     var sendCount: Int { lock.withLock { sent.count } }
+    var pingCount: Int { lock.withLock { pingCalls } }
+    func simulateHalfOpen() { lock.withLock { failPing = true } }
+    func holdPongs() { lock.withLock { holdPing = true } }
     func closeWhileIdle() { lock.withLock { closed = true } }
     var cancelCount: Int { lock.withLock { cancellations } }
     var payloads: [String] { lock.withLock { sent } }
+    func ping() async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            let immediate: Result<Void, Error>? = lock.withLock {
+                pingCalls += 1
+                if closed { return .failure(CancellationError()) }
+                if failPing { return .failure(URLError(.networkConnectionLost)) }
+                if holdPing {
+                    precondition(pong == nil, "Overlapping pings crossed the socket lease")
+                    pong = continuation
+                    return nil
+                }
+                return .success(())
+            }
+            if let immediate { continuation.resume(with: immediate) }
+        }
+    }
     func send(_ text: String) async throws {
         let batch: [Data]? = try lock.withLock {
             guard !closed else { throw CancellationError() }
@@ -49,9 +72,10 @@ private final class SocketFixture: ChatGPTWebSocket, @unchecked Sendable {
     func cancel() {
         let pending = lock.withLock {
             cancellations += 1; closed = true; queue.removeAll()
-            let pending = receiver; receiver = nil; return pending
+            let pending = (receiver, pong); receiver = nil; pong = nil; return pending
         }
-        pending?.resume(throwing: CancellationError())
+        pending.0?.resume(throwing: CancellationError())
+        pending.1?.resume(throwing: CancellationError())
     }
 }
 
@@ -161,11 +185,13 @@ final class ChatGPTWebSocketTransportTests: XCTestCase {
         }
         try await Task.sleep(for: .milliseconds(20))
         XCTAssertEqual(socket.sendCount, 1)
+        XCTAssertEqual(socket.pingCount, 0, "A queued request cannot ping while the active response owns the socket")
         XCTAssertEqual(values.authorizationCount, 1, "Queued turns refresh credentials only after acquiring the lease")
         socket.push(socketResponse("first", "First answer."))
         try await first.value; try await second.value
         XCTAssertEqual(connector.count, 1)
         XCTAssertEqual(socket.payloads, ["first", "second"])
+        XCTAssertEqual(socket.pingCount, 1, "The completed socket is checked before its next model request")
         XCTAssertEqual(values.output, ["First answer.", "Second answer."])
     }
 
@@ -187,6 +213,114 @@ final class ChatGPTWebSocketTransportTests: XCTestCase {
         XCTAssertEqual(fresh.payloads, ["second"])
         XCTAssertEqual(values.output, ["Fresh answer."])
         XCTAssertGreaterThan(closed.cancelCount, 0)
+    }
+
+    func testHalfOpenWarmupSocketIsReplacedBeforeAnyModelSend() async throws {
+        let stale = SocketFixture([])
+        stale.simulateHalfOpen()
+        let fresh = SocketFixture([socketResponse("fresh", "Fresh answer.")])
+        let connector = SocketConnectorFixture([stale, fresh])
+        let transport = ChatGPTWebSocketTransport(connector: connector)
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        XCTAssertTrue(stale.isReusable, "Foundation state alone can miss a half-open socket")
+        XCTAssertEqual(stale.pingCount, 0, "warmUp opens an unused socket without model input")
+        try await transport.run(
+            accountID: "a", model: "m", payload: "only-model-request", authorization: { "fixture" }, yield: { _ in })
+        XCTAssertEqual(stale.pingCount, 1)
+        XCTAssertEqual(stale.sendCount, 0)
+        XCTAssertEqual(fresh.payloads, ["only-model-request"])
+        XCTAssertEqual(connector.count, 2)
+    }
+
+    func testPingTimeoutReplacesStaleSocketBeforeModelSend() async throws {
+        let stale = SocketFixture([])
+        stale.holdPongs()
+        let fresh = SocketFixture([socketResponse("fresh")])
+        let connector = SocketConnectorFixture([stale, fresh])
+        let transport = ChatGPTWebSocketTransport(connector: connector, healthCheckTimeout: .milliseconds(30))
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        try await transport.run(
+            accountID: "a", model: "m", payload: "only-model-request", authorization: { "fixture" }, yield: { _ in })
+        XCTAssertEqual(stale.sendCount, 0)
+        XCTAssertGreaterThan(stale.cancelCount, 0)
+        XCTAssertEqual(fresh.sendCount, 1)
+        XCTAssertEqual(connector.count, 2)
+    }
+
+    func testHealthyPongRetiresHealthDeadlineBeforeLongerModelResponse() async throws {
+        let socket = SocketFixture([nil])
+        let connector = SocketConnectorFixture([socket])
+        let transport = ChatGPTWebSocketTransport(connector: connector, healthCheckTimeout: .milliseconds(20))
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        let task = Task {
+            try await transport.run(
+                accountID: "a", model: "m", payload: "only-model-request", authorization: { "fixture" }, yield: { _ in }
+            )
+        }
+        try await waitUntil { socket.sendCount == 1 }
+        try await Task.sleep(for: .milliseconds(60))
+        XCTAssertEqual(socket.cancelCount, 0, "A losing health timer must not close a socket during inference")
+        socket.push(socketResponse("completed"))
+        try await task.value
+        XCTAssertEqual(socket.pingCount, 1)
+        XCTAssertEqual(connector.count, 1)
+    }
+
+    func testCancellationDuringPingCannotReconnectOrSendModelInput() async throws {
+        let stale = SocketFixture([])
+        stale.holdPongs()
+        let connector = SocketConnectorFixture([stale, SocketFixture([socketResponse("unused")])])
+        let transport = ChatGPTWebSocketTransport(connector: connector)
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        let task = Task {
+            try await transport.run(
+                accountID: "a", model: "m", payload: "never-send", authorization: { "fixture" }, yield: { _ in })
+        }
+        try await waitUntil { stale.pingCount == 1 }
+        task.cancel()
+        do { try await task.value; XCTFail("Cancelled ping must not recover") } catch {}
+        XCTAssertEqual(stale.sendCount, 0)
+        XCTAssertEqual(connector.count, 1)
+        XCTAssertGreaterThan(stale.cancelCount, 0)
+    }
+
+    func testAccountInvalidationDuringPingCannotReconnectOrSendModelInput() async throws {
+        let stale = SocketFixture([])
+        stale.holdPongs()
+        let connector = SocketConnectorFixture([stale, SocketFixture([socketResponse("unused")])])
+        let transport = ChatGPTWebSocketTransport(connector: connector)
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        let task = Task {
+            try await transport.run(
+                accountID: "a", model: "m", payload: "never-send", authorization: { "fixture" }, yield: { _ in })
+        }
+        try await waitUntil { stale.pingCount == 1 }
+        transport.cancelAll()
+        do { try await task.value; XCTFail("An invalidated epoch must not recover") } catch {}
+        XCTAssertEqual(stale.sendCount, 0)
+        XCTAssertEqual(connector.count, 1)
+    }
+
+    func testFailureAfterSuccessfulPingNeverReplaysModelRequest() async throws {
+        let socket = SocketFixture([
+            [
+                socketEvent("response.created", ["response": ["id": "first"]]),
+                socketEvent("response.output_text.delta", ["delta": "Partial"]),
+                socketEvent("response.incomplete"),
+            ]
+        ])
+        let connector = SocketConnectorFixture([socket, SocketFixture([socketResponse("must-not-run")])])
+        let transport = ChatGPTWebSocketTransport(connector: connector)
+        try await transport.warmUp(accountID: "a", model: "m", authorization: { "fixture" })
+        do {
+            try await transport.run(
+                accountID: "a", model: "m", payload: "only-model-request", authorization: { "fixture" }, yield: { _ in }
+            )
+            XCTFail("An incomplete inference must fail")
+        } catch { XCTAssertEqual(error as? ChatGPTLiveError, .incomplete) }
+        XCTAssertEqual(socket.pingCount, 1)
+        XCTAssertEqual(socket.sendCount, 1)
+        XCTAssertEqual(connector.count, 1, "Only pre-send control failures may replace a socket")
     }
 
     func testCancellingQueuedTurnDoesNotCloseActiveTurn() async throws {
