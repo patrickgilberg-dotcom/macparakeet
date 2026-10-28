@@ -1328,6 +1328,17 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.testHook_state, .recording)
 
         let chatViewModel = try XCTUnwrap(coordinator.testHook_panelChatViewModel)
+        // Live Ask owns its direct provider independently of the optional LLM
+        // service. Keep this persistence journey entirely on a simulated stream.
+        chatViewModel.configureDirectLiveAnswers(
+            prepareTranscript: {},
+            stream: { _ in
+                AsyncThrowingStream { continuation in
+                    continuation.yield("Answer saved")
+                    continuation.finish()
+                }
+            }
+        )
         chatViewModel.inputText = "What did I miss?"
         chatViewModel.sendMessage()
         for _ in 0..<20 where chatViewModel.isStreaming {
