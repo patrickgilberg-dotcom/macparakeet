@@ -69,6 +69,65 @@ final class MeetingRecordingRecoveryServiceTests: XCTestCase {
         XCTAssertNil(metadata.captureReport)
     }
 
+    func testRecoveredAssociationHookReceivesRecordingAndCanonicalRowBeforeLockSettlement() async throws {
+        let probe = RecoveryAssociationHookProbe()
+        let fixture = try makeRecoverableSession(lockState: .awaitingTranscription)
+        // The callback has a separate lifetime from this XCTest instance.
+        let canonicalRepository = transcriptionRepo!
+        let recoveryLocks = lockStore!
+        let folderURL = fixture.folderURL
+        recoveryService = MeetingRecordingRecoveryService(
+            meetingsRoot: tempRoot, lockFileStore: recoveryLocks,
+            transcriptionService: transcriptionService, transcriptionRepo: canonicalRepository,
+            meetingArtifactStore: MeetingArtifactStore(), promptResultRepo: promptResultRepo,
+            audioConverter: audioConverter,
+            onRecovered: { recordingID, transcriptionID in
+                try probe.record(
+                    recordingID: recordingID, transcriptionID: transcriptionID,
+                    canonicalRowCompleted: canonicalRepository.fetch(id: transcriptionID)?.status == .completed,
+                    recoveryLockPresent: recoveryLocks.read(folderURL: folderURL) != nil)
+            })
+
+        let recovered = try await recoveryService.recover(fixture.lock)
+
+        XCTAssertEqual(probe.calls.map(\.recordingID), [fixture.lock.sessionId])
+        XCTAssertEqual(probe.calls.map(\.transcriptionID), [recovered.id])
+        XCTAssertEqual(probe.calls.first?.canonicalRowCompleted, true)
+        XCTAssertEqual(probe.calls.first?.recoveryLockPresent, true)
+        XCTAssertEqual(try meetingRows(in: fixture.folderURL).map(\.id), [recovered.id])
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
+    func testRecoveredAssociationHookFailureKeepsCanonicalRowAndLockForRetry() async throws {
+        let probe = RecoveryAssociationHookProbe(failuresRemaining: 1)
+        try resetRecoveryFixture(onRecovered: { recordingID, transcriptionID in
+            try probe.record(recordingID: recordingID, transcriptionID: transcriptionID)
+        })
+        let fixture = try makeRecoverableSession(lockState: .awaitingTranscription)
+
+        do {
+            _ = try await recoveryService.recover(fixture.lock)
+            XCTFail("A failed project association must leave recovery retryable")
+        } catch RecoveryTestError.associationFailed {
+            // Expected: the canonical row remains durable before association.
+        }
+        let canonical = try XCTUnwrap(try meetingRows(in: fixture.folderURL).first)
+        XCTAssertEqual(canonical.status, .completed)
+        XCTAssertNotNil(try lockStore.read(folderURL: fixture.folderURL))
+        XCTAssertEqual(transcriptionService.recordings.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.folderURL.path))
+        XCTAssertEqual(probe.calls.map(\.transcriptionID), [canonical.id])
+
+        let recovered = try await recoveryService.recover(fixture.lock)
+
+        XCTAssertEqual(recovered.id, canonical.id)
+        XCTAssertEqual(try meetingRows(in: fixture.folderURL).map(\.id), [canonical.id])
+        XCTAssertEqual(transcriptionService.recordings.count, 1, "Association retry must reuse the canonical row")
+        XCTAssertEqual(probe.calls.map(\.recordingID), [fixture.lock.sessionId, fixture.lock.sessionId])
+        XCTAssertEqual(probe.calls.map(\.transcriptionID), [canonical.id, canonical.id])
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
     func testRecoverImportedSessionWithoutRowPreservesHistoricalMetadata() async throws {
         let startedAt = Date(timeIntervalSince1970: 1_650_000_000)
         let retentionStartedAt = Date(timeIntervalSince1970: 1_800_000_000)
@@ -1350,7 +1409,9 @@ final class MeetingRecordingRecoveryServiceTests: XCTestCase {
         case completedRowWithLock
     }
 
-    private func resetRecoveryFixture() throws {
+    private func resetRecoveryFixture(
+        onRecovered: (@Sendable (_ recordingID: UUID, _ transcriptionID: UUID) throws -> Void)? = nil
+    ) throws {
         try? FileManager.default.removeItem(at: tempRoot)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         lockStore = RecoveryRecordingLockFileStore(processChecker: RecoveryProcessChecker(alivePIDs: []))
@@ -1366,7 +1427,8 @@ final class MeetingRecordingRecoveryServiceTests: XCTestCase {
             transcriptionRepo: transcriptionRepo,
             meetingArtifactStore: MeetingArtifactStore(),
             promptResultRepo: promptResultRepo,
-            audioConverter: audioConverter
+            audioConverter: audioConverter,
+            onRecovered: onRecovered
         )
     }
 
@@ -1710,6 +1772,42 @@ private enum RecoveryTestError: Error {
     case lockDeleteFailed
     case mixFailed
     case folderRemovalFailed
+    case associationFailed
+}
+
+private final class RecoveryAssociationHookProbe: @unchecked Sendable {
+    struct Call {
+        let recordingID: UUID
+        let transcriptionID: UUID
+        let canonicalRowCompleted: Bool?
+        let recoveryLockPresent: Bool?
+    }
+
+    private let lock = NSLock()
+    private var recordedCalls: [Call] = []
+    private var failuresRemaining: Int
+
+    init(failuresRemaining: Int = 0) {
+        self.failuresRemaining = failuresRemaining
+    }
+
+    var calls: [Call] { lock.withLock { recordedCalls } }
+
+    func record(
+        recordingID: UUID, transcriptionID: UUID,
+        canonicalRowCompleted: Bool? = nil, recoveryLockPresent: Bool? = nil
+    ) throws {
+        try lock.withLock {
+            recordedCalls.append(
+                Call(
+                    recordingID: recordingID, transcriptionID: transcriptionID,
+                    canonicalRowCompleted: canonicalRowCompleted, recoveryLockPresent: recoveryLockPresent))
+            if failuresRemaining > 0 {
+                failuresRemaining -= 1
+                throw RecoveryTestError.associationFailed
+            }
+        }
+    }
 }
 
 private final class RecoveryRemovalFailingFileManager: FileManager {

@@ -210,6 +210,19 @@ struct LiveAskPaneView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("live-answer-context-progress")
             }
+            if let projectStatus = viewModel.liveProjectContextStatus {
+                Text(projectStatus)
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            if let projectContext = viewModel.lastLiveProjectContext {
+                DisclosureGroup("Previous project meeting used for this answer") {
+                    ScrollView {
+                        Text(projectContext.quotedContext).font(.system(size: 12)).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }.frame(maxHeight: 150)
+                }.font(.caption)
+            }
             if let context = viewModel.lastLiveMeetingMemory {
                 DisclosureGroup("Context for last completed answer", isExpanded: $showingAnswerContext) {
                     VStack(alignment: .leading, spacing: 6) {

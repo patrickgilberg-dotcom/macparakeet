@@ -3,6 +3,12 @@ import MacParakeetCore
 import MacParakeetViewModels
 import OSLog
 
+enum MeetingCalendarStartSelection {
+    case unmatched
+    case cancelled
+    case event(MeetingCalendarSnapshot)
+}
+
 enum MeetingRecordingQuitState: Equatable {
     case starting
     /// Capture has been requested. Source audio may already be on disk even
@@ -85,6 +91,13 @@ final class MeetingRecordingFlowCoordinator {
     private let quickPromptRepo: QuickPromptRepositoryProtocol
     private let configStore: LLMConfigStoreProtocol
     private let cliConfigStore: LocalCLIConfigStore
+    private let preparationRepository: (any MeetingPreparationRepositoryProtocol)?
+    private let projectRepository: (any MeetingProjectRepositoryProtocol)?
+    private var pendingPreparation: MeetingPreparation?
+    private var activePreparedRecordingID: UUID?
+    private var activeProjectID: UUID?
+    private var activeEventPreparation = ""
+    private var activeMeetingStartedAt = Date()
     private let sttManager: (any STTRuntimeManaging)?
     private let speechEngineSelectionProvider: (@Sendable () async -> SpeechEngineSelection?)?
     private let meetingAudioSourceModeProvider: @MainActor @Sendable () -> MeetingAudioSourceMode
@@ -95,6 +108,8 @@ final class MeetingRecordingFlowCoordinator {
     private let shouldShowFloatingMeetingPill: @MainActor @Sendable () -> Bool
     private let frontmostApplicationProvider: any FrontmostApplicationProviding
     private let probableCalendarSnapshotProvider: @MainActor @Sendable () -> MeetingCalendarSnapshot?
+    private let calendarStartSelectionProvider: (@MainActor () -> MeetingCalendarStartSelection)?
+    private let manualProjectIDProvider: @MainActor () -> UUID?
     private var llmService: LLMServiceProtocol?
     private let onMenuBarIconUpdate: (BreathWaveIcon.MenuBarState) -> Void
     private let onTranscriptionReady: (Transcription) -> Void
@@ -165,6 +180,8 @@ final class MeetingRecordingFlowCoordinator {
         quickPromptRepo: QuickPromptRepositoryProtocol,
         configStore: LLMConfigStoreProtocol,
         cliConfigStore: LocalCLIConfigStore = LocalCLIConfigStore(),
+        preparationRepository: (any MeetingPreparationRepositoryProtocol)? = nil,
+        projectRepository: (any MeetingProjectRepositoryProtocol)? = nil,
         sttManager: (any STTRuntimeManaging)? = nil,
         speechEngineSelectionProvider: (@Sendable () async -> SpeechEngineSelection?)? = nil,
         meetingAudioSourceModeProvider: @escaping @MainActor @Sendable () -> MeetingAudioSourceMode = {
@@ -179,6 +196,8 @@ final class MeetingRecordingFlowCoordinator {
         probableCalendarSnapshotProvider: @escaping @MainActor @Sendable () -> MeetingCalendarSnapshot? = {
             nil
         },
+        calendarStartSelectionProvider: (@MainActor () -> MeetingCalendarStartSelection)? = nil,
+        manualProjectIDProvider: @escaping @MainActor () -> UUID? = { nil },
         llmService: LLMServiceProtocol?,
         pillViewModel: MeetingRecordingPillViewModel,
         meetingRecordingSettlement: MeetingRecordingSettlement,
@@ -212,6 +231,8 @@ final class MeetingRecordingFlowCoordinator {
         self.quickPromptRepo = quickPromptRepo
         self.configStore = configStore
         self.cliConfigStore = cliConfigStore
+        self.preparationRepository = preparationRepository
+        self.projectRepository = projectRepository
         self.sttManager = sttManager
         self.speechEngineSelectionProvider = speechEngineSelectionProvider
         self.meetingAudioSourceModeProvider = meetingAudioSourceModeProvider
@@ -222,6 +243,8 @@ final class MeetingRecordingFlowCoordinator {
         self.shouldShowFloatingMeetingPill = shouldShowFloatingMeetingPill
         self.frontmostApplicationProvider = frontmostApplicationProvider
         self.probableCalendarSnapshotProvider = probableCalendarSnapshotProvider
+        self.calendarStartSelectionProvider = calendarStartSelectionProvider
+        self.manualProjectIDProvider = manualProjectIDProvider
         self.llmService = llmService
         self.pillViewModel = pillViewModel
         self.meetingTranscriptionQueue =
@@ -383,7 +406,19 @@ final class MeetingRecordingFlowCoordinator {
     ) -> Int? {
         guard stateMachine.state == .idle else { return nil }
         let resolvedTrigger = pendingTrigger ?? trigger
+        var chosenCalendar: MeetingCalendarSnapshot?
+        if title == nil, resolvedTrigger != .calendarAutoStart, let calendarStartSelectionProvider {
+            switch calendarStartSelectionProvider() {
+            case .cancelled: return nil
+            case .unmatched: break
+            case .event(let snapshot): chosenCalendar = snapshot
+            }
+        }
+        pendingPreparation = nil
         let sourceMode = meetingAudioSourceModeProvider()
+        activePreparedRecordingID = nil
+        activeProjectID = nil
+        activeEventPreparation = ""
         pendingLivePanelPresentation = presentLivePanelWhenReady
         pendingTrigger = resolvedTrigger
         pendingTitle = title
@@ -391,8 +426,9 @@ final class MeetingRecordingFlowCoordinator {
         pendingStartContext = makeStartContext(trigger: resolvedTrigger, sourceMode: sourceMode)
         pendingCalendarEventSnapshot =
             (resolvedTrigger != .calendarAutoStart && title == nil)
-            ? probableCalendarSnapshotProvider()
+            ? (calendarStartSelectionProvider == nil ? probableCalendarSnapshotProvider() : chosenCalendar)
             : nil
+        if title == nil, let snapshot = pendingCalendarEventSnapshot { pendingTitle = snapshot.title }
         currentMeetingOperationContext = ObservabilityOperationContext()
         sendEvent(.startRequested)
         return stateMachine.generation
@@ -501,18 +537,35 @@ final class MeetingRecordingFlowCoordinator {
     /// often back-to-back meetings actually collide in the wild. Returns the
     /// recording generation on success (or `nil` when the state was busy).
     @discardableResult
-    func startFromCalendar(calendarEventSnapshot: MeetingCalendarSnapshot) -> Int? {
+    func startPreparedMeeting(event: CalendarEvent, preparation: MeetingPreparation) -> Int? {
+        guard stateMachine.state == .idle else { return nil }
+        return startFromCalendar(
+            calendarEventSnapshot: MeetingCalendarSnapshot(event: event, confidence: .confirmed),
+            trigger: .manual, presentLivePanelWhenReady: true, preparation: preparation)
+    }
+
+    @discardableResult
+    func startFromCalendar(
+        calendarEventSnapshot: MeetingCalendarSnapshot,
+        trigger: TelemetryMeetingRecordingTrigger = .calendarAutoStart,
+        presentLivePanelWhenReady: Bool = false,
+        preparation: MeetingPreparation? = nil
+    ) -> Int? {
         guard stateMachine.state == .idle else {
             Telemetry.send(.calendarAutoStartFailed(reason: "state_busy"))
             return nil
         }
-        pendingTrigger = .calendarAutoStart
+        activePreparedRecordingID = nil
+        activeProjectID = nil
+        activeEventPreparation = ""
+        pendingPreparation = preparation
+        pendingTrigger = trigger
         pendingTitle = calendarEventSnapshot.title
         pendingCalendarEventSnapshot = calendarEventSnapshot
         let sourceMode = meetingAudioSourceModeProvider()
         pendingAudioSourceMode = sourceMode
-        pendingLivePanelPresentation = false
-        pendingStartContext = makeStartContext(trigger: .calendarAutoStart, sourceMode: sourceMode)
+        pendingLivePanelPresentation = presentLivePanelWhenReady
+        pendingStartContext = makeStartContext(trigger: trigger, sourceMode: sourceMode)
         currentMeetingOperationContext = ObservabilityOperationContext()
         sendEvent(.startRequested)
         return stateMachine.generation
@@ -749,6 +802,7 @@ final class MeetingRecordingFlowCoordinator {
                     },
                     sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() }
                 )
+                configureProjectContext(for: panelVM.chatViewModel)
                 chatGPTPreparationTask?.cancel()
                 let chatViewModel = panelVM.chatViewModel
                 chatGPTPreparationTask = Task.detached(priority: .userInitiated) { [weak chatViewModel] in
@@ -825,6 +879,8 @@ final class MeetingRecordingFlowCoordinator {
             let trigger = pendingTrigger
             let title = pendingTitle
             let calendarEventSnapshot = pendingCalendarEventSnapshot
+            let explicitPreparation = pendingPreparation
+            pendingPreparation = nil
             let meetingTypeID = meetingTypeIDProvider()
             let sourceMode = pendingAudioSourceMode ?? meetingAudioSourceModeProvider()
             let startContext =
@@ -846,12 +902,45 @@ final class MeetingRecordingFlowCoordinator {
             )
             actionTask = Task { @MainActor in
                 do {
+                    var preparation = explicitPreparation
+                    if preparation == nil, let calendarID = calendarEventSnapshot?.calendarIdentifier,
+                        let eventID = calendarEventSnapshot?.providerEventID, let preparationRepository
+                    {
+                        preparation = try await Task.detached {
+                            try preparationRepository.fetch(key: .init(calendarID: calendarID, eventID: eventID))
+                        }.value
+                    }
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    activeMeetingStartedAt = Date()
                     try await meetingRecordingService.startRecording(
                         title: title,
                         sourceMode: sourceMode,
                         startContext: startContext,
                         calendarEventSnapshot: calendarEventSnapshot
                     )
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    let ownedRecordingID = await meetingRecordingService.activeSessionID
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    activeProjectID =
+                        preparation != nil
+                        ? preparation?.projectID
+                        : (trigger == .calendarAutoStart ? nil : manualProjectIDProvider())
+                    activeEventPreparation = preparation?.context ?? ""
+                    activePreparedRecordingID = ownedRecordingID
+                    if let recordingID = activePreparedRecordingID, let preparationRepository {
+                        let association = RecordingMeetingAssociation(
+                            recordingID: recordingID, preparationID: preparation?.id,
+                            projectID: activeProjectID,
+                            titleSnapshot: title ?? calendarEventSnapshot?.title ?? "Meeting",
+                            contextSnapshot: preparation?.context ?? "",
+                            calendarID: calendarEventSnapshot?.calendarIdentifier,
+                            eventID: calendarEventSnapshot?.providerEventID,
+                            scheduledStartAt: calendarEventSnapshot?.scheduledStartAt,
+                            scheduledEndAt: calendarEventSnapshot?.scheduledEndAt,
+                            createdAt: activeMeetingStartedAt)
+                        _ = try await Task.detached { try preparationRepository.saveRecordingAssociation(association) }
+                            .value
+                    }
                     await meetingRecordingService.updateMeetingType(meetingTypeID)
                     guard self.ownsPendingStart(generation: gen) else {
                         self.recordIgnoredStartResult(generation: gen, outcome: "success")
@@ -871,6 +960,7 @@ final class MeetingRecordingFlowCoordinator {
                             return
                         }
                     }
+                    if let chat = self.panelViewModel?.chatViewModel { self.configureProjectContext(for: chat) }
                     let activeSpeechPlan = await meetingRecordingService.activeMeetingSpeechPlan
                     guard self.ownsPendingStart(generation: gen) else {
                         self.recordIgnoredStartResult(generation: gen, outcome: "success")
@@ -1115,6 +1205,12 @@ final class MeetingRecordingFlowCoordinator {
                             sessionID: output.sessionID,
                             startedAt: prepareRowStartedAt
                         )
+                        if let preparationRepository = self.preparationRepository {
+                            let recordingID = output.sessionID
+                            _ = try await Task.detached {
+                                try preparationRepository.bindRecording(recordingID: recordingID, to: prepared.id)
+                            }.value
+                        }
                         self.persistLiveAskConversationIfNeeded(transcriptionID: prepared.id)
                         let enqueueStartedAt = Date()
                         await meetingTranscriptionQueue.enqueue(
@@ -1963,6 +2059,24 @@ final class MeetingRecordingFlowCoordinator {
                 liveTranscriptLagged: false
             )
         }.value
+    }
+
+    private func configureProjectContext(for chat: TranscriptChatViewModel) {
+        guard let projectID = activeProjectID, let repository = projectRepository else {
+            chat.configureLiveProjectContext(eventPreparation: activeEventPreparation)
+            return
+        }
+        let startedAt = activeMeetingStartedAt
+        let recordingID = activePreparedRecordingID
+        chat.configureLiveProjectContext(eventPreparation: activeEventPreparation) {
+            try await Task.detached { () throws -> LiveProjectMeetingSource? in
+                guard let project = try repository.fetch(id: projectID) else { return nil }
+                let previous = try repository.latestPreviousMeeting(
+                    projectID: projectID, before: startedAt,
+                    excludingRecordingID: recordingID, excludingTranscriptionID: nil)
+                return LiveProjectMeetingSource(project: project, previous: previous)
+            }.value
+        }
     }
 
     private func persistLiveAskConversationIfNeeded(transcriptionID: UUID) {

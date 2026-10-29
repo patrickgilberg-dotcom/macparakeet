@@ -182,12 +182,16 @@ final class LiveAnswerTests: XCTestCase {
                 }
             })
         vm.helpMeAnswer()
-        await Task.yield()
+        let preparingDeadline = ContinuousClock.now.advanced(by: .seconds(1))
+        while preparationCount == 0, ContinuousClock.now < preparingDeadline {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        XCTAssertEqual(preparationCount, 1)
         vm.helpMeAnswer()
         try await waitUntilSettled(vm)
         let requests = await capture.requests
         XCTAssertEqual(requests.count, 1)
-        XCTAssertTrue(requests[0].last!.content.contains("Latest revision"))
+        XCTAssertTrue(try XCTUnwrap(requests.first?.last).content.contains("Latest revision"))
         XCTAssertEqual(vm.messages.filter { $0.role == .assistant }.map(\.content), ["Here is the current answer."])
         XCTAssertEqual(vm.liveAnswerTiming?.outcome, "completed")
     }

@@ -47,6 +47,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
     private let lockFileStore: any MeetingRecordingLockFileStoring & MeetingFinalizationOwnershipClaiming
     private let transcriptionService: TranscriptionServiceProtocol
     private let transcriptionRepo: TranscriptionRepositoryProtocol
+    private let onRecovered: (@Sendable (UUID, UUID) throws -> Void)?
     private let meetingArtifactStore: MeetingArtifactStoring
     private let promptResultRepo: PromptResultRepositoryProtocol
     private let settlement: MeetingRecordingSettlement
@@ -72,7 +73,8 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         promptResultRepo: PromptResultRepositoryProtocol,
         audioConverter: AudioFileConverting = AudioFileConverter(),
         fileManager: FileManager = .default,
-        echoSuppressionConfiguration: MeetingEchoSuppressionConfiguration = .fromEnvironment()
+        echoSuppressionConfiguration: MeetingEchoSuppressionConfiguration = .fromEnvironment(),
+        onRecovered: (@Sendable (UUID, UUID) throws -> Void)? = nil
     ) {
         self.init(
             meetingsRoot: meetingsRoot,
@@ -86,7 +88,8 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
             micConditionerFactory: {
                 MeetingEchoSuppressionFactory.makeConditioner(
                     configuration: echoSuppressionConfiguration)
-            }
+            },
+            onRecovered: onRecovered
         )
     }
 
@@ -106,12 +109,14 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         recordingDurationProvider: @escaping @Sendable ([TimeInterval], Date) -> TimeInterval = {
             sourceDurations, startedAt in
             sourceDurations.max() ?? max(0, Date().timeIntervalSince(startedAt))
-        }
+        },
+        onRecovered: (@Sendable (UUID, UUID) throws -> Void)? = nil
     ) {
         self.meetingsRoot = meetingsRoot
         self.lockFileStore = lockFileStore
         self.transcriptionService = transcriptionService
         self.transcriptionRepo = transcriptionRepo
+        self.onRecovered = onRecovered
         self.meetingArtifactStore = meetingArtifactStore
         self.promptResultRepo = promptResultRepo
         self.settlement =
@@ -435,6 +440,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         let ownershipLease = try lockFileStore.claimFinalizationOwnership(folderURL: folderURL)
         do {
             if let completed = try existingCompletedTranscription(in: folderURL) {
+                try onRecovered?(lock.sessionId, completed.id)
                 try await settlement.settleCompletedTranscription(
                     folderURL: folderURL,
                     transcriptionID: completed.id,
@@ -650,6 +656,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         if lock.state == .awaitingTranscription {
             // A completed row is canonical, including explicit nil/empty notes.
             // A retained lock can contain older notes and must not restore them.
+            try onRecovered?(lock.sessionId, transcription.id)
             try await refreshArtifacts(for: transcription)
             try await settlement.settleCompletedTranscription(
                 folderURL: folderURL,
@@ -672,6 +679,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         recovered.recoveredFromCrash = true
         recovered.updatedAt = Date()
         try transcriptionRepo.save(recovered)
+        try onRecovered?(lock.sessionId, recovered.id)
         try await refreshArtifacts(for: recovered)
         try await settlement.settleCompletedTranscription(
             folderURL: folderURL,

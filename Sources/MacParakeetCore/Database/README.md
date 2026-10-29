@@ -32,6 +32,8 @@ processes own their connections.
   - `PromptLabelPolicyRepository.swift` — active label availability and fallback policies.
   - `MeetingLabelRepository.swift` / `TranscriptionMeetingLabelRepository.swift` — reusable labels across sources.
   - `MeetingTypeRepository.swift` / `PromptMeetingPolicyRepository.swift` — retained legacy classification compatibility.
+  - `MeetingProjectRepository.swift` — virtual project folders, transactional single-folder membership and latest-prior-meeting read models.
+  - `MeetingPreparationRepository.swift` — user-authored Google-occurrence preparation and frozen recording associations.
   - `PromptVersionRepository.swift` — immutable prompt request versions.
   - `PromptResultRepository.swift` — saved prompt outputs.
   - `QuickPromptRepository.swift` — quick-prompt entries (Ask tab).
@@ -154,6 +156,25 @@ diarization timing JSON as `NULL`; on a real library that JSON is over 90% of
 a page's bytes. Transcript text and metadata stay, so search and previews
 are unchanged. Reload a summary row by ID before persisting it, exporting
 it, or opening it in transcript detail.
+
+**Project folders do not move source files.** `meeting_projects` and the separate
+`transcription_project_memberships` table preserve all transcription columns and
+artifact paths. Bulk assignment validates every source before changing any row
+inside one transaction. Deleting a project unfiles its transcripts; it never
+deletes them. The latest-prior read selects the newest same-project meeting
+before the current start, excluding the active source and split children, before
+examining readiness. A processing, failed, cancelled or empty latest row does not
+fall back to an older completed one. Effective speaker/text corrections and
+their revision/fingerprint are resolved in the same read transaction.
+
+**Preparation is user-authored context, not a calendar cache.** Its unique key is
+the selected Google calendar ID and event/instance ID, never a title or current
+scheduled time. Recording intent is frozen under a native recording UUID before
+a transcription exists. Later `bindRecording` attaches the Library ID and folder
+membership atomically. It is idempotent and never reverses a later explicit user
+folder move. Recording snapshots survive draft deletion and remain independent
+of transcription completion's full-row metadata merge. These repositories do no
+network, artifact refresh, inference or calendar polling.
 
 **Never use raw SQL `WHERE id = ?` with `uuid.uuidString`.**
 GRDB stores UUID values via Codable encoding, which produces a

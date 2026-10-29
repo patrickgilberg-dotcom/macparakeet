@@ -71,11 +71,26 @@ it never selects an API-key provider, CLI, connector, or agent fallback.
   partial request is never automatically replayed. HTTP/SSE remains an explicit
   comparison mode, with no automatic transport or billing fallback. The detailed
   transport contract is [ChatGPT plan usage](chatgpt-plan-usage.md).
-- Preparation is saved in the isolated app preferences and sent only on an
-  explicit answer request, alongside notes. Automatic summary updates send
-  recognized transcript text and prior meeting memory to the approved ChatGPT
-  connection; they do not send raw audio. Rolling memory is held in this live
-  session's process, not imported ChatGPT or Servant memory/tools.
+- Notes/session preparation and the selected event's privately saved preparation
+  accompany explicit answers. Per-event drafts and project membership live in
+  the isolated Live database; they are user-authored records, not a polling cache
+  of Google Calendar. A recording freezes its event context/project association
+  at start and preserves the exact calendar title against automatic renaming.
+  Automatic three-minute updates send only recognized current-meeting text and
+  that meeting's prior rolling memory; they do not absorb project history or send
+  raw audio. Rolling memory remains scoped to this live session's process.
+- A selected project can add one separately labeled historical reference: the
+  actual latest eligible prior project meeting before this recording began.
+  Selection happens before readiness checks. A processing, failed, cancelled or
+  empty latest row stays visibly unavailable; no older completed row substitutes
+  for it. A separate prefetch builds its brief using the same pinned ChatGPT plan
+  client, and Ask cancels/awaits that work, re-reads the source and adds semantic
+  memory plus exact question-relevant excerpts. Source hashes, corrections,
+  notes, membership and deletion changes invalidate that reference and its
+  model-facing history scope. Historical action completion is unverified unless
+  explicit evidence updates it; omission does not establish a missed action.
+  The detailed Google/event/project boundary is
+  [Google Calendar and project context](google-calendar-live.md).
 - Ask shows review progress and the last successful background update or its
   error. The optional context disclosure belongs to the last completed answer:
   it identifies full raw context or shows that answer's earlier summary, plus
@@ -109,3 +124,6 @@ recorded in [the validation report](../../docs/macparakeet-live-validation.md):
 focused and full tests pass, the signed Release app is installed, and the
 synthetic cloud memory/answer flow completed. The native 180-second wall-clock
 cadence and capture-to-answer timing were not re-measured in this revision.
+The subsequent Google Calendar/event-preparation/latest-project extension is
+pending its new integrated tests and installed runtime qualification. Those
+earlier measurements do not establish its additional grounding or latency.

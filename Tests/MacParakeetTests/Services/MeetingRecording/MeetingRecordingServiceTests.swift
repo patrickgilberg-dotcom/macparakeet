@@ -3450,6 +3450,31 @@ final class MeetingRecordingServiceTests: XCTestCase {
         XCTAssertEqual(output.displayName, "Q1 Roadmap Standup")
     }
 
+    func testCalendarTitleIsExactAndProtectedInFinalOutputAndRecoveryLock() async throws {
+        for title in ["Meeting", "  Calendar / Q4 🦜 — ready?!  "] {
+            let captureService = MockMeetingAudioCaptureService()
+            let service = MeetingRecordingService(
+                audioCaptureService: captureService, audioConverter: MockMeetingAudioFileConverter(),
+                sttTranscriber: CountingMeetingSTTClient())
+            let now = Date()
+            let snapshot = MeetingCalendarSnapshot(
+                confidence: .confirmed, eventIdentifier: "synthetic-calendar-event", title: title,
+                scheduledStartAt: now, scheduledEndAt: now.addingTimeInterval(60))
+            try await service.startRecording(title: title, calendarEventSnapshot: snapshot)
+            let buffer = try XCTUnwrap(makeMonoFloatBuffer(frameCount: 80_000, sampleValue: 0.25))
+            await captureService.yield(
+                .microphoneBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 100))))
+            let output = try await service.stopRecording()
+            defer { try? FileManager.default.removeItem(at: output.folderURL) }
+            let lock = try XCTUnwrap(MeetingRecordingLockFileStore().read(folderURL: output.folderURL))
+            XCTAssertEqual(output.displayName, title)
+            XCTAssertEqual(output.titleOverride, title)
+            XCTAssertEqual(lock.titleOverride, title)
+            XCTAssertEqual(lock.state, .awaitingTranscription)
+            XCTAssertEqual(output.calendarEventSnapshot?.title, title)
+        }
+    }
+
     func testStartRecordingFallsBackToDateBasedDisplayNameWhenTitleIsBlank() async throws {
         let captureService = MockMeetingAudioCaptureService()
         let audioConverter = MockMeetingAudioFileConverter()

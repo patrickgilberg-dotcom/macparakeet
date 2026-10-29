@@ -1,7 +1,8 @@
 # Calendar
 
-> Local EventKit integration for meeting reminders and auto-start (ADR-017).
-> No cloud calendar APIs. No SQLite event cache.
+> EventKit calendar integration and the personal Live fork's explicit Google
+> Calendar connection for meeting preparation, reminders and auto-start (ADR-017).
+> No automatic SQLite calendar inventory cache.
 
 ## Entry point
 
@@ -59,6 +60,22 @@ Governing docs:
 **Do not persist a queryable calendar cache.** One `calendarEventSnapshot` on
 a recording at start is allowed (ADR-017 §6 amendment). Attendee names/emails
 never go to telemetry.
+
+The Live fork also persists user-authored preparation and project selections
+for explicitly chosen Google events. These drafts use raw Google calendar and
+occurrence IDs (`CalendarEvent.preparationCalendarID` / `preparationEventID`),
+never titles, current start times, or a recurring series ID. Google provider,
+recurring-series and original-occurrence metadata roundtrip separately. Merely
+seeing an event in a shared calendar does not establish that the user attends;
+the Google provider supplies `isUserMeeting`, and automation applies that policy.
+This narrow draft store is not a mirrored calendar event database.
+
+Pass the selected event's exact title and matching snapshot into recording.
+Explicit title intent survives session, crash lock, output and transcription;
+automatic title generation must not replace it, including titles such as
+`Meeting`. Calendar titles retain Unicode, punctuation and spacing. Folder and
+export filename sanitization remain separate from the visible title, and a
+later ordinary user rename continues to win.
 
 **Candidate filters must not fork between Upcoming and the coordinator.**
 CLI `calendar upcoming` is an inspection list for #609 with **different

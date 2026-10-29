@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import MacParakeetCore
 import MacParakeetViewModels
@@ -12,6 +13,34 @@ private enum MeetingFinalizationRetryBridgeError: LocalizedError {
 
 @MainActor
 final class AppEnvironmentConfigurer {
+    private static func selectCalendarForRecording(events: [CalendarEvent], now: Date = Date())
+        -> MeetingCalendarStartSelection
+    {
+        var candidates: [String: CalendarEvent] = [:]
+        for event in events
+        where !event.isAllDay && event.userStatus != .declined
+            && (event.provider != .google || event.isUserMeeting == true)
+            && event.startTime <= now.addingTimeInterval(300) && event.endTime > now
+        {
+            let identity = (event.externalId ?? event.id) + "|" + String(event.startTime.timeIntervalSince1970)
+            if candidates[identity] == nil { candidates[identity] = event }
+        }
+        let ordered = candidates.values.sorted { $0.startTime < $1.startTime }
+        guard !ordered.isEmpty else { return .unmatched }
+        if ordered.count == 1 { return .event(.init(event: ordered[0], confidence: .probable)) }
+        let choice = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 420, height: 28))
+        choice.addItems(withTitles: ordered.map { $0.title + " · " + ($0.calendarName ?? "Calendar") })
+        let alert = NSAlert()
+        alert.messageText = "Which meeting are you recording?"
+        alert.informativeText =
+            "These calendar events overlap. Choose the meeting whose title and preparation Live should use."
+        alert.accessoryView = choice
+        alert.addButton(withTitle: "Record selected meeting")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return .cancelled }
+        return .event(.init(event: ordered[choice.indexOfSelectedItem], confidence: .confirmed))
+    }
+
     private final class CoordinatorRefs {
         weak var dictation: DictationFlowCoordinator?
         weak var meeting: MeetingRecordingFlowCoordinator?
@@ -159,6 +188,14 @@ final class AppEnvironmentConfigurer {
             promptMeetingPolicyRepository: env.promptMeetingPolicyRepo,
             promptLabelPolicyRepository: env.promptLabelPolicyRepo
         )
+        meetingsWorkspaceViewModel.planner = LiveMeetingPlannerViewModel(
+            projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
+            transcriptionRepository: env.transcriptionRepo)
+        Task { [weak meetingsWorkspaceViewModel, weak settingsViewModel] in
+            _ = await GoogleCalendarAuth.shared.connection()
+            await settingsViewModel?.refreshCalendarAccess()
+            await meetingsWorkspaceViewModel?.refreshUpcomingEvents().value
+        }
         transcriptionViewModel.onMeetingRenamed = { [weak self] rename in
             self?.libraryViewModel.applyMeetingRename(rename)
             self?.meetingsWorkspaceViewModel.recentMeetingsViewModel.applyMeetingRename(rename)
@@ -383,6 +420,8 @@ final class AppEnvironmentConfigurer {
             conversationRepo: env.chatConversationRepo,
             quickPromptRepo: env.quickPromptRepo,
             configStore: env.llmConfigStore,
+            preparationRepository: env.meetingPreparationRepo,
+            projectRepository: env.meetingProjectRepo,
             sttManager: env.sttScheduler,
             speechEngineSelectionProvider: { SpeechEngineSelection.liveSpeech() },
             meetingAudioSourceModeProvider: { env.runtimePreferences.meetingAudioSourceMode },
@@ -399,6 +438,12 @@ final class AppEnvironmentConfigurer {
             shouldShowFloatingMeetingPill: { env.runtimePreferences.shouldShowMeetingRecordingPill },
             probableCalendarSnapshotProvider: {
                 calendarCoordinator?.probableSnapshotForManualStart()
+            },
+            calendarStartSelectionProvider: { [weak meetingsWorkspaceViewModel] in
+                Self.selectCalendarForRecording(events: meetingsWorkspaceViewModel?.upcomingEvents ?? [])
+            },
+            manualProjectIDProvider: { [weak meetingsWorkspaceViewModel] in
+                meetingsWorkspaceViewModel?.planner?.selectedProjectFilterID
             },
             llmService: hasLLMConfig ? env.llmService : nil,
             pillViewModel: meetingPillViewModel,
@@ -445,6 +490,9 @@ final class AppEnvironmentConfigurer {
                 coordinatorRefs.dictation?.showIdlePill()
             }
         )
+        meetingsWorkspaceViewModel.onRecordPreparedMeeting = { [weak meetingCoordinator] event, preparation in
+            meetingCoordinator?.startPreparedMeeting(event: event, preparation: preparation)
+        }
         coordinatorRefs.meeting = meetingCoordinator
         liveMeetingCoordinator = meetingCoordinator
         let retryMeetingFinalization: (Transcription) async throws -> Void = {
@@ -542,7 +590,7 @@ final class AppEnvironmentConfigurer {
         // the user can actually record meetings.
         if AppFeatures.meetingRecordingEnabled {
             let coordinator = MeetingAutoStartCoordinator(
-                calendarService: CalendarService.shared,
+                calendarService: GoogleCalendarService.shared,
                 settingsViewModel: settingsViewModel,
                 isRecordingActive: { [weak meetingCoordinator] in
                     meetingCoordinator?.isMeetingRecordingActive ?? false

@@ -24,6 +24,7 @@ struct MeetingsView: View {
     @State private var showingAskPromptsSheet = false
     @State private var showingPromptLibrary = false
     @State private var showingMeetingImport = false
+    @State private var preparingEvent: CalendarEvent?
     @FocusState private var recentMeetingsSelectionFocused: Bool
 
     private static let rightRailWidth: CGFloat = 300
@@ -31,6 +32,14 @@ struct MeetingsView: View {
 
     var body: some View {
         sheetContent
+            .sheet(item: $preparingEvent) { event in
+                if let planner = viewModel.planner {
+                    MeetingPreparationSheet(event: event, planner: planner) { preparation in
+                        preparingEvent = nil
+                        viewModel.onRecordPreparedMeeting?(event, preparation)
+                    }
+                }
+            }
     }
 
     private var layoutContent: some View {
@@ -39,6 +48,9 @@ struct MeetingsView: View {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                     header
                     recordingSurface
+                    if let planner = viewModel.planner {
+                        ProjectFoldersView(planner: planner, onOpen: onSelectMeeting)
+                    }
                     contentColumns(
                         usesTwoColumnLayout: proxy.size.width >= Self.twoColumnMinimumWidth
                     )
@@ -87,6 +99,9 @@ struct MeetingsView: View {
                 viewModel.refreshUpcomingEvents()
             }
             .onChange(of: viewModel.settingsViewModel.calendarExcludedIdentifiers) { _, _ in
+                viewModel.refreshUpcomingEvents()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionDidChange)) { _ in
                 viewModel.refreshUpcomingEvents()
             }
             .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
@@ -331,10 +346,13 @@ struct MeetingsView: View {
     private var upcomingSection: some View {
         if AppFeatures.calendarEnabled {
             MeetingsSection(title: "Upcoming", icon: "calendar.badge.clock") {
-                CalendarInlineControlsRow(
-                    settingsViewModel: viewModel.settingsViewModel,
-                    onOpenCalendarSettings: onOpenCalendarSettings
-                )
+                if LiveAppIdentity.isLive {
+                    GoogleCalendarConnectionView(settings: viewModel.settingsViewModel, compact: true)
+                } else {
+                    CalendarInlineControlsRow(
+                        settingsViewModel: viewModel.settingsViewModel,
+                        onOpenCalendarSettings: onOpenCalendarSettings)
+                }
                 if viewModel.calendarStatus != .off {
                     MeetingsHairline()
                 }
@@ -353,7 +371,9 @@ struct MeetingsView: View {
                     MeetingsInlineState(
                         icon: "calendar.badge.exclamationmark",
                         title: "Calendar access needed",
-                        detail: "Connect Calendar above to see your upcoming meetings.",
+                        detail: LiveAppIdentity.isLive
+                            ? "Sign in with Google above to see upcoming meetings."
+                            : "Connect Calendar above to see your upcoming meetings.",
                         actionTitle: nil,
                         actionIcon: nil,
                         action: nil
@@ -362,7 +382,9 @@ struct MeetingsView: View {
                     MeetingsInlineState(
                         icon: "lock.shield",
                         title: "Calendar is blocked",
-                        detail: "Re-enable Calendar access in macOS Settings to see upcoming meetings.",
+                        detail: LiveAppIdentity.isLive
+                            ? "Reconnect your Google account to see upcoming meetings."
+                            : "Re-enable Calendar access in macOS Settings to see upcoming meetings.",
                         actionTitle: nil,
                         actionIcon: nil,
                         action: nil
@@ -398,7 +420,8 @@ struct MeetingsView: View {
                                     onSkipThisMeeting: { viewModel.skipThisMeeting(event) },
                                     onSkipThisRepeatingMeeting: { viewModel.skipThisRepeatingMeeting(event) },
                                     onUnskipThisMeeting: { viewModel.unskipThisMeeting(event) },
-                                    onUnskipThisRepeatingMeeting: { viewModel.unskipThisRepeatingMeeting(event) }
+                                    onUnskipThisRepeatingMeeting: { viewModel.unskipThisRepeatingMeeting(event) },
+                                    onPrepare: viewModel.planner == nil ? nil : { preparingEvent = event }
                                 )
                                 if event.id != viewModel.upcomingEvents.last?.id {
                                     MeetingsHairline()
@@ -682,6 +705,15 @@ struct MeetingsView: View {
         let audioState = MeetingAudioFile.state(for: transcription)
         let audioAvailable = audioState == .saved
         let audioRemovable = MeetingAudioFile.isRemovable(for: transcription, state: audioState)
+        if let planner = viewModel.planner {
+            Menu("Move to Project") {
+                Button("Unfiled") { planner.assign(transcriptionIDs: [transcription.id], to: nil) }
+                ForEach(planner.projects) { project in
+                    Button(project.name) { planner.assign(transcriptionIDs: [transcription.id], to: project.id) }
+                }
+            }
+            Divider()
+        }
         let artifactAvailable = MeetingArtifactActions.folderURL(for: transcription) != nil
 
         if meetingSplitViewModel != nil, let provenance = transcription.splitProvenance {
@@ -966,8 +998,8 @@ struct MeetingsView: View {
     private func calendarEmptyDetail(for mode: CalendarAutoStartMode) -> String {
         switch mode {
         case .off:
-            assertionFailure("calendarEmptyDetail should not be called when calendar reminders are off.")
-            return "Calendar reminders are off."
+            return LiveAppIdentity.isLive
+                ? "No events in the next seven days on your selected calendars." : "Calendar reminders are off."
         case .notify:
             return "Calendar reminders are on."
         case .autoStart:
@@ -1545,6 +1577,7 @@ private struct CalendarEventRow: View {
     var onSkipThisRepeatingMeeting: () -> Void
     var onUnskipThisMeeting: () -> Void
     var onUnskipThisRepeatingMeeting: () -> Void
+    var onPrepare: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: DesignSystem.Spacing.md) {
@@ -1575,6 +1608,11 @@ private struct CalendarEventRow: View {
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .lineLimit(2)
                 }
+            }
+            Spacer(minLength: 8)
+            if let onPrepare {
+                Button("Prepare / Record", action: onPrepare)
+                    .parakeetAction(.secondary)
             }
         }
         .padding(DesignSystem.Spacing.md)

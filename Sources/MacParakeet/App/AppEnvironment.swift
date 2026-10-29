@@ -14,6 +14,8 @@ final class AppEnvironment {
     let shareCoordinator: ShareCoordinator?
     let dictationRepo: DictationRepository
     let transcriptionRepo: TranscriptionRepository
+    let meetingProjectRepo: MeetingProjectRepository
+    let meetingPreparationRepo: MeetingPreparationRepository
     let meetingTypeRepo: MeetingTypeRepository
     let meetingLabelRepo: MeetingLabelRepository
     let transcriptionMeetingLabelRepo: TranscriptionMeetingLabelRepository
@@ -92,6 +94,8 @@ final class AppEnvironment {
         // Repositories
         dictationRepo = DictationRepository(dbQueue: databaseManager.dbQueue)
         transcriptionRepo = TranscriptionRepository(dbQueue: databaseManager.dbQueue)
+        meetingProjectRepo = MeetingProjectRepository(dbQueue: databaseManager.dbQueue)
+        meetingPreparationRepo = MeetingPreparationRepository(dbQueue: databaseManager.dbQueue)
         meetingTypeRepo = MeetingTypeRepository(dbQueue: databaseManager.dbQueue)
         meetingLabelRepo = MeetingLabelRepository(dbQueue: databaseManager.dbQueue)
         transcriptionMeetingLabelRepo = TranscriptionMeetingLabelRepository(dbQueue: databaseManager.dbQueue)
@@ -490,7 +494,12 @@ final class AppEnvironment {
             transcriptionService: transcriptionService,
             transcriptionRepo: transcriptionRepo,
             meetingArtifactStore: meetingArtifactStore,
-            promptResultRepo: promptResultRepo
+            promptResultRepo: promptResultRepo,
+            onRecovered: { [meetingPreparationRepo] recordingID, transcriptionID in
+                if try meetingPreparationRepo.fetchRecordingAssociation(recordingID: recordingID) != nil {
+                    try meetingPreparationRepo.bindRecording(recordingID: recordingID, to: transcriptionID)
+                }
+            }
         )
 
         let savedAudioCompletionService = SavedAudioAutoPromptCompletionService(

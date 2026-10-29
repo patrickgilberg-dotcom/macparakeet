@@ -303,6 +303,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     private struct Session: Sendable {
         let id: UUID
         let displayName: String
+        let titleOverride: String?
         let startedAt: Date
         let folderURL: URL
         let chunkFolderURL: URL
@@ -816,9 +817,12 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
             liveCapabilities: liveSpeechEngineCapabilities,
             liveTranscriptionEnabled: isLiveTranscriptionEnabled()
         )
+        let titleOverride = Transcription.protectedTitleOverride(
+            from: title, calendarEventSnapshot: calendarEventSnapshot)
         let session = Session(
             id: sessionID,
-            displayName: Self.resolveDisplayName(title: title, fallbackDate: now),
+            displayName: titleOverride ?? Self.resolveDisplayName(title: nil, fallbackDate: now),
+            titleOverride: titleOverride,
             startedAt: now,
             folderURL: folderURL,
             chunkFolderURL: chunkFolderURL,
@@ -842,6 +846,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
                 speechEngine: session.speechPlan.final,
                 startContext: session.startContext,
                 calendarEventSnapshot: session.calendarEventSnapshot,
+                titleOverride: session.titleOverride,
                 folderURL: session.folderURL
             )
             try lockFileStore.write(initialLock, folderURL: session.folderURL)
@@ -1327,6 +1332,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
                 speechEngine: session.speechPlan.final,
                 startContext: session.startContext,
                 calendarEventSnapshot: session.calendarEventSnapshot,
+                titleOverride: session.titleOverride,
                 folderURL: session.folderURL
             ))
             .withNotes(finalNotes)
@@ -1379,7 +1385,8 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
             startContext: session.startContext,
             userNotes: finalNotes,
             calendarEventSnapshot: session.calendarEventSnapshot,
-            meetingTypeId: finalMeetingTypeId
+            meetingTypeId: finalMeetingTypeId,
+            titleOverride: session.titleOverride
         )
 
         let cleanupStartedAt = Date()

@@ -98,7 +98,8 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         self.notes = notes
         self.meetingTypeId = meetingTypeId
         self.audioRetentionStartedAt = audioRetentionStartedAt
-        self.titleOverride = Transcription.normalizedTitleOverride(from: titleOverride)
+        self.titleOverride = Transcription.protectedTitleOverride(
+            from: titleOverride, calendarEventSnapshot: calendarEventSnapshot)
         self.folderURL = folderURL
     }
 
@@ -130,12 +131,10 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         // of the audio metadata still succeeds; only the typed notes are lost.
         notes = (try? container.decodeIfPresent(String.self, forKey: .notes)) ?? nil
         meetingTypeId = (try? container.decodeIfPresent(UUID.self, forKey: .meetingTypeId)) ?? nil
-        audioRetentionStartedAt = (
-            try? container.decodeIfPresent(Date.self, forKey: .audioRetentionStartedAt)
-        ) ?? nil
-        titleOverride = Transcription.normalizedTitleOverride(
-            from: (try? container.decodeIfPresent(String.self, forKey: .titleOverride)) ?? nil
-        )
+        audioRetentionStartedAt = (try? container.decodeIfPresent(Date.self, forKey: .audioRetentionStartedAt)) ?? nil
+        titleOverride = Transcription.protectedTitleOverride(
+            from: (try? container.decodeIfPresent(String.self, forKey: .titleOverride)) ?? nil,
+            calendarEventSnapshot: calendarEventSnapshot)
         folderURL = nil
     }
 

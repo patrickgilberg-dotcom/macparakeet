@@ -58,6 +58,34 @@ Classification names are local user data and are not telemetry dimensions.
 SQLite is the mutable source of truth; meeting artifact JSON and Markdown are
 materialized projections refreshed after classification changes.
 
+## Project folders and event preparation (personal Live fork)
+
+`v0.50-project-meeting-preparation` adds virtual folders and user-authored context.
+It does not alter existing transcription columns, audio paths or calendar event
+records. Folder membership is separate from labels and prompt applicability.
+
+| Table | Identity and fields | Deletion/ownership |
+| --- | --- | --- |
+| `meeting_projects` | UUID `id`; case-insensitive unique nonempty `name`; `sortOrder`, `isArchived`, `createdAt`, `updatedAt`. | Explicit local user folders. Delete unfiles transcripts rather than deleting source data. |
+| `transcription_project_memberships` | Primary key `transcriptionID`; required `projectID`; `assignedAt`. One folder per transcript. Index `(projectID, transcriptionID)`. | Both foreign keys cascade only this membership. Moves validate all selected IDs and commit atomically. |
+| `meeting_preparations` | UUID `id`; unique case-sensitive `(calendarID, eventID)` for an explicit Google occurrence; user `context`; optional project; exact `titleSnapshot`, optional scheduled start/end snapshots; created/updated dates. | This is not an event inventory or attendee cache. Project deletion sets its project ID to null and preserves preparation. Rename/reschedule updates display snapshots without changing occurrence identity. |
+| `recording_meeting_associations` | Primary key native `recordingID`; optional unique `transcriptionID`; historical `preparationID`; optional project; frozen title/context/calendar/event/schedule/project-name snapshots and creation date. | Recording ID has no transcription foreign key, allowing intent before the Library row exists. Later binding assigns membership in one transaction. Source deletion nulls `transcriptionID`; project deletion nulls `projectID`. Preparation ID deliberately has no live foreign key, preserving original provenance after its editable draft is deleted. |
+
+Association snapshots are inserted once. Conflicting reuse of a recording UUID
+fails rather than overwriting context. Repeating the same final binding leaves a
+later user folder move intact, and normal transcription completion cannot
+overwrite these separate tables.
+
+The latest previous meeting query joins folder membership across the complete
+database, filters `sourceType=meeting`, `createdAt < current recording start`,
+excludes the active recording/transcription and split-derived children, then
+orders by `createdAt DESC, id DESC`. Explicitly assigned meeting imports are
+eligible. It selects one row before evaluating ready/processing/failed/cancelled/
+empty state, without an older fallback. Ready content uses the effective edited
+transcript projection, with exact-text SHA-256, source fingerprint and correction
+revision. Project/event/prior context is intended for Live AI only; these
+repositories do not add it to current transcript text or generic prompt runs.
+
 ## Experimental speaker identity memory (2026-09-10)
 
 Migrations v0.39–v0.41 add optional local voice profiles. The compiled release
@@ -1885,6 +1913,8 @@ migrator.registerMigration("v0.7-prompts-and-summaries") { db in
 | `dictations.wordCount` | v0.5 | Cached word count for voice stats |
 | `chat_conversations` | v0.5 | Multi-conversation chat per transcription (FK → transcriptions) |
 | `ask_conversations` | v0.49-ask-conversations | Independent Ask conversations; bounded Codable payload, revision and run lease; no source foreign key |
+| `meeting_projects` / `transcription_project_memberships` | v0.50-project-meeting-preparation | Virtual single-project transcript folders; moves preserve source rows and media |
+| `meeting_preparations` / `recording_meeting_associations` | v0.50-project-meeting-preparation | Explicit occurrence preparation and frozen recording intent, bound to a later Library row |
 | `transcriptions.thumbnailURL` | v0.5 | YouTube video thumbnail URL |
 | `transcriptions.channelName` | v0.5 | YouTube channel name |
 | `transcriptions.videoDescription` | v0.5 | YouTube video description |

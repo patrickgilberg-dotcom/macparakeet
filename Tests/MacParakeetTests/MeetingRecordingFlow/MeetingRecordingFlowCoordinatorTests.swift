@@ -1178,7 +1178,7 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         )
     }
 
-    func testManualStartPassesProbableCalendarSnapshotWithoutChangingTitle() async throws {
+    func testManualStartUsesProbableCalendarSnapshotTitle() async throws {
         let expectedSnapshot = MeetingCalendarSnapshot(
             confidence: .probable,
             eventIdentifier: "evt-manual",
@@ -1214,7 +1214,7 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         let snapshot = await recordingService.snapshot()
         XCTAssertEqual(snapshot.startCallCount, 1)
         XCTAssertEqual(snapshot.startTitles.count, 1)
-        XCTAssertNil(snapshot.startTitles[0])
+        XCTAssertEqual(snapshot.startTitles[0], expectedSnapshot.title)
         XCTAssertEqual(snapshot.calendarEventSnapshots.first ?? nil, expectedSnapshot)
     }
 
@@ -1252,7 +1252,7 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
 
         let snapshot = await recordingService.snapshot()
         XCTAssertEqual(snapshot.startCallCount, 1)
-        XCTAssertEqual(snapshot.startTitles, [nil])
+        XCTAssertEqual(snapshot.startTitles, [expectedSnapshot.title])
         XCTAssertEqual(snapshot.calendarEventSnapshots.first ?? nil, expectedSnapshot)
     }
 

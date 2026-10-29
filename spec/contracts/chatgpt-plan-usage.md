@@ -102,7 +102,7 @@ approved `ChatGPTLiveClient`. It skips empty or unchanged snapshots and avoids
 competing with an answer or existing summary. Pause, stop and teardown cancel
 the work. This is a local scheduling policy; it does not use the Responses API
 `background` option. Raw capture remains local. Recognized transcript text and
-prior semantic memory are sent for summaries; notes and preparation accompany
+prior current-meeting semantic memory are sent for summaries; notes and preparation accompany
 explicit answer requests. Summary and answer calls consume the connected plan's
 usage and have no alternate provider or billing fallback.
 
@@ -137,6 +137,43 @@ shows review progress, the background update time/error, and an optional context
 snapshot published only for a completed answer. That snapshot belongs to the
 answer made when the user asked; it is separate from later background updates.
 See [the live-answer contract](live-answer.md) for all context limits.
+
+## Selected project and event context
+
+Google Calendar sign-in is a separate read-only calendar authorization. It does
+not create another AI account, provider, billing path or model client. Explicit
+event preparation is a private user draft in the Live database, frozen with the
+recording's project/event association and included on Ask. The current-meeting
+180-second summary still processes only that meeting's recognized transcript
+and its own prior semantic memory.
+
+Project context adds at most one historical meeting. The repository first
+selects the actual latest eligible prior project row, then evaluates readiness;
+an unavailable latest row cannot silently fall back to an older completed one.
+`LiveProjectMeetingMemory` may prefetch a semantic brief when the selected
+project is attached. Both prefetch and foreground preparation use the existing
+pinned `LiveAnswerStreamSession`, complete-only chunk commits and the same
+subscription-only transport rules. Ask preempts and awaits prefetch before
+preparing fresh current context. A missing cached brief can add summary calls;
+no unchanged-latency or one-total-call promise is made.
+
+The final prompt labels the prior project's title/date/status and distinguishes
+its summary, exact question-relevant excerpts, raw tail and notes from the
+current call. Previously recorded actions have no independently verified current
+completion status. Silence, a summary omission or a lack of current discussion
+cannot establish that an action was missed, overdue, completed or cancelled.
+Later explicit corrections take precedence; unresolved conflicts remain explicit.
+
+The reference scope includes the selected project/row, readiness, effective
+source hash, attribution/correction revision, metadata and notes. Edits, deletion
+and membership/source changes invalidate cached reference memory and omit stale
+model-facing conversation history. Source identity is re-read before dispatch
+and before accepting the final answer; provider account/model/effort/transport/
+policy remains pinned across every summary and answer. Old reference content
+cannot continue through a changed scope or imported external memory/tools.
+See [the Google Calendar/project contract](google-calendar-live.md) for identities,
+limits and private storage. This extension is pending its new integrated tests
+and installed runtime qualification; existing benchmarks do not measure it.
 
 ## Reproducible benchmark
 
