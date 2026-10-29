@@ -39,6 +39,10 @@ public final class TranscriptChatViewModel {
     public var livePreparationContext: String = ""
     public private(set) var liveAnswerTiming: LiveAnswerTiming?
     public private(set) var usesDirectLiveAnswers = false
+    public private(set) var liveMeetingMemoryProgress: LiveMeetingMemoryProgress?
+    public private(set) var lastLiveMeetingMemory: LiveMeetingMemorySnapshot?
+    public private(set) var liveMeetingMemoryLastUpdated: Date?
+    public private(set) var liveMeetingMemoryBackgroundError: String?
     public var liveAnswerGlobalShortcutAvailable = false
     public var liveAnswerGlobalShortcutIncludesControl = false
     public var liveAnswerGlobalShortcutLabel: String {
@@ -85,7 +89,16 @@ public final class TranscriptChatViewModel {
     /// state (e.g. `MeetingNotesViewModel.notesText`).
     private var userNotesProvider: (@MainActor () -> String?)?
     private var prepareLiveTranscript: (@MainActor () async throws -> Void)?
-    private var directLiveStream: (@Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>)?
+    private var directLiveSessionProvider: (@Sendable () async throws -> LiveAnswerStreamSession)?
+    private var liveMeetingMemory = LiveMeetingMemory()
+    // Mutated only on MainActor; deinit only cancels the Sendable task handles.
+    @ObservationIgnored nonisolated(unsafe) private var summaryTimerTask: Task<Void, Never>?
+    @ObservationIgnored nonisolated(unsafe) private var backgroundSummaryTask: Task<Void, Never>?
+    private var summaryGeneration: UInt64 = 0
+    private var summaryUpdatesEnabled = false
+    private var summaryRefreshInterval: Duration = .seconds(180)
+    private var lastBackgroundSource: String?
+    private var lastBackgroundCacheKey: String?
     private var chatHistory: [ChatMessage] = []
     private var streamingTask: Task<Void, Never>?
     private var modelListTask: Task<Void, Never>?
@@ -94,17 +107,165 @@ public final class TranscriptChatViewModel {
     private let logger = Logger(subsystem: "com.macparakeet.viewmodels", category: "TranscriptChatViewModel")
 
     public var canSendMessage: Bool {
-        llmService != nil || directLiveStream != nil
+        llmService != nil || directLiveSessionProvider != nil
     }
 
-    /// A direct stream intentionally bypasses all provider fallback and agent/tool loops.
+    /// The stream-only overload keeps injected local test providers simple.
     public func configureDirectLiveAnswers(
         prepareTranscript: @escaping @MainActor () async throws -> Void,
-        stream: @escaping @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>
+        stream: @escaping @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>,
+        summaryRefreshInterval: Duration = .seconds(180)
     ) {
+        configureDirectLiveAnswers(
+            prepareTranscript: prepareTranscript,
+            sessionProvider: { LiveAnswerStreamSession(cacheKey: "injected-live-provider", stream: stream) },
+            summaryRefreshInterval: summaryRefreshInterval)
+    }
+
+    /// One identity is pinned across each summary update and its eventual answer.
+    public func configureDirectLiveAnswers(
+        prepareTranscript: @escaping @MainActor () async throws -> Void,
+        sessionProvider: @escaping @Sendable () async throws -> LiveAnswerStreamSession,
+        summaryRefreshInterval: Duration = .seconds(180)
+    ) {
+        cancelStreaming()
+        stopLiveMeetingMemory()
         usesDirectLiveAnswers = true
-        prepareLiveTranscript = prepareTranscript
-        directLiveStream = stream
+        self.prepareLiveTranscript = prepareTranscript
+        directLiveSessionProvider = sessionProvider
+        liveMeetingMemory = LiveMeetingMemory()
+        lastLiveMeetingMemory = nil
+        liveMeetingMemoryLastUpdated = nil
+        liveMeetingMemoryBackgroundError = nil
+        lastBackgroundSource = nil
+        lastBackgroundCacheKey = nil
+        self.summaryRefreshInterval = summaryRefreshInterval
+        resumeLiveMeetingMemory()
+    }
+
+    public func resumeLiveMeetingMemory() {
+        guard usesDirectLiveAnswers, directLiveSessionProvider != nil else { return }
+        summaryUpdatesEnabled = true
+        guard summaryTimerTask == nil else { return }
+        let interval = summaryRefreshInterval
+        summaryTimerTask = Task { @MainActor [weak self] in
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: interval)
+                    try Task.checkCancellation()
+                    guard let self, self.summaryUpdatesEnabled else { return }
+                    self.beginBackgroundSummaryUpdate()
+                }
+            } catch is CancellationError {
+                // Recording pause/stop owns timer cancellation.
+            } catch {
+                // Sleep has no other operational failure mode.
+            }
+        }
+    }
+
+    /// Capture pause, stop and panel teardown must explicitly end periodic work.
+    public func stopLiveMeetingMemory() {
+        summaryUpdatesEnabled = false
+        summaryGeneration &+= 1
+        summaryTimerTask?.cancel()
+        summaryTimerTask = nil
+        backgroundSummaryTask?.cancel()
+        backgroundSummaryTask = nil
+        liveMeetingMemoryProgress = nil
+    }
+
+    private func meetingTranscriptSnapshot() -> String {
+        guard liveTranscriptHasEarlierGap else { return transcriptText }
+        let warning =
+            "[Earlier live-preview audio was missed; missing words were not reconstructed. The full recording is preserved for final transcription.]"
+        return transcriptText.hasPrefix(warning) ? transcriptText : warning + "\n" + transcriptText
+    }
+
+    private func beginBackgroundSummaryUpdate() {
+        guard summaryUpdatesEnabled, !isStreaming, backgroundSummaryTask == nil,
+            let provider = directLiveSessionProvider
+        else { return }
+        guard !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let source = meetingTranscriptSnapshot()
+        summaryGeneration &+= 1
+        let generation = summaryGeneration
+        let snapshotAt = Date()
+        let memory = liveMeetingMemory
+        backgroundSummaryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if summaryGeneration == generation {
+                    backgroundSummaryTask = nil
+                    liveMeetingMemoryProgress = nil
+                }
+            }
+            do {
+                let session = try await provider()
+                try Task.checkCancellation()
+                guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming else { return }
+                if source == lastBackgroundSource, session.cacheKey == lastBackgroundCacheKey { return }
+                if lastBackgroundCacheKey != session.cacheKey { liveMeetingMemoryLastUpdated = nil }
+                _ = try await memory.update(
+                    transcript: source, cacheKey: session.cacheKey,
+                    summarize: { messages in
+                        var result = ""
+                        for try await text in session.stream(messages: messages) {
+                            try Task.checkCancellation()
+                            result += text
+                        }
+                        try Task.checkCancellation()
+                        return result
+                    },
+                    progress: { [weak self] progress in
+                        guard let self else { return }
+                        await self.publishBackgroundMemoryProgress(progress, generation: generation)
+                    })
+                try Task.checkCancellation()
+                try await session.validate()
+                guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming else { return }
+                // A live correction invalidates this old snapshot; never label it current.
+                guard meetingTranscriptSnapshot().hasPrefix(source) else {
+                    liveMeetingMemoryLastUpdated = nil
+                    return
+                }
+                lastBackgroundSource = source
+                lastBackgroundCacheKey = session.cacheKey
+                liveMeetingMemoryLastUpdated = snapshotAt
+                liveMeetingMemoryBackgroundError = nil
+                AudioCaptureDiagnostics.appendAsync("live_meeting_memory outcome=updated source_chars=\(source.count)")
+            } catch is CancellationError {
+                // Explicit Ask, pause and stop preempt background work.
+            } catch LiveMeetingMemoryError.backgroundDeferred {
+                // The foreground request owns the context builder.
+            } catch {
+                guard summaryUpdatesEnabled, summaryGeneration == generation else { return }
+                liveMeetingMemoryBackgroundError =
+                    "Summary update failed. Your next question will retry earlier context."
+                AudioCaptureDiagnostics.appendAsync("live_meeting_memory outcome=failed")
+            }
+        }
+    }
+
+    private func publishBackgroundMemoryProgress(_ progress: LiveMeetingMemoryProgress, generation: UInt64) {
+        guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming else { return }
+        liveMeetingMemoryProgress = progress
+    }
+
+    private func publishForegroundMemoryProgress(_ progress: LiveMeetingMemoryProgress, assistantID: UUID) {
+        guard streamingAssistantID == assistantID else { return }
+        liveMeetingMemoryProgress = progress
+    }
+
+    private func preemptBackgroundSummary() async {
+        summaryGeneration &+= 1
+        let generation = summaryGeneration
+        let previous = backgroundSummaryTask
+        backgroundSummaryTask = nil
+        liveMeetingMemoryProgress = nil
+        previous?.cancel()
+        await previous?.value
+        if summaryGeneration == generation { liveMeetingMemoryProgress = nil }
     }
 
     public func helpMeAnswer(requestedAt: ContinuousClock.Instant = ContinuousClock.now) {
@@ -128,6 +289,11 @@ public final class TranscriptChatViewModel {
     }
 
     public init() {}
+
+    deinit {
+        summaryTimerTask?.cancel()
+        backgroundSummaryTask?.cancel()
+    }
 
     public func configure(
         llmService: LLMServiceProtocol?,
@@ -331,10 +497,10 @@ public final class TranscriptChatViewModel {
     ) {
         guard canSendMessage else { return }
         let llmService = llmService
-        let directLiveStream = directLiveStream
+        let directLiveSessionProvider = directLiveSessionProvider
         let prepareLiveTranscript = prepareLiveTranscript
         let requestStarted = requestedAt
-        if directLiveStream != nil { liveAnswerTiming = LiveAnswerTiming() }
+        if directLiveSessionProvider != nil { liveAnswerTiming = LiveAnswerTiming() }
 
         let assistantID = UUID()
         let assistantMessage = ChatDisplayMessage(id: assistantID, role: .assistant, content: "", isStreaming: true)
@@ -356,9 +522,23 @@ public final class TranscriptChatViewModel {
         streamingTask = Task { @MainActor [weak self] in
             guard let self else { return }
             var accumulated = ""
+            var preparedMeetingMemory: LiveMeetingMemorySnapshot?
             var coalescer = StreamingTextCoalescer(interval: .milliseconds(33))
             do {
-                if directLiveStream != nil {
+                var liveSession: LiveAnswerStreamSession?
+                if let directLiveSessionProvider {
+                    await preemptBackgroundSummary()
+                    try Task.checkCancellation()
+                    liveSession = try await directLiveSessionProvider()
+                    try Task.checkCancellation()
+                    guard streamingAssistantID == assistantID else { return }
+                    if let previousKey = lastBackgroundCacheKey, previousKey != liveSession?.cacheKey {
+                        liveMeetingMemoryLastUpdated = nil
+                        lastBackgroundSource = nil
+                        lastBackgroundCacheKey = nil
+                    }
+                    try Task.checkCancellation()
+                    guard streamingAssistantID == assistantID else { return }
                     try await prepareLiveTranscript?()
                     try Task.checkCancellation()
                     guard streamingAssistantID == assistantID else { return }
@@ -367,17 +547,40 @@ public final class TranscriptChatViewModel {
                     liveAnswerTiming?.outcome = "streaming"
                 }
                 // Read after the audio barrier, so the pending end of the question is included.
-                let transcript = directLiveStream == nil ? capturedTranscript : transcriptText
-                let userNotes = directLiveStream == nil ? capturedNotes : userNotesProvider?()
+                let transcript = directLiveSessionProvider == nil ? capturedTranscript : meetingTranscriptSnapshot()
+                let userNotes = directLiveSessionProvider == nil ? capturedNotes : userNotesProvider?()
                 let stream: AsyncThrowingStream<String, Error>
-                if let directLiveStream {
+                if let session = liveSession {
+                    let memory = liveMeetingMemory
+                    let memorySnapshot = try await memory.prepare(
+                        transcript: transcript, question: question, cacheKey: session.cacheKey,
+                        summarize: { messages in
+                            var result = ""
+                            for try await text in session.stream(messages: messages) {
+                                try Task.checkCancellation()
+                                result += text
+                            }
+                            try Task.checkCancellation()
+                            return result
+                        },
+                        progress: { [weak self] progress in
+                            guard let self else { return }
+                            await self.publishForegroundMemoryProgress(progress, assistantID: assistantID)
+                        })
+                    try Task.checkCancellation()
+                    guard streamingAssistantID == assistantID else { return }
+                    try await session.validate()
+                    guard streamingAssistantID == assistantID else { return }
+                    liveMeetingMemoryProgress = nil
+                    preparedMeetingMemory = memorySnapshot
+                    liveAnswerTiming?.contextReadyMs = LiveAnswerTiming.milliseconds(
+                        requestStarted.duration(to: .now))
                     let contextMessages = LiveAnswerContext.messages(
-                        question: question, transcript: transcript, notes: userNotes,
-                        preparation: livePreparationContext, history: historyForRequest
-                    )
+                        question: question, context: memorySnapshot, notes: userNotes,
+                        preparation: livePreparationContext, history: historyForRequest)
                     liveAnswerTiming?.requestStartedMs = LiveAnswerTiming.milliseconds(
                         requestStarted.duration(to: .now))
-                    stream = directLiveStream(contextMessages)
+                    stream = session.stream(messages: contextMessages)
                 } else if let llmService {
                     stream = llmService.chatStream(
                         question: question, transcript: transcript, userNotes: userNotes,
@@ -389,7 +592,7 @@ public final class TranscriptChatViewModel {
                 for try await token in stream {
                     try Task.checkCancellation()
                     accumulated += token
-                    if directLiveStream != nil, streamingAssistantID == assistantID {
+                    if directLiveSessionProvider != nil, streamingAssistantID == assistantID {
                         let elapsed = LiveAnswerTiming.milliseconds(requestStarted.duration(to: .now))
                         if liveAnswerTiming?.firstTextMs == nil,
                             LiveAnswerTiming.containsMeaningfulText(accumulated)
@@ -410,6 +613,7 @@ public final class TranscriptChatViewModel {
                     }
                 }
 
+                if let liveSession { try await liveSession.validate() }
                 // Explicit cancellation (Stop button) — discard partial response
                 guard !Task.isCancelled else {
                     if streamingAssistantID == assistantID {
@@ -435,7 +639,9 @@ public final class TranscriptChatViewModel {
                     persistChatMessages()
                     streamingAssistantID = nil
                     isStreaming = false
-                    if directLiveStream != nil {
+                    if directLiveSessionProvider != nil {
+                        lastLiveMeetingMemory = preparedMeetingMemory
+                        liveMeetingMemoryProgress = nil
                         liveAnswerTiming?.completionMs = LiveAnswerTiming.milliseconds(
                             requestStarted.duration(to: .now))
                         liveAnswerTiming?.outcome = "completed"
@@ -461,12 +667,13 @@ public final class TranscriptChatViewModel {
                 if streamingAssistantID == assistantID {
                     removeStreamingAssistantMessage()
                     isStreaming = false
+                    liveMeetingMemoryProgress = nil
                     liveAnswerTiming?.outcome = "cancelled"
                     recordLiveTiming()
                 }
             } catch {
                 if streamingAssistantID == assistantID {
-                    if directLiveStream != nil, !accumulated.isEmpty,
+                    if directLiveSessionProvider != nil, !accumulated.isEmpty,
                         let idx = messages.firstIndex(where: { $0.id == assistantID })
                     {
                         messages[idx].content = accumulated + "\n\n[Incomplete response]"
@@ -477,6 +684,7 @@ public final class TranscriptChatViewModel {
                     }
                     isStreaming = false
                     errorMessage = error.localizedDescription
+                    liveMeetingMemoryProgress = nil
                     liveAnswerTiming?.outcome = "failed"
                     recordLiveTiming()
                 }
@@ -488,6 +696,7 @@ public final class TranscriptChatViewModel {
         streamingTask?.cancel()
         streamingTask = nil
         isStreaming = false
+        liveMeetingMemoryProgress = nil
         removeStreamingAssistantMessage()
         if liveAnswerTiming?.outcome == "streaming" || liveAnswerTiming?.outcome == "preparing" {
             liveAnswerTiming?.outcome = "cancelled"
@@ -501,7 +710,7 @@ public final class TranscriptChatViewModel {
             milliseconds.map { String(format: "%.1f", $0) } ?? "none"
         }
         AudioCaptureDiagnostics.appendAsync(
-            "live_answer_timing request=\(timing.requestID.uuidString) outcome=\(timing.outcome) transcript_ready_ms=\(value(timing.transcriptReadyMs)) hotkey_to_request_ms=\(value(timing.requestStartedMs)) request_to_first_text_ms=\(value(timing.requestToFirstTextMs)) first_text_ms=\(value(timing.firstTextMs)) first_sentence_ms=\(value(timing.firstSentenceMs)) completion_ms=\(value(timing.completionMs))"
+            "live_answer_timing request=\(timing.requestID.uuidString) outcome=\(timing.outcome) transcript_ready_ms=\(value(timing.transcriptReadyMs)) context_ready_ms=\(value(timing.contextReadyMs)) hotkey_to_request_ms=\(value(timing.requestStartedMs)) request_to_first_text_ms=\(value(timing.requestToFirstTextMs)) first_text_ms=\(value(timing.firstTextMs)) first_sentence_ms=\(value(timing.firstSentenceMs)) completion_ms=\(value(timing.completionMs))"
         )
     }
 
@@ -647,6 +856,7 @@ public final class TranscriptChatViewModel {
 
         messages.removeAll()
         chatHistory.removeAll()
+        lastLiveMeetingMemory = nil
         errorMessage = nil
         inputText = ""
         currentConversation = nil
@@ -705,6 +915,7 @@ public final class TranscriptChatViewModel {
     /// Clears all conversations for the current transcript (used when retranscribing).
     public func clearHistory() {
         cancelStreaming()
+        lastLiveMeetingMemory = nil
 
         // Delete all conversations for this transcript
         if let transcriptionId {
@@ -740,12 +951,19 @@ public final class TranscriptChatViewModel {
     /// Disowns the current streaming task without cancelling.
     /// The task continues in the background and persists to DB when done.
     private func detachCurrentStreaming() {
+        // A live answer belongs to this visible question. Releasing it also
+        // prevents the periodic worker competing with an invisible live stream.
+        if usesDirectLiveAnswers {
+            cancelStreaming()
+            return
+        }
         streamingTask = nil
         isStreaming = false
         removeStreamingAssistantMessage()
     }
 
     private func loadConversationMessages(_ conversation: ChatConversation) {
+        lastLiveMeetingMemory = nil
         currentConversation = conversation
         if let chatMessages = conversation.messages, !chatMessages.isEmpty {
             messages = chatMessages.map { msg in

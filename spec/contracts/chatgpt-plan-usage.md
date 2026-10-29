@@ -93,6 +93,51 @@ The spoken opening targets 8–12 words with an 18-word maximum, followed by at
 most two supporting bullets. Accuracy and necessary conditions take priority;
 output is never mechanically truncated to force a word count.
 
+## Rolling meeting memory and cloud scope
+
+The user explicitly authorized automatic cloud summaries every three minutes
+while recording, alongside fresh live context in answers. A local 180-second
+timer attempts updates during active, unpaused recording through the same
+approved `ChatGPTLiveClient`. It skips empty or unchanged snapshots and avoids
+competing with an answer or existing summary. Pause, stop and teardown cancel
+the work. This is a local scheduling policy; it does not use the Responses API
+`background` option. Raw capture remains local. Recognized transcript text and
+prior semantic memory are sent for summaries; notes and preparation accompany
+explicit answer requests. Summary and answer calls consume the connected plan's
+usage and have no alternate provider or billing fallback.
+
+`LiveMeetingMemory` processes ordered source chunks of at most 16,000 characters,
+including up to 800 characters of overlap, into at most 8,000 characters of
+rolling semantic memory. Each update uses the prior memory and new source rather
+than resending every earlier word. The memory cache is local to the live session.
+Its identity includes account, model, reasoning effort, transport and policy;
+source edits that change the cached prefix invalidate coverage. Summary calls
+and their eventual answer pin one identity and validate it again before accepting
+results. A changed account or selection cancels that build instead of silently
+continuing with different credentials or settings. Normal socket replacement
+and refresh still follow the transport rules above; "same client" does not
+require keeping one physical socket alive for three minutes.
+
+An Ask cancels and awaits a background update, flushes current speech, and checks
+coverage immediately. A transcript of at most 16,000 characters is included fully
+as raw text. Longer meetings use semantic memory, the complete latest 12,000 raw
+characters, and up to 6,000 characters of exact question-relevant older excerpts.
+Any uncovered older prefix is summarized before the final streamed answer.
+The answer can therefore require additional summary calls, especially after a
+long pause, an edit or a provider change. There is no one-total-call or unchanged
+latency guarantee. Failed or incomplete summaries cannot become successful
+coverage or a keyword-only substitute.
+
+Processing every available source character is not a promise of lossless recall.
+Summaries can omit details, exact excerpts are selective, and missing live-preview
+audio remains a source gap. The answer prompt distinguishes quoted context from
+instructions, preserves corrections/approval conditions, and warns against
+treating an omission as evidence that something was never discussed. The UI
+shows review progress, the background update time/error, and an optional context
+snapshot published only for a completed answer. That snapshot belongs to the
+answer made when the user asked; it is separate from later background updates.
+See [the live-answer contract](live-answer.md) for all context limits.
+
 ## Reproducible benchmark
 
 Build the native harness with `swift build -c release --product
@@ -130,6 +175,13 @@ exclude audio, transcription, hotkey handling and UI rendering. Inspect outputs
 before calling a sentence useful; punctuation is only an observable proxy.
 Live Ask maintains separate freshness and request-to-display timings.
 
+Saved comparisons through `d8d6477875b5`, and the existing bounded-context provider
+fixtures, use the previous recent-text/extractive-anchor projection. They are
+historical transport/answer baselines. They do not qualify the new periodic
+summary traffic, semantic retention, background preemption or long-meeting
+catch-up latency. Rolling-memory tests and installed qualification must report
+those separately, including summary time before the final answer handoff.
+
 ## Governing sources
 
 Verified against the official documentation on October 28, 2026:
@@ -144,6 +196,7 @@ Verified against the official documentation on October 28, 2026:
 - [Responses WebSocket events](https://developers.openai.com/api/reference/resources/responses/websocket-events)
 
 Focused tests: `ChatGPTAuthTests`, `ChatGPTLiveClientTests`,
-`ChatGPTWebSocketTransportTests`, `LiveAnswerTests`.
+`ChatGPTWebSocketTransportTests`, `LiveMeetingMemoryTests`,
+`LiveMeetingMemoryViewModelTests`, `LiveAnswerTests`.
 Synthetic tests do not establish account eligibility, completed cloud inference,
 microphone/system-audio capture, TCC authorization, or installed-app performance.

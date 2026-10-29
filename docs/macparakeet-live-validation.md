@@ -2,12 +2,15 @@
 
 Qualification date: October 28, 2026 (America/Edmonton).
 
-Installed production source: `d8d6477875b5`, branch `feat/macparakeet-live`,
+Last qualified installed source: `d8d6477875b5`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
 Capture and provider reports identify their measured revisions separately. The
-latest native replay and optimized WebSocket run used `d8d6477875b5`. Earlier
-recordings and experiments retain their original source labels. The final update
-adds a ten-second idle reuse bound; only completed responses refresh that activity.
+latest qualified native replay and optimized WebSocket run used `d8d6477875b5`
+with the prior bounded recent-text/extractive-anchor context policy. Earlier
+recordings and experiments retain their original source labels. That build adds
+a ten-second idle reuse bound; only completed responses refresh that activity.
+The source now adds rolling whole-meeting memory. Its separate qualification is
+pending below; the earlier latency and accuracy observations do not measure it.
 
 ## Installed build
 
@@ -54,8 +57,11 @@ preview loss. Pre-gap held audio cannot masquerade as new speech. Older gaps
 remain disclosed after later speech recovers the current question. Durable audio
 and final transcription remain independent.
 
-`LiveAnswerContext` bounds recent text, extracts older anchors, retains compact
-history and accepts local preparation/notes. Stable instructions stay separate
+The current source keeps all available live-preview text upstream of context
+preparation. `LiveMeetingMemory` adds periodic semantic coverage of that text;
+Ask combines this with the complete recent raw tail, exact older excerpts and
+local preparation/notes. Short transcripts are included fully. Summaries are
+lossy, and known preview gaps remain explicit. Stable instructions stay separate
 from quoted meeting data. `ChatGPTLiveClient` uses the app's own OAuth bearer
 token with a persistent native URLSession WebSocket. One serialized default lane
 sends full bounded input on each turn, with `store:false` and no previous-response
@@ -109,7 +115,61 @@ changes only from explicit Picker edits; a view reload cannot overwrite a newer
 benchmark choice. The prior reload race was possible, but the cause of the observed
 preference change was not proven.
 
-## Automated verification
+## Rolling whole-meeting memory: qualification pending
+
+After the measurements below, the user explicitly requested and authorized
+automatic cloud summaries every three minutes while recording, alongside fresh
+live context in answers. The source implements a local 180-second schedule using
+the same approved ChatGPT client/account. Empty or unchanged snapshots are
+skipped; an active answer or summary takes priority. Pause, stop and teardown
+cancel scheduled work. An Ask cancels and awaits an in-flight background update,
+flushes pending speech and catches up context immediately. This changes cloud
+scope: recognized transcript text can be sent before an Ask. Raw audio stays
+local; preparation and notes accompany explicit answer requests.
+
+The rolling actor processes ordered chunks of at most 16,000 source characters,
+including up to 800 overlapping characters, into a semantic summary capped at
+8,000 characters. It preserves processing coverage of the available recognized
+source, not verbatim recall of every earlier detail. A transcript of at most
+16,000 characters is included wholly as raw text when answering. Longer source
+uses prior semantic memory, the complete latest 12,000 raw characters, and up to
+6,000 characters of exact older-source excerpts selected for the question. If
+more older text remains uncovered, summary catch-up happens before the final
+answer. Memory may overlap the recent raw tail. Nothing caps the upstream live
+transcript to fifteen minutes or to the visible portion of a timeline.
+
+The cache is in memory for the live session. Account/model/effort/transport/policy
+identity is pinned across a build and answer; a changed identity or edited source
+prefix invalidates it. Failed, empty, oversized, partial or cancelled summaries
+cannot establish successful coverage. Known source gaps are not reconstructed,
+and a failed summary is not replaced by keyword anchors while claiming complete
+meeting coverage. Summary prompts retain corrections, uncertainty, ownership and
+approval conditions; output fidelity still requires evaluation.
+
+The source UI shows review progress, the latest successful background snapshot
+time or an error, and a collapsed context disclosure for the last completed
+answer. Its earlier summary and recent-speech caption describe that answer's
+snapshot, not the continuously changing recording or a live view of background
+memory. The UI warns that summaries omit details and directs exact wording back
+to the transcript.
+
+The first focused gate passed 91 tests: memory/source coverage, timer updates,
+empty/unchanged-source skipping, pause/resume, Ask preemption, account/model/effort
+pinning, transcript freshness, final-answer context and recording coordination.
+Changed Swift sources pass strict formatter lint and independent source review.
+The final regression suite and signed Release build are in progress.
+
+Pending runtime qualification: installed three-minute cadence, unchanged-source skipping,
+pause/stop cancellation and Ask preemption; long-meeting coverage/corrections,
+identity changes, summary failure and source-gap handling; and separately timed
+background summaries, first long Ask, cache reuse and catch-up. Existing provider
+fixtures and all saved measurements through `d8d6477875b5` use the prior bounded
+context projection. They do not establish semantic recall, new plan usage/cost,
+memory behavior or latency for this change. A final answer is still streamed,
+but it may now follow additional summary calls. No new speed or accuracy result
+is claimed until this policy is measured and its outputs are reviewed.
+
+## Automated verification before rolling memory
 
 - Earlier affected-area focused run: **367 tests passed**, zero failures.
 - Final integrated transport/hotkey run: **194 tests passed**, zero failures.
@@ -200,7 +260,7 @@ muted off. Recording and playback tests paused at the user's quiet-first request
 resumed only after the user explicitly approved audio again. The user confirmed
 that they intentionally stopped the earlier recordings.
 
-## Native speech and global shortcut qualification
+## Native speech and global shortcut qualification before rolling memory
 
 The installed `a4a73f90205a` app completed a 668.331-second dual-source recording
 containing two approved generated questions and time for the user to try the UI.
@@ -242,7 +302,7 @@ rather than attributed to the pipeline. These are actual captured playback tests
 not an independent acoustic speech-end measurement. The full content-free report
 retains all five trials and their raw clocks.
 
-### Final connection-policy replay (`d8d6477875b5`)
+### Last qualified connection-policy replay (`d8d6477875b5`)
 
 The client now retires a socket after ten seconds without a completed response,
 using creation time for an unused warm-up. This avoids waiting up to two seconds
@@ -283,7 +343,7 @@ The registered-hotkey implementation is unchanged from the two verified global
 callbacks above. The installed app retains all three granted permissions and is
 left open in Library, with no recording or test helper running.
 
-## Timing evidence and limits
+## Historical timing evidence and limits
 
 Initial measurements are preserved under `benchmarks/chatgpt-live/results/`.
 They used the earlier, less constrained opening-sentence prompt and shorter
@@ -323,13 +383,14 @@ visible in Library. These tests exposed the old global shortcut failure; they do
 not qualify shortcut delivery. Playback-end proxies were dominated by tool round-trip
 trigger gaps, so they cannot establish the speech-end latency target.
 
-The final harness uses the actual Live context builder, a raw long-meeting fixture
-that exceeds the context bound, letter/number-based first text, explicit failed
-trials, hardware metadata, nearest-rank median/p95 and saved outputs. Sentence
-timing is a punctuation proxy; usefulness requires inspecting the answer.
+The provider harness used the then-current bounded Live context projection, a raw
+long-meeting fixture that exceeds that bound, letter/number-based first text,
+explicit failed trials, hardware metadata, nearest-rank median/p95 and saved
+outputs. It does not exercise the new rolling-memory actor or background schedule.
+Sentence timing is a punctuation proxy; usefulness requires inspecting the answer.
 
-The latest optimized Release WebSocket run measured installed production source
-`d8d6477875b5`, including the final idle policy and exactly-once native callback
+The latest qualified optimized Release WebSocket run before rolling memory
+measured `d8d6477875b5`, including the idle policy and exactly-once native callback
 settlement. All **11 of 11** responses completed with nonempty text. The explicit
 HTTP/SSE control on `ef90261f206f` also completed **11 of 11**; its code path was
 unchanged by the later WebSocket-only changes. Both use GPT-6 Luna / `none`, the
@@ -373,6 +434,8 @@ separately above.
 
 Native global shortcut delivery, custom questions, changed-question relevance,
 normal recording finalization and saved chat are verified in the revisions above.
+Those checks precede the rolling-memory source change and do not qualify its
+automatic summaries, semantic retention or catch-up latency.
 Exact acoustic speech-end timing and physical display scan-out were not measured;
 playback-end proxies and view-model publication clocks are identified as such.
 No paid developer membership, self-signed root, weakened code requirement or TCC

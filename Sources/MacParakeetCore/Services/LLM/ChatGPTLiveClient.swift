@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public struct ChatGPTModel: Codable, Sendable, Identifiable, Equatable {
@@ -271,6 +272,57 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         try await cache.save(selection, for: account.id)
     }
 
+    private struct MeetingSessionIdentity: Encodable, Equatable, Sendable {
+        let accountID: String
+        let selection: ChatGPTModelSelection
+        let transport: ChatGPTTransport
+        let policy = "rolling-meeting-memory-v1"
+    }
+
+    private func meetingSessionIdentity() async throws -> MeetingSessionIdentity {
+        guard let account = await auth.activeAccount(), account.planUsageEnabled else {
+            throw ChatGPTLiveError.disconnected
+        }
+        let chosen = try await selection()
+        guard let current = await auth.activeAccount(), current.id == account.id, current.planUsageEnabled else {
+            throw CancellationError()
+        }
+        return MeetingSessionIdentity(accountID: account.id, selection: chosen, transport: transport)
+    }
+
+    private func validateMeetingSession(_ expected: MeetingSessionIdentity) async throws {
+        try Task.checkCancellation()
+        guard try await meetingSessionIdentity() == expected else { throw CancellationError() }
+    }
+
+    /// Summary chunks and the answer share an explicit account/model/effort identity.
+    public func liveAnswerSession() async throws -> LiveAnswerStreamSession {
+        let identity = try await meetingSessionIdentity()
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let key = SHA256.hash(data: try encoder.encode(identity)).map { String(format: "%02x", $0) }.joined()
+        return LiveAnswerStreamSession(
+            cacheKey: key, validate: { [self] in try await validateMeetingSession(identity) }
+        ) { [self] messages in
+            let events = detailedStream(
+                messages: messages, model: identity.selection.model,
+                reasoningEffort: identity.selection.reasoningEffort, expectedIdentity: identity)
+            return AsyncThrowingStream { continuation in
+                let task = Task {
+                    do {
+                        for try await event in events {
+                            try Task.checkCancellation()
+                            if case .text(let text) = event { continuation.yield(text) }
+                        }
+                        try Task.checkCancellation()
+                        continuation.finish()
+                    } catch { continuation.finish(throwing: error) }
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+        }
+    }
+
     public func warmUp() async throws {
         guard let account = await auth.activeAccount(), account.planUsageEnabled else {
             throw ChatGPTLiveError.disconnected
@@ -352,6 +404,13 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
     public func detailedStream(messages: [ChatMessage], model: String? = nil, reasoningEffort: String? = nil)
         -> AsyncThrowingStream<LLMStreamEvent, Error>
     {
+        detailedStream(messages: messages, model: model, reasoningEffort: reasoningEffort, expectedIdentity: nil)
+    }
+
+    private func detailedStream(
+        messages: [ChatMessage], model: String?, reasoningEffort: String?,
+        expectedIdentity: MeetingSessionIdentity?
+    ) -> AsyncThrowingStream<LLMStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             let requestID = UUID()
             let lease = requests.register(requestID)
@@ -359,7 +418,12 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
                 defer { self.requests.remove(requestID) }
                 do {
                     guard let account = await self.auth.activeAccount() else { throw ChatGPTLiveError.disconnected }
+                    if let expectedIdentity {
+                        guard account.id == expectedIdentity.accountID else { throw CancellationError() }
+                        try await self.validateMeetingSession(expectedIdentity)
+                    }
                     let selected = try await self.selection()
+                    if let expectedIdentity, selected != expectedIdentity.selection { throw CancellationError() }
                     let chosenModel = model ?? selected.model
                     let effort = reasoningEffort ?? (model == nil ? selected.reasoningEffort : nil)
                     AudioCaptureDiagnostics.appendAsync(
@@ -371,14 +435,16 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
                         try await self.webSocket.run(
                             accountID: account.id, model: chosenModel,
                             payload: String(decoding: payload, as: UTF8.self),
-                            authorization: { [auth = self.auth] in
+                            authorization: { [self] in
                                 let token = try await auth.accessToken(expectedAccountID: account.id)
                                 guard let current = await auth.activeAccount(), current.id == account.id,
                                     current.planUsageEnabled
                                 else { throw CancellationError() }
+                                if let expectedIdentity { try await validateMeetingSession(expectedIdentity) }
                                 return token
                             }, yield: { continuation.yield(.text($0)) })
                         try Task.checkCancellation()
+                        if let expectedIdentity { try await self.validateMeetingSession(expectedIdentity) }
                         continuation.yield(.completed(LLMStreamTerminal(provider: "chatgpt-plan", model: chosenModel)))
                         continuation.finish()
                         return
@@ -395,6 +461,7 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
                         current.planUsageEnabled
                     else { throw CancellationError() }
                     try Task.checkCancellation()
+                    if let expectedIdentity { try await self.validateMeetingSession(expectedIdentity) }
                     let (bytes, response) = try await self.session.bytes(for: request, delegate: self.redirectDelegate)
                     guard let http = response as? HTTPURLResponse else { throw ChatGPTLiveError.interrupted }
                     guard (200..<300).contains(http.statusCode) else {
@@ -432,6 +499,7 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
                     try Task.checkCancellation()
                     guard decoder.completed else { throw ChatGPTLiveError.interrupted }
                     guard meaningfulTextReceived else { throw ChatGPTLiveError.incomplete }
+                    if let expectedIdentity { try await self.validateMeetingSession(expectedIdentity) }
                     continuation.yield(.completed(LLMStreamTerminal(provider: "chatgpt-plan", model: chosenModel)))
                     continuation.finish()
                 } catch { continuation.finish(throwing: error) }

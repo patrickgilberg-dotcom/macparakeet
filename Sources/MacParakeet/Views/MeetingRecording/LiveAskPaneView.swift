@@ -15,6 +15,7 @@ struct LiveAskPaneView: View {
     @State private var showingPromptMenu = false
     @State private var showingPromptsSheet = false
     @State private var showingPreparation = false
+    @State private var showingAnswerContext = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -181,6 +182,61 @@ struct LiveAskPaneView: View {
             )
             .font(.caption)
             .foregroundStyle(DesignSystem.Colors.textSecondary)
+            Text("Summary refreshes every 3 minutes while recording; answers also include latest speech.")
+                .font(.caption)
+                .foregroundStyle(DesignSystem.Colors.textSecondary)
+            if let updatedAt = viewModel.liveMeetingMemoryLastUpdated {
+                HStack(spacing: 3) {
+                    Text("Summary updated")
+                    Text(updatedAt, style: .relative)
+                    Text("ago")
+                }
+                .font(.caption2)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .accessibilityElement(children: .combine)
+            }
+            if let error = viewModel.liveMeetingMemoryBackgroundError {
+                Text("Summary refresh couldn’t finish. \(error)")
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            if viewModel.liveMeetingMemoryProgress != nil {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text("Reviewing earlier discussion…")
+                        .font(.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("live-answer-context-progress")
+            }
+            if let context = viewModel.lastLiveMeetingMemory {
+                DisclosureGroup("Context for last completed answer", isExpanded: $showingAnswerContext) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        switch context.coverage.mode {
+                        case .fullRaw:
+                            Text("The full available live transcript was included.")
+                        case .allEarlierSummarized:
+                            ScrollView {
+                                Text(context.earlierSummary)
+                                    .font(.system(size: 12))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(maxHeight: 150)
+                            Text(
+                                "Earlier discussion was summarized, so some details may be missing. Check the transcript for exact wording."
+                            )
+                        }
+                        Text("Includes recent speech captured when you asked. This snapshot belongs to that answer.")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .padding(.top, 4)
+                }
+                .font(.caption)
+                .accessibilityIdentifier("live-answer-context-disclosure")
+            }
             if showingPreparation {
                 Text("Account facts and meeting goals · saved only on this Mac")
                     .font(.caption)

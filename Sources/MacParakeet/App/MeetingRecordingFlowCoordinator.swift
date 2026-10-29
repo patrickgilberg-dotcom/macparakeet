@@ -340,6 +340,11 @@ final class MeetingRecordingFlowCoordinator {
             self.pillViewModel.state = wantPause ? .paused : .recording
             self.pillController?.refreshState()
             self.panelViewModel?.isPaused = wantPause
+            if wantPause {
+                self.panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+            } else {
+                self.panelViewModel?.chatViewModel.resumeLiveMeetingMemory()
+            }
         }
     }
 
@@ -740,15 +745,9 @@ final class MeetingRecordingFlowCoordinator {
                             }
                             panelVM.updatePreviewLines(lines, isTranscriptionLagging: update.isTranscriptionLagging)
                             panelVM.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
-                            if update.hasEarlierPreviewGap {
-                                panelVM.chatViewModel.updateTranscriptText(
-                                    "[Some earlier live-preview audio was missed. Newer speech is available; missing words were not reconstructed. The full recording is preserved for final transcription.]\n"
-                                        + panelVM.chatTranscript
-                                )
-                            }
                         }
                     },
-                    stream: { messages in ChatGPTLiveClient.shared.stream(messages: messages) }
+                    sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() }
                 )
                 chatGPTPreparationTask?.cancel()
                 let chatViewModel = panelVM.chatViewModel
@@ -968,6 +967,8 @@ final class MeetingRecordingFlowCoordinator {
             }
 
         case .showTranscribingState:
+            panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+            panelViewModel?.chatViewModel.cancelStreaming()
             onRecordingStopping()
             stopPillPolling()
             stopTranscriptObservation()
@@ -1400,6 +1401,7 @@ final class MeetingRecordingFlowCoordinator {
         chatGPTPreparationTask = nil
         liveAnswerHotkey?.stop()
         liveAnswerHotkey = nil
+        panelViewModel?.chatViewModel.stopLiveMeetingMemory()
         panelViewModel?.chatViewModel.cancelStreaming()
         panelController?.close()
         panelController = nil
@@ -1578,6 +1580,11 @@ final class MeetingRecordingFlowCoordinator {
             pillViewModel.state = .recording
         }
         panelViewModel?.isPaused = serviceIsPaused
+        if serviceIsPaused {
+            panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+        } else if stateMachine.state == .recording {
+            panelViewModel?.chatViewModel.resumeLiveMeetingMemory()
+        }
     }
 
     /// The same recording is still live and the source is still lost.
@@ -1677,6 +1684,7 @@ final class MeetingRecordingFlowCoordinator {
                     Self.makePreviewLines(from: update)
                 }.value
                 guard !Task.isCancelled else { break }
+                panelViewModel?.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
                 panelViewModel?.updatePreviewLines(
                     previewLines,
                     isTranscriptionLagging: update.isTranscriptionLagging
@@ -1959,6 +1967,7 @@ final class MeetingRecordingFlowCoordinator {
 
     private func persistLiveAskConversationIfNeeded(transcriptionID: UUID) {
         guard let chatViewModel = panelViewModel?.chatViewModel else { return }
+        chatViewModel.stopLiveMeetingMemory()
         chatViewModel.cancelStreaming()
         chatViewModel.bindPersistedConversation(
             transcriptionId: transcriptionID,
