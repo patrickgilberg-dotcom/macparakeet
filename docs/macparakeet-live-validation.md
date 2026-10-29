@@ -1,13 +1,15 @@
 # MacParakeet Live qualification
 
-Qualification date: October 28, 2026 (America/Edmonton).
+Qualification dates: October 28–29, 2026 (America/Edmonton).
 
-Last qualified installed source: `14851bd6a0c6`, branch `feat/macparakeet-live`,
+Installed source: `9447f78bcb2e`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
 The installed Release includes direct Google Calendar sign-in, private event
-preparation, project folders and latest-project-meeting grounding. Native Google
-SSO/calendar reads and quiet connection/permission checks passed. The sections
-below distinguish automated coverage from actual recording and cloud checks.
+preparation, project folders, latest-project grounding and live-chat recovery.
+The integrated native recording/answer checks below used `14851bd6a0c6`; the
+recovery repair passed its full automated gate and signed installation in
+`9447f78bcb2e`. Its final native replay is pending because the Mac locked before
+the app could be opened. The sections below distinguish those verification stages.
 Capture and performance reports retain their measured revision labels; earlier
 speed observations do not measure the added project-context payload.
 
@@ -211,6 +213,50 @@ ends audio if a chat checkpoint or database promotion fails, retaining the lock
 instead of allowing settlement. Import receipts preserve later edits and explicit
 deletion without retaining message content. Recovery never replays inference.
 Installed post-repair qualification is recorded after its final gate below.
+
+### Recovery repair gates and installed source `9447f78bcb2e`
+
+- The once-per-task full run passed **8,434 XCTest tests**, with 36 skipped and
+  zero failures, plus **30 Swift Testing tests**. Affected-area coverage includes
+  seven new checkpoint view-model tests, two service tests, three recovery tests
+  and three coordinator tests. Three new coordinator fixtures were corrected to
+  wait for the owned recording-start task and accept an initial empty checkpoint;
+  production behavior was not changed to satisfy those fixture assumptions.
+- The opt-in accelerated writer test and its helper passed in **20.607 seconds**.
+  It encoded two hours of generated 48 kHz mono PCM, verified an independent
+  one-hour fragment copy, killed its own writer process before clean finalization,
+  and strict-decoded the retained **7,200.0 seconds / 345,600,000 samples**. Source
+  size was 34,939,359 bytes. Earlier harness drain/read/process-wait failures are
+  retained in the local audit; the final strengthened test uses fatal decode
+  errors, sample counts and finite RMS checks, with bounded resources.
+- Another 142 baseline writer/artifact/recovery checks passed, including synthetic
+  child-process crash/recovery journeys. The two-hour fixture is accelerated
+  storage coverage, not two hours of native mic/system capture, STT or hardware
+  stability.
+- Supported optimized Release build and installation succeeded with the existing
+  persistent Apple Development identity. The installed source stamp is
+  `9447f78bcb2e`; strict/deep signature verification passed. A new private SQLite
+  backup passed `PRAGMA quick_check`, and no recording/recovery locks were present
+  during installation. The original app executable hash remains unchanged.
+- Independent review converged after cancellation, stale-discovery, ownership and
+  database-promotion failure fixes. Changed Swift formatting/whitespace checks
+  pass; the existing `DatabaseManager.swift` formatting baseline is preserved.
+  Local no-mistakes and Greptile CLI are unavailable; the personal fork has no
+  hosted CI checks.
+
+The final native post-fix interruption/recovery check is still required. The
+first attempt to open the newly installed app encountered the Mac lock screen;
+the user has been asked to unlock it. No capture was started while locked.
+The temporary calendar preparation must be restored to its original blank/no-project
+state after that replay; frozen QA recording artifacts remain in the labeled folder.
+
+Long-recording limits remain material: observed free storage ranged down to about
+2.2 GiB; two hours of dual-source audio plus playback is roughly 230 MB, and each
+16 kHz mono Float32 scratch stream adds roughly 461 MB before overlapping work.
+No proactive free-space monitor, bounded raw-capture event queue or explicit
+sleep-prevention assertion was found in the reviewed path. AEC cleanup skips
+inputs over four hours and retains raw fallback. No zero-loss promise is made for
+disk exhaustion, power loss, sleep, device changes or arbitrary-duration capture.
 
 ## Rolling whole-meeting memory: qualified source and synthetic cloud flow
 
