@@ -50,6 +50,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
     private let onRecovered: (@Sendable (UUID, UUID) throws -> Void)?
     private let meetingArtifactStore: MeetingArtifactStoring
     private let promptResultRepo: PromptResultRepositoryProtocol
+    private let chatConversationRepo: ChatConversationRepositoryProtocol?
     private let settlement: MeetingRecordingSettlement
     private let audioConverter: AudioFileConverting
     private let fileManager: FileManager
@@ -71,6 +72,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         transcriptionRepo: TranscriptionRepositoryProtocol,
         meetingArtifactStore: MeetingArtifactStoring,
         promptResultRepo: PromptResultRepositoryProtocol,
+        chatConversationRepo: ChatConversationRepositoryProtocol? = nil,
         audioConverter: AudioFileConverting = AudioFileConverter(),
         fileManager: FileManager = .default,
         echoSuppressionConfiguration: MeetingEchoSuppressionConfiguration = .fromEnvironment(),
@@ -83,6 +85,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
             transcriptionRepo: transcriptionRepo,
             meetingArtifactStore: meetingArtifactStore,
             promptResultRepo: promptResultRepo,
+            chatConversationRepo: chatConversationRepo,
             audioConverter: audioConverter,
             fileManager: fileManager,
             micConditionerFactory: {
@@ -102,6 +105,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         transcriptionRepo: TranscriptionRepositoryProtocol,
         meetingArtifactStore: MeetingArtifactStoring,
         promptResultRepo: PromptResultRepositoryProtocol,
+        chatConversationRepo: ChatConversationRepositoryProtocol? = nil,
         settlement: MeetingRecordingSettlement? = nil,
         audioConverter: AudioFileConverting = AudioFileConverter(),
         fileManager: FileManager = .default,
@@ -119,6 +123,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         self.onRecovered = onRecovered
         self.meetingArtifactStore = meetingArtifactStore
         self.promptResultRepo = promptResultRepo
+        self.chatConversationRepo = chatConversationRepo
         self.settlement =
             settlement
             ?? MeetingRecordingSettlement(
@@ -217,6 +222,8 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         let ownershipLease = try lockFileStore.claimFinalizationOwnership(
             folderURL: folderURL
         )
+        let requestedSessionID = lock.sessionId
+        let lock = ownershipLease.previousLock
         var shouldRestoreOwnership = true
         defer {
             if shouldRestoreOwnership {
@@ -230,6 +237,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
             }
         }
 
+        guard lock.sessionId == requestedSessionID else { throw MeetingLiveChatPersistenceError.recordingChanged }
         let microphoneAudio = MeetingArtifactAudioFileNames.resolveRawMicrophoneURL(
             in: folderURL,
             fileManager: fileManager)
@@ -438,8 +446,12 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         // Discovery can outlive its dialog. Claim the current on-disk lock so
         // a stale Discard cannot remove audio that recovery or Retry now owns.
         let ownershipLease = try lockFileStore.claimFinalizationOwnership(folderURL: folderURL)
+        let requestedSessionID = lock.sessionId
+        let lock = ownershipLease.previousLock
         do {
+            guard lock.sessionId == requestedSessionID else { throw MeetingLiveChatPersistenceError.recordingChanged }
             if let completed = try existingCompletedTranscription(in: folderURL) {
+                try restoreLiveChat(lock, transcriptionID: completed.id)
                 try onRecovered?(lock.sessionId, completed.id)
                 try await settlement.settleCompletedTranscription(
                     folderURL: folderURL,
@@ -656,6 +668,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         if lock.state == .awaitingTranscription {
             // A completed row is canonical, including explicit nil/empty notes.
             // A retained lock can contain older notes and must not restore them.
+            try restoreLiveChat(lock, transcriptionID: transcription.id)
             try onRecovered?(lock.sessionId, transcription.id)
             try await refreshArtifacts(for: transcription)
             try await settlement.settleCompletedTranscription(
@@ -679,6 +692,7 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
         recovered.recoveredFromCrash = true
         recovered.updatedAt = Date()
         try transcriptionRepo.save(recovered)
+        try restoreLiveChat(lock, transcriptionID: recovered.id)
         try onRecovered?(lock.sessionId, recovered.id)
         try await refreshArtifacts(for: recovered)
         try await settlement.settleCompletedTranscription(
@@ -700,6 +714,16 @@ public final class MeetingRecordingRecoveryService: MeetingRecordingRecoveryServ
             transcription: transcription,
             promptResults: promptResults
         )
+    }
+
+    private func restoreLiveChat(_ lock: MeetingRecordingLockFile, transcriptionID: UUID) throws {
+        guard let snapshot = lock.liveChat else { return }
+        guard snapshot.recordingID == lock.sessionId, snapshot.isValid else {
+            throw MeetingLiveChatPersistenceError.invalidSnapshot
+        }
+        guard !snapshot.messages.isEmpty else { return }
+        guard let chatConversationRepo else { throw MeetingLiveChatPersistenceError.storageUnavailable }
+        try chatConversationRepo.insertRecoveredIfAbsent(snapshot.conversation(transcriptionID: transcriptionID))
     }
 
     private func repairIfNeeded(_ url: URL) async throws -> (url: URL, duration: TimeInterval, sampleRate: Double) {

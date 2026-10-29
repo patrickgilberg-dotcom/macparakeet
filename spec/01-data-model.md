@@ -666,6 +666,18 @@ CREATE UNIQUE INDEX idx_text_snippets_trigger ON text_snippets(trigger COLLATE N
 
 Stores multi-conversation chat history per transcription. Migrated from the `chatMessages` JSON field on `transcriptions` (v0.4) to a proper table for multi-conversation support. Each transcription can have multiple conversations.
 
+Live capture checkpoints accepted questions and terminal-completed assistant
+turns in the recording lock before a transcription row exists. Recovery uses
+the same conversation UUID when importing that checkpoint.
+
+`v0.51-live-chat-recovery-receipts` adds `chat_recovery_imports` with a BLOB UUID
+`id` (the stable conversation UUID), BLOB UUID `transcriptionId`, and datetime
+`createdAt`. The import and content-free receipt commit atomically. This table
+has no cascading foreign key: a retained lock must not resurrect a chat or
+meeting the user explicitly deleted after import. Existing chat edits, including
+empty messages, remain canonical. Receipts contain no transcript, message or
+calendar content. See the [recovery contract](contracts/meeting-recovery-retention.md).
+
 ```sql
 CREATE TABLE chat_conversations (
     id TEXT PRIMARY KEY,                              -- UUID string

@@ -101,6 +101,13 @@ it never selects an API-key provider, CLI, connector, or agent fallback.
   visible as `[Incomplete response]` and does not enter successful model history.
   Only terminal success is persisted as an assistant turn. Cancelled generations
   cannot update a newer request's output or timing.
+- Live questions and completed assistant turns are checkpointed locally under
+  the recording's stable conversation ID before normal Stop creates a Library
+  row. A local checkpoint failure is reported separately from completed cloud
+  inference. End awaits the serialized write/rollback chain and still stops
+  capture if saving fails, retaining the recovery lock. Recovery inserts the
+  conversation only when absent and preserves existing user edits; it never
+  repeats inference. See [recording recovery](meeting-recovery-retention.md).
 - Local diagnostic events record recognition duration, preview audio-end age at
   transcript commit, and invocation-to-transcript-ready/context-ready/request/
   first-text/first-sentence/completion. Context preparation includes any summary

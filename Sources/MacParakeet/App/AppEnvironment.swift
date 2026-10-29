@@ -495,6 +495,7 @@ final class AppEnvironment {
             transcriptionRepo: transcriptionRepo,
             meetingArtifactStore: meetingArtifactStore,
             promptResultRepo: promptResultRepo,
+            chatConversationRepo: chatConversationRepo,
             onRecovered: { [meetingPreparationRepo] recordingID, transcriptionID in
                 if try meetingPreparationRepo.fetchRecordingAssociation(recordingID: recordingID) != nil {
                     try meetingPreparationRepo.bindRecording(recordingID: recordingID, to: transcriptionID)

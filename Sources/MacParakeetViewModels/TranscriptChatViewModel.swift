@@ -33,6 +33,7 @@ public final class TranscriptChatViewModel {
     public var inputText: String = ""
     public var isStreaming: Bool = false
     public var errorMessage: String?
+    public private(set) var liveChatPersistenceError: String?
     public var onConversationsChanged: ((UUID, Bool) -> Void)?
     public var onModelChanged: (() -> Void)?
     /// Local-only account/meeting facts prepared before the call. Sent only on an explicit Ask.
@@ -52,6 +53,13 @@ public final class TranscriptChatViewModel {
     private var lastAnswerProjectScopeKey: String?
     private var projectConfigurationGeneration: UInt64 = 0
     private var liveHistoryStartIndex = 0
+    private var liveChatRecordingID: UUID?
+    private var liveChatCheckpoint: (@Sendable (MeetingLiveChatSnapshot) async throws -> Void)?
+    private var liveChatCheckpointRevision: UInt64 = 0
+    private var liveChatCheckpointGeneration: UInt64 = 0
+    private var liveChatCreatedAt = Date()
+    private var latestLiveChatSnapshot: MeetingLiveChatSnapshot?
+    @ObservationIgnored private var liveChatCheckpointTask: Task<Void, Error>?
     public var liveAnswerGlobalShortcutAvailable = false
     public var liveAnswerGlobalShortcutIncludesControl = false
     public var liveAnswerGlobalShortcutLabel: String {
@@ -574,14 +582,29 @@ public final class TranscriptChatViewModel {
         let requestConversationID = capturedConversationId ?? unsavedConversationID
         let capturedHistory = chatHistory
         let repo = conversationRepo
+        let checkpointGeneration = liveChatCheckpointGeneration
+        let admissionCheckpoint = enqueueLiveChatCheckpoint(chatHistory)
 
         streamingTask = Task { @MainActor [weak self] in
             guard let self else { return }
             var accumulated = ""
             var preparedMeetingMemory: LiveMeetingMemorySnapshot?
             var preparedProjectContext: LiveProjectMeetingSnapshot?
+            var terminalCheckpointAttempted = false
             var coalescer = StreamingTextCoalescer(interval: .milliseconds(33))
             do {
+                if let admissionCheckpoint {
+                    do { try await admissionCheckpoint.value } catch {
+                        liveChatPersistenceError =
+                            "Your question could not be saved. No AI request was sent. Retry saving before trying again."
+                        throw MeetingLiveChatPersistenceError.storageUnavailable
+                    }
+                    try Task.checkCancellation()
+                    guard checkpointGeneration == liveChatCheckpointGeneration,
+                        streamingAssistantID == assistantID
+                    else { throw CancellationError() }
+                    liveChatPersistenceError = nil
+                }
                 var liveSession: LiveAnswerStreamSession?
                 if let directLiveSessionProvider {
                     await preemptBackgroundSummary()
@@ -715,6 +738,30 @@ public final class TranscriptChatViewModel {
                 let assistantMsg = ChatMessage(role: .assistant, content: accumulated)
 
                 if streamingAssistantID == assistantID {
+                    if let checkpoint = enqueueLiveChatCheckpoint(chatHistory + [assistantMsg]) {
+                        terminalCheckpointAttempted = true
+                        do {
+                            try await checkpoint.value
+                            liveChatPersistenceError = nil
+                        } catch {
+                            // Cloud completion is still real. Keep the full
+                            // answer in memory and expose local-save failure;
+                            // Retry Saving must not repeat model inference.
+                            liveChatPersistenceError =
+                                "Answer completed, but its chat could not be saved. Keep the app open and retry saving."
+                        }
+                        try Task.checkCancellation()
+                        guard checkpointGeneration == liveChatCheckpointGeneration,
+                            streamingAssistantID == assistantID
+                        else { throw CancellationError() }
+                        if let liveSession { try await liveSession.validate() }
+                        if let preparedProjectContext, let sourceProvider = capturedProjectSourceProvider {
+                            let currentSource = try await sourceProvider()
+                            guard currentSource?.scopeKey == preparedProjectContext.scopeKey,
+                                projectGeneration == projectConfigurationGeneration
+                            else { throw LiveProjectContextChanged() }
+                        }
+                    }
                     // Publish the complete response before marking it finished.
                     // Cancellation/failure still discard partial replies; detached
                     // conversations persist the full accumulated text below.
@@ -755,6 +802,7 @@ public final class TranscriptChatViewModel {
                     }
                 }
             } catch is CancellationError {
+                if terminalCheckpointAttempted { await rollbackLiveChatCheckpoint(generation: checkpointGeneration) }
                 // Cancellation is expected (Stop button, provider change) — don't surface as error
                 if streamingAssistantID == assistantID {
                     removeStreamingAssistantMessage()
@@ -764,6 +812,7 @@ public final class TranscriptChatViewModel {
                     recordLiveTiming()
                 }
             } catch {
+                if terminalCheckpointAttempted { await rollbackLiveChatCheckpoint(generation: checkpointGeneration) }
                 if streamingAssistantID == assistantID {
                     if directLiveSessionProvider != nil, !accumulated.isEmpty,
                         let idx = messages.firstIndex(where: { $0.id == assistantID })
@@ -786,6 +835,12 @@ public final class TranscriptChatViewModel {
 
     public func cancelStreaming() {
         streamingTask?.cancel()
+        // A provider-completed assistant can still be awaiting its local save.
+        // Queue cancellation's successful-history rollback synchronously, before
+        // End can flush/stop/promote and before the canceled owner resumes.
+        if latestLiveChatSnapshot?.messages != chatHistory {
+            enqueueLiveChatCheckpoint(chatHistory)
+        }
         streamingTask = nil
         isStreaming = false
         liveMeetingMemoryProgress = nil
@@ -793,6 +848,83 @@ public final class TranscriptChatViewModel {
         if liveAnswerTiming?.outcome == "streaming" || liveAnswerTiming?.outcome == "preparing" {
             liveAnswerTiming?.outcome = "cancelled"
             recordLiveTiming()
+        }
+    }
+
+    /// The caller binds one recording before accepting live questions. The
+    /// callback must write through an off-main serialized recording owner.
+    public func configureLiveChatCheckpoint(
+        recordingID: UUID,
+        checkpoint: @escaping @Sendable (MeetingLiveChatSnapshot) async throws -> Void
+    ) {
+        liveChatCheckpointGeneration &+= 1
+        liveChatCheckpointTask?.cancel()
+        liveChatCheckpointTask = nil
+        liveChatRecordingID = recordingID
+        liveChatCheckpoint = checkpoint
+        liveChatCheckpointRevision = 0
+        latestLiveChatSnapshot = nil
+        liveChatCreatedAt = Date()
+        liveChatPersistenceError = nil
+    }
+
+    /// Retries only local saving, never provider inference. End must still stop
+    /// audio on failure and retain the awaiting-transcription lock for retry.
+    public func flushLiveChatCheckpoint() async throws {
+        guard latestLiveChatSnapshot != nil else { return }
+        let generation = liveChatCheckpointGeneration
+        while let snapshot = latestLiveChatSnapshot, let checkpoint = liveChatCheckpoint {
+            do {
+                if let task = liveChatCheckpointTask {
+                    do { try await task.value } catch {
+                        if latestLiveChatSnapshot?.revision != snapshot.revision { continue }
+                        try await checkpoint(snapshot)
+                    }
+                } else {
+                    try await checkpoint(snapshot)
+                }
+                guard generation == liveChatCheckpointGeneration else {
+                    throw MeetingLiveChatPersistenceError.recordingChanged
+                }
+                if latestLiveChatSnapshot?.revision != snapshot.revision { continue }
+                liveChatPersistenceError = nil
+                return
+            } catch {
+                guard generation == liveChatCheckpointGeneration else {
+                    throw MeetingLiveChatPersistenceError.recordingChanged
+                }
+                liveChatPersistenceError = MeetingLiveChatPersistenceError.storageUnavailable.localizedDescription
+                throw MeetingLiveChatPersistenceError.storageUnavailable
+            }
+        }
+    }
+
+    @discardableResult
+    private func enqueueLiveChatCheckpoint(_ history: [ChatMessage]) -> Task<Void, Error>? {
+        guard let recordingID = liveChatRecordingID, let checkpoint = liveChatCheckpoint else { return nil }
+        liveChatCheckpointRevision &+= 1
+        let snapshot = MeetingLiveChatSnapshot(
+            recordingID: recordingID, conversationID: unsavedConversationID,
+            revision: liveChatCheckpointRevision, messages: history, createdAt: liveChatCreatedAt)
+        latestLiveChatSnapshot = snapshot
+        let previous = liveChatCheckpointTask
+        let task = Task {
+            // A failed earlier write must not prevent saving a newer complete
+            // snapshot. Revision checks also reject out-of-order late writers.
+            _ = try? await previous?.value
+            try Task.checkCancellation()
+            try await checkpoint(snapshot)
+        }
+        liveChatCheckpointTask = task
+        return task
+    }
+
+    private func rollbackLiveChatCheckpoint(generation: UInt64) async {
+        guard generation == liveChatCheckpointGeneration,
+            latestLiveChatSnapshot?.messages != chatHistory
+        else { return }
+        do { try await enqueueLiveChatCheckpoint(chatHistory)?.value } catch {
+            liveChatPersistenceError = MeetingLiveChatPersistenceError.storageUnavailable.localizedDescription
         }
     }
 
@@ -857,35 +989,54 @@ public final class TranscriptChatViewModel {
     /// Call this once after `sendMessage()` was used in live in-memory mode and the
     /// recording has been transcribed and saved. Existing in-memory `chatHistory` is
     /// flushed to the new conversation in one repo write.
+    @discardableResult
     public func bindPersistedConversation(
         transcriptionId: UUID,
         transcriptionRepo: TranscriptionRepositoryProtocol,
         conversationRepo: ChatConversationRepositoryProtocol
-    ) {
+    ) -> Bool {
         self.transcriptionId = transcriptionId
         self.transcriptionRepo = transcriptionRepo
         self.conversationRepo = conversationRepo
 
         // Nothing to persist, or already bound to a conversation.
         guard !chatHistory.isEmpty, currentConversation == nil else {
-            return
+            return true
         }
 
         let firstUser = chatHistory.first(where: { $0.role == .user })?.content ?? "Meeting chat"
         let title = String(firstUser.prefix(50))
-        let conversation = ChatConversation(id: unsavedConversationID, transcriptionId: transcriptionId, title: title)
+        let conversation = ChatConversation(
+            id: unsavedConversationID, transcriptionId: transcriptionId,
+            title: title, messages: chatHistory)
 
         do {
-            try conversationRepo.save(conversation)
-            try conversationRepo.updateMessages(id: conversation.id, messages: chatHistory)
-            var stored = conversation
-            stored.messages = chatHistory
+            let stored = try conversationRepo.insertRecoveredIfAbsent(conversation)
             currentConversation = stored
-            conversations.insert(stored, at: 0)
+            if let stored {
+                conversations.insert(stored, at: 0)
+                chatHistory = stored.messages ?? []
+                messages = chatHistory.map {
+                    ChatDisplayMessage(role: $0.role, content: $0.content, modelPromptOverride: $0.modelPromptOverride)
+                }
+            } else {
+                chatHistory.removeAll()
+                messages.removeAll()
+            }
+            liveChatCheckpointGeneration &+= 1
+            liveChatCheckpoint = nil
+            liveChatRecordingID = nil
+            liveChatCheckpointTask = nil
+            latestLiveChatSnapshot = nil
+            liveChatPersistenceError = nil
             notifyConversationsChanged()
+            return true
         } catch {
             logger.error("Failed to promote live chat error=\(error.localizedDescription, privacy: .public)")
             errorMessage = "Failed to save chat history."
+            liveChatPersistenceError =
+                "Chat could not be linked to the saved meeting. Its recovery checkpoint was kept; retry saving."
+            return false
         }
     }
 
@@ -1040,6 +1191,7 @@ public final class TranscriptChatViewModel {
         inputText = ""
         currentConversation = nil
         unsavedConversationID = UUID()
+        enqueueLiveChatCheckpoint([])
 
         notifyConversationsChanged()
     }

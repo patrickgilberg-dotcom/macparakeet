@@ -921,6 +921,12 @@ final class MeetingRecordingFlowCoordinator {
                     guard self.ownsPendingStart(generation: gen) else { return }
                     let ownedRecordingID = await meetingRecordingService.activeSessionID
                     guard self.ownsPendingStart(generation: gen) else { return }
+                    if let recordingID = ownedRecordingID, let chat = self.panelViewModel?.chatViewModel {
+                        let recordingService = self.meetingRecordingService
+                        chat.configureLiveChatCheckpoint(recordingID: recordingID) { snapshot in
+                            try await recordingService.updateLiveChat(snapshot)
+                        }
+                    }
                     activeProjectID =
                         preparation != nil
                         ? preparation?.projectID
@@ -1081,6 +1087,7 @@ final class MeetingRecordingFlowCoordinator {
             let liveWordCount = panelViewModel?.wordCount ?? 0
             let liveTranscriptLagged = panelViewModel?.isTranscriptionLagging ?? false
             let notesVM = panelViewModel?.notesViewModel
+            let liveChatVM = panelViewModel?.chatViewModel
             let operationContext = currentMeetingOperationContext ?? ObservabilityOperationContext()
             let operationTrigger = currentMeetingTrigger
             currentMeetingOperationContext = operationContext
@@ -1144,6 +1151,14 @@ final class MeetingRecordingFlowCoordinator {
                             sessionID: activeSessionID,
                             startedAt: notesCommitStartedAt
                         )
+                        // Always honor End even when a recovery checkpoint fails.
+                        // Stop the audio first, then retain its awaiting lock for retry.
+                        var chatCheckpointError: Error?
+                        do {
+                            try await liveChatVM?.flushLiveChatCheckpoint()
+                        } catch {
+                            chatCheckpointError = error
+                        }
                         let serviceStopStartedAt = Date()
                         let output: MeetingRecordingOutput
                         do {
@@ -1163,6 +1178,7 @@ final class MeetingRecordingFlowCoordinator {
                             throw error
                         }
                         stoppedOutput = output
+                        if let chatCheckpointError { throw chatCheckpointError }
                         captureDiagnostics = await meetingRecordingService.captureDiagnostics(for: output.sessionID)
                         appendStopStage(
                             "service_stop",
@@ -1211,7 +1227,7 @@ final class MeetingRecordingFlowCoordinator {
                                 try preparationRepository.bindRecording(recordingID: recordingID, to: prepared.id)
                             }.value
                         }
-                        self.persistLiveAskConversationIfNeeded(transcriptionID: prepared.id)
+                        try self.persistLiveAskConversationIfNeeded(transcriptionID: prepared.id)
                         let enqueueStartedAt = Date()
                         await meetingTranscriptionQueue.enqueue(
                             MeetingTranscriptionQueue.Item(
@@ -2079,15 +2095,17 @@ final class MeetingRecordingFlowCoordinator {
         }
     }
 
-    private func persistLiveAskConversationIfNeeded(transcriptionID: UUID) {
+    private func persistLiveAskConversationIfNeeded(transcriptionID: UUID) throws {
         guard let chatViewModel = panelViewModel?.chatViewModel else { return }
         chatViewModel.stopLiveMeetingMemory()
         chatViewModel.cancelStreaming()
-        chatViewModel.bindPersistedConversation(
-            transcriptionId: transcriptionID,
-            transcriptionRepo: transcriptionRepo,
-            conversationRepo: conversationRepo
-        )
+        guard
+            chatViewModel.bindPersistedConversation(
+                transcriptionId: transcriptionID,
+                transcriptionRepo: transcriptionRepo,
+                conversationRepo: conversationRepo
+            )
+        else { throw MeetingLiveChatPersistenceError.storageUnavailable }
     }
 
     private func clearMeetingOperationContext() {

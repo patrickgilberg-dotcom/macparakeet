@@ -77,6 +77,9 @@ public protocol MeetingRecordingServiceProtocol: Sendable {
     /// (completion-path deletion is owned by `MeetingRecordingSettlement`) —
     /// so notes-saves cannot race with state-transition writes.
     func updateNotes(_ notes: String) async
+    /// Session/revision-bound durable live chat. Production writes through this
+    /// actor's lock mirror so chat, notes and capture-state updates cannot clobber.
+    func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws
     /// Persist the active recording's primary type to its crash-recovery lock.
     func updateMeetingType(_ meetingTypeId: UUID?) async
     var isRecording: Bool { get async }
@@ -105,6 +108,9 @@ public protocol MeetingRecordingServiceProtocol: Sendable {
 }
 
 public extension MeetingRecordingServiceProtocol {
+    func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws {
+        throw MeetingLiveChatPersistenceError.storageUnavailable
+    }
     func prepareLiveAnswerTranscript() async throws -> MeetingTranscriptUpdate? { nil }
     func captureDiagnostics(for sessionID: UUID) async -> MeetingCaptureDiagnostics? { nil }
 
@@ -407,6 +413,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     /// typed (which we preserve as `nil` rather than empty so downstream
     /// `Transcription.userNotes` is `nil` for non-notepad recordings).
     private var currentNotes: String?
+    private var stoppedLiveChatCheckpoint: (id: UUID, folderURL: URL)?
     private var currentMeetingTypeId: UUID?
     /// In-memory mirror of the session's `recording.lock` content. Held so
     /// `updateNotes` can persist notes by mutating + atomic-writing in one
@@ -851,6 +858,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
             )
             try lockFileStore.write(initialLock, folderURL: session.folderURL)
             currentLockFile = initialLock
+            stoppedLiveChatCheckpoint = nil
 
             let events = await audioCaptureService.events
             try await validateStartStillCurrent(session)
@@ -1415,8 +1423,42 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
         AudioCaptureDiagnostics.append(
             echoSuppressionSummaryLine(session: session)
         )
+        stoppedLiveChatCheckpoint = (session.id, session.folderURL)
         cleanupState()
         return output
+    }
+
+    public func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws {
+        let current: MeetingRecordingLockFile
+        let folder: URL
+        if let session = currentSession {
+            guard session.id == snapshot.recordingID, let lock = currentLockFile,
+                lock.sessionId == snapshot.recordingID
+            else { throw MeetingLiveChatPersistenceError.recordingChanged }
+            current = lock
+            folder = session.folderURL
+        } else {
+            // End always stops audio, even if a checkpoint failed. Permit an
+            // explicit local-save retry only while our stopped lock still
+            // exists and no replacement session/recovery has taken ownership.
+            guard let stopped = stoppedLiveChatCheckpoint, stopped.id == snapshot.recordingID else {
+                throw MeetingLiveChatPersistenceError.recordingChanged
+            }
+            try lockFileStore.updateLiveChatIfOwnedAwaiting(
+                snapshot, folderURL: stopped.folderURL, ownerPID: ProcessInfo.processInfo.processIdentifier)
+            return
+        }
+        guard snapshot.isValid else { throw MeetingLiveChatPersistenceError.invalidSnapshot }
+        if let previous = current.liveChat {
+            guard snapshot.revision >= previous.revision else { throw MeetingLiveChatPersistenceError.outdatedSnapshot }
+            if snapshot.revision == previous.revision {
+                guard snapshot == previous else { throw MeetingLiveChatPersistenceError.outdatedSnapshot }
+                return
+            }
+        }
+        let updated = current.withLiveChat(snapshot)
+        try lockFileStore.write(updated, folderURL: folder)
+        currentLockFile = updated
     }
 
     public func updateNotes(_ notes: String) async {

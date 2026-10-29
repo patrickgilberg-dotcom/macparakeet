@@ -161,11 +161,15 @@ integration tests and once-per-task full regression gate passed: 8,417 XCTest
 tests with 35 skipped and zero failures, plus 30 Swift Testing tests. See
 [qualification evidence](../../docs/macparakeet-live-validation.md).
 
-A new calendar-selected native recording and project-grounded cloud answer were
-not replayed. Capture association, recovery and project-source boundaries have
-automated coverage. Earlier ChatGPT/rolling-memory performance reports do not
-measure this additional project-context policy; no new latency distribution or
-real-meeting accuracy guarantee is established.
+An additional 411.277-second native recording qualified exact calendar naming,
+saved event context, latest-project selection and current spoken corrections
+through three completed cloud answers. Two scheduled context refreshes and
+normal artifact saving were observed. Its short synthetic transcript fit raw
+context; this is not long-meeting semantic or multi-hour hardware qualification.
+An interrupted native recording exposed the previous chat-save gap, addressed
+by the local checkpoint/recovery contract. See the linked qualification evidence
+for final build and post-repair replay status. No general latency distribution
+or real-meeting accuracy guarantee is established.
 
 Relevant focused areas are `GoogleCalendarTests`, `CalendarRecordingIdentityTests`,
 `MeetingProjectPreparationRepositoryTests` and `LiveProjectMeetingMemoryTests`,

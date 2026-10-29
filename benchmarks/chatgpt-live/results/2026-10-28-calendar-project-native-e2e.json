@@ -1,0 +1,113 @@
+{
+  "measuredSource": "14851bd6a0c6",
+  "fixture": "Two synthetic prior meetings in a QA project; distinct saved event preparation; two spoken current-meeting updates. No private calendar names, account identifiers, audio or transcript contents are published.",
+  "normalCapture": {
+    "status": "completed",
+    "durationMs": 411277,
+    "calendarNameExact": true,
+    "eventContextFrozen": true,
+    "notePreserved": true,
+    "transcriptCharacters": 1495,
+    "chatMessageCounts": [
+      6
+    ],
+    "lockRemaining": false,
+    "strictAudioDecodes": [
+      {
+        "file": "microphone-raw.m4a",
+        "bytes": 3469483,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.227
+      },
+      {
+        "file": "system-raw.m4a",
+        "bytes": 637331,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.186
+      },
+      {
+        "file": "meeting-playback.m4a",
+        "bytes": 6666241,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.307
+      }
+    ],
+    "qaProjectAssigned": true
+  },
+  "beforeFixAbruptRecovery": {
+    "status": "completed",
+    "durationMs": 132073,
+    "calendarNameExact": true,
+    "eventContextFrozen": true,
+    "notePreserved": true,
+    "transcriptCharacters": 1137,
+    "chatMessageCounts": [],
+    "lockRemaining": false,
+    "strictAudioDecodes": [
+      {
+        "file": "microphone-raw.m4a",
+        "bytes": 1085220,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.112
+      },
+      {
+        "file": "system-raw.m4a",
+        "bytes": 259485,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.112
+      },
+      {
+        "file": "meeting-playback.m4a",
+        "bytes": 2141674,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.163
+      }
+    ],
+    "qaProjectAssigned": true
+  },
+  "nativeContextRefreshSeconds": [
+    180,
+    360
+  ],
+  "nativeTranscriptFitFullRawContext": true,
+  "answers": [
+    "No; don\u2019t promise Friday while security approval and the rollback drill remain unconfirmed.\n\n- Current evidence: The pilot budget is $7,000; security review is pending, and Nina has not yet delivered the rollback checklist.\n- The event requires a 48-hour rollback drill before launch. In the prior meeting, Nina was to deliver the checklist by Thursday; confirm that task and due day, and whether the drill is complete.",
+    "The preparation reference is COBALT-27; the prior meeting\u2019s code name was Lighthouse.",
+    "No; Friday isn\u2019t approved, and the required 48-hour rollback drill remains incomplete.\n\n- The final pilot budget is $6,500; security review is approved, and Nina confirmed the checklist was delivered today."
+  ],
+  "checks": {
+    "currentBudget7000Used": true,
+    "savedEvent48HourRequirementUsed": true,
+    "latestPriorOwnerAndDueDayUsed": true,
+    "savedEventMarkerAndLatestProjectCodeUsed": true,
+    "laterBudget6500AndSecurityChecklistCorrectionsUsed": true,
+    "olderOnlyCanariesAbsent": true
+  },
+  "normalNativeUITimingsMs": [
+    {
+      "firstText": 2440,
+      "firstSentence": 2710
+    },
+    {
+      "firstText": 2120,
+      "firstSentence": 2280
+    },
+    {
+      "firstText": 2110,
+      "firstSentence": 2330
+    }
+  ],
+  "postFixNativeRecovery": null,
+  "limits": [
+    "Native capture lasted411.277s with short spoken fixtures and quiet intervals. Its full transcript fit raw context; this did not exercise long semantic compaction.",
+    "These are three native UI observations, not a speed distribution or acoustic speech-end measurements.",
+    "Before-fix recovery lost completed chat while preserving title, project, notes, transcript and audio; that failed case is retained.",
+    "A final post-fix native replay is pending in this intermediate evidence file."
+  ]
+}

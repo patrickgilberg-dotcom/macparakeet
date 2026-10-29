@@ -4182,6 +4182,69 @@ final class MeetingRecordingServiceTests: XCTestCase {
 
     // MARK: - ADR-020 §8 — updateNotes
 
+    func testLiveChatCheckpointPreservesNotesAndRejectsWrongSessionOrOlderRevision() async throws {
+        let locks = RecordingLockFileStore()
+        let service = MeetingRecordingService(
+            audioCaptureService: MockMeetingAudioCaptureService(), audioConverter: MockMeetingAudioFileConverter(),
+            sttTranscriber: CountingMeetingSTTClient(), lockFileStore: locks)
+        try await service.startRecording()
+        let session = try XCTUnwrap(locks.writes.last?.file.sessionId)
+        let conversation = UUID()
+        let first = MeetingLiveChatSnapshot(
+            recordingID: session, conversationID: conversation, revision: 1,
+            messages: [.init(role: .user, content: "Question?")])
+        await service.updateNotes("Original note")
+        try await service.updateLiveChat(first)
+        await service.updateNotes("Latest note")
+        XCTAssertEqual(locks.writes.last?.file.liveChat, first)
+        XCTAssertEqual(locks.writes.last?.file.notes, "Latest note")
+        let second = MeetingLiveChatSnapshot(
+            recordingID: session, conversationID: conversation, revision: 2,
+            messages: first.messages + [.init(role: .assistant, content: "Completed answer.")])
+        locks.errorToThrow = CocoaError(.fileWriteUnknown)
+        do { try await service.updateLiveChat(second); XCTFail("Write failure was hidden") } catch {}
+        XCTAssertEqual(locks.writes.last?.file.liveChat, first)
+        locks.errorToThrow = nil
+        try await service.updateLiveChat(second)
+        XCTAssertEqual(locks.writes.last?.file.notes, "Latest note")
+        do {
+            try await service.updateLiveChat(first); XCTFail("Old snapshot overwrote terminal answer")
+        } catch MeetingLiveChatPersistenceError.outdatedSnapshot {}
+        let other = MeetingLiveChatSnapshot(
+            recordingID: UUID(), conversationID: conversation, revision: 3, messages: [])
+        do {
+            try await service.updateLiveChat(other); XCTFail("Wrong session accepted")
+        } catch MeetingLiveChatPersistenceError.recordingChanged {}
+        XCTAssertEqual(locks.writes.last?.file.liveChat, second)
+        await service.cancelRecording()
+    }
+
+    func testStoppedLiveChatSaveRetryRequiresExistingOwnedAwaitingLock() async throws {
+        let capture = MockMeetingAudioCaptureService(startReport: .init(sourceMode: .systemOnly))
+        let locks = StoppedLiveChatLockStore()
+        let service = MeetingRecordingService(
+            audioCaptureService: capture, audioConverter: MockMeetingAudioFileConverter(),
+            sttTranscriber: CountingMeetingSTTClient(), lockFileStore: locks)
+        try await service.startRecording()
+        let buffer = try XCTUnwrap(makeMonoFloatBuffer(frameCount: 48_000, sampleValue: 0.25, sampleRate: 48_000))
+        await capture.yield(.systemBuffer(buffer, AVAudioTime(hostTime: AVAudioTime.hostTime(forSeconds: 100))))
+        let output = try await service.stopRecording()
+        defer { try? FileManager.default.removeItem(at: output.folderURL) }
+        let snapshot = MeetingLiveChatSnapshot(
+            recordingID: output.sessionID, conversationID: UUID(), revision: 1,
+            messages: [.init(role: .user, content: "Durable question?")])
+        try await service.updateLiveChat(snapshot)
+        XCTAssertEqual(try locks.read(folderURL: output.folderURL)?.liveChat, snapshot)
+        try locks.delete(folderURL: output.folderURL)
+        let newer = MeetingLiveChatSnapshot(
+            recordingID: output.sessionID, conversationID: snapshot.conversationID,
+            revision: 2, messages: snapshot.messages)
+        do {
+            try await service.updateLiveChat(newer); XCTFail("A settled/removed lock was recreated")
+        } catch MeetingLiveChatPersistenceError.recordingChanged {}
+        XCTAssertNil(try locks.read(folderURL: output.folderURL))
+    }
+
     func testUpdateNotesPersistsNotesIntoLockFileWithoutChangingState() async throws {
         let captureService = MockMeetingAudioCaptureService()
         let lockStore = RecordingLockFileStore()
@@ -5379,6 +5442,25 @@ private final class RecordingLockFileStore: MeetingRecordingLockFileStoring, @un
 
     func discoverOrphans(meetingsRoot: URL) throws -> [MeetingRecordingLockFile] {
         []
+    }
+}
+
+private final class StoppedLiveChatLockStore: MeetingRecordingLockFileStoring, @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [URL: MeetingRecordingLockFile] = [:]
+    func write(_ file: MeetingRecordingLockFile, folderURL: URL) throws { lock.withLock { values[folderURL] = file } }
+    func read(folderURL: URL) throws -> MeetingRecordingLockFile? { lock.withLock { values[folderURL] } }
+    func delete(folderURL: URL) throws { _ = lock.withLock { values.removeValue(forKey: folderURL) } }
+    func discoverOrphans(meetingsRoot: URL) throws -> [MeetingRecordingLockFile] { [] }
+    func updateLiveChatIfOwnedAwaiting(_ snapshot: MeetingLiveChatSnapshot, folderURL: URL, ownerPID: Int32) throws {
+        try lock.withLock {
+            guard let current = values[folderURL], current.sessionId == snapshot.recordingID,
+                current.state == .awaitingTranscription, current.pid == ownerPID, current.finalizationLeaseId == nil
+            else {
+                throw MeetingLiveChatPersistenceError.recordingChanged
+            }
+            values[folderURL] = current.withLiveChat(snapshot)
+        }
     }
 }
 

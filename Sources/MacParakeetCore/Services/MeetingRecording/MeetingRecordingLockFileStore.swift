@@ -41,6 +41,8 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
     /// the lock file (ADR-020 §9): a malformed `notes` value cannot block
     /// recovery of the audio metadata.
     public let notes: String?
+    /// Successful live turns checkpointed before normal Stop creates a row.
+    public let liveChat: MeetingLiveChatSnapshot?
     public let meetingTypeId: UUID?
     /// Fresh retention clock for an imported managed copy. Absent on legacy
     /// and live-capture locks, which keep their existing row-date behavior.
@@ -61,6 +63,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         case startContext
         case calendarEventSnapshot
         case notes
+        case liveChat
         case meetingTypeId
         case audioRetentionStartedAt
         case titleOverride
@@ -79,6 +82,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         startContext: MeetingStartContext? = nil,
         calendarEventSnapshot: MeetingCalendarSnapshot? = nil,
         notes: String? = nil,
+        liveChat: MeetingLiveChatSnapshot? = nil,
         meetingTypeId: UUID? = nil,
         audioRetentionStartedAt: Date? = nil,
         titleOverride: String? = nil,
@@ -96,6 +100,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         self.startContext = startContext
         self.calendarEventSnapshot = calendarEventSnapshot
         self.notes = notes
+        self.liveChat = liveChat
         self.meetingTypeId = meetingTypeId
         self.audioRetentionStartedAt = audioRetentionStartedAt
         self.titleOverride = Transcription.protectedTitleOverride(
@@ -130,6 +135,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         // bug or hand-edited file produces a malformed `notes` value, recovery
         // of the audio metadata still succeeds; only the typed notes are lost.
         notes = (try? container.decodeIfPresent(String.self, forKey: .notes)) ?? nil
+        liveChat = (try? container.decodeIfPresent(MeetingLiveChatSnapshot.self, forKey: .liveChat)) ?? nil
         meetingTypeId = (try? container.decodeIfPresent(UUID.self, forKey: .meetingTypeId)) ?? nil
         audioRetentionStartedAt = (try? container.decodeIfPresent(Date.self, forKey: .audioRetentionStartedAt)) ?? nil
         titleOverride = Transcription.protectedTitleOverride(
@@ -153,6 +159,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
         try container.encodeIfPresent(startContext, forKey: .startContext)
         try container.encodeIfPresent(calendarEventSnapshot, forKey: .calendarEventSnapshot)
         try container.encodeIfPresent(notes, forKey: .notes)
+        try container.encodeIfPresent(liveChat, forKey: .liveChat)
         try container.encodeIfPresent(meetingTypeId, forKey: .meetingTypeId)
         try container.encodeIfPresent(audioRetentionStartedAt, forKey: .audioRetentionStartedAt)
         try container.encodeIfPresent(titleOverride, forKey: .titleOverride)
@@ -172,6 +179,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
             startContext: startContext,
             calendarEventSnapshot: calendarEventSnapshot,
             notes: notes,
+            liveChat: liveChat,
             meetingTypeId: meetingTypeId,
             audioRetentionStartedAt: audioRetentionStartedAt,
             titleOverride: titleOverride,
@@ -193,6 +201,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
             startContext: startContext,
             calendarEventSnapshot: calendarEventSnapshot,
             notes: notes,
+            liveChat: liveChat,
             meetingTypeId: meetingTypeId,
             audioRetentionStartedAt: audioRetentionStartedAt,
             titleOverride: titleOverride,
@@ -214,11 +223,23 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
             startContext: startContext,
             calendarEventSnapshot: calendarEventSnapshot,
             notes: notes,
+            liveChat: liveChat,
             meetingTypeId: meetingTypeId,
             audioRetentionStartedAt: audioRetentionStartedAt,
             titleOverride: titleOverride,
             folderURL: folderURL
         )
+    }
+
+    public func withLiveChat(_ liveChat: MeetingLiveChatSnapshot?) -> MeetingRecordingLockFile {
+        MeetingRecordingLockFile(
+            schemaVersion: schemaVersion, sessionId: sessionId, startedAt: startedAt,
+            pid: pid, displayName: displayName, state: state,
+            finalizationLeaseId: finalizationLeaseId, speechEngine: speechEngine,
+            speechEngineWasCaptured: speechEngineWasCaptured, startContext: startContext,
+            calendarEventSnapshot: calendarEventSnapshot, notes: notes, liveChat: liveChat,
+            meetingTypeId: meetingTypeId, audioRetentionStartedAt: audioRetentionStartedAt,
+            titleOverride: titleOverride, folderURL: folderURL)
     }
 
     public func withMeetingTypeId(_ meetingTypeId: UUID?) -> MeetingRecordingLockFile {
@@ -235,6 +256,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
             startContext: startContext,
             calendarEventSnapshot: calendarEventSnapshot,
             notes: notes,
+            liveChat: liveChat,
             meetingTypeId: meetingTypeId,
             audioRetentionStartedAt: audioRetentionStartedAt,
             titleOverride: titleOverride,
@@ -259,6 +281,7 @@ public struct MeetingRecordingLockFile: Codable, Sendable, Equatable {
             startContext: startContext,
             calendarEventSnapshot: calendarEventSnapshot,
             notes: notes,
+            liveChat: liveChat,
             meetingTypeId: meetingTypeId,
             audioRetentionStartedAt: audioRetentionStartedAt,
             titleOverride: titleOverride,
@@ -272,6 +295,13 @@ public protocol MeetingRecordingLockFileStoring: Sendable {
     func read(folderURL: URL) throws -> MeetingRecordingLockFile?
     func delete(folderURL: URL) throws
     func discoverOrphans(meetingsRoot: URL) throws -> [MeetingRecordingLockFile]
+    func updateLiveChatIfOwnedAwaiting(_ snapshot: MeetingLiveChatSnapshot, folderURL: URL, ownerPID: Int32) throws
+}
+
+public extension MeetingRecordingLockFileStoring {
+    func updateLiveChatIfOwnedAwaiting(_ snapshot: MeetingLiveChatSnapshot, folderURL: URL, ownerPID: Int32) throws {
+        throw MeetingLiveChatPersistenceError.storageUnavailable
+    }
 }
 
 public struct MeetingFinalizationOwnershipLease: Sendable, Equatable {
@@ -367,6 +397,30 @@ public final class MeetingRecordingLockFileStore:
         try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
         let data = try JSONEncoder.meetingRecordingLockFile.encode(file)
         try data.write(to: Self.lockFileURL(for: folderURL), options: .atomic)
+    }
+
+    /// Serialize stopped-session checkpoint retries with recovery admission and
+    /// settlement. A missing or claimed lock must never be recreated/replaced.
+    public func updateLiveChatIfOwnedAwaiting(_ snapshot: MeetingLiveChatSnapshot, folderURL: URL, ownerPID: Int32)
+        throws
+    {
+        try Self.withFinalizationOwnershipMutex(folderURL: folderURL) {
+            guard let current = try read(folderURL: folderURL), current.sessionId == snapshot.recordingID,
+                current.state == .awaitingTranscription, current.pid == ownerPID,
+                current.finalizationLeaseId == nil
+            else { throw MeetingLiveChatPersistenceError.recordingChanged }
+            guard snapshot.isValid else { throw MeetingLiveChatPersistenceError.invalidSnapshot }
+            if let previous = current.liveChat {
+                guard snapshot.revision >= previous.revision else {
+                    throw MeetingLiveChatPersistenceError.outdatedSnapshot
+                }
+                if snapshot.revision == previous.revision {
+                    guard snapshot == previous else { throw MeetingLiveChatPersistenceError.outdatedSnapshot }
+                    return
+                }
+            }
+            try write(current.withLiveChat(snapshot), folderURL: folderURL)
+        }
     }
 
     public func read(folderURL: URL) throws -> MeetingRecordingLockFile? {
@@ -519,7 +573,10 @@ public final class MeetingRecordingLockFileStore:
         guard FileManager.default.fileExists(atPath: lockFileURL.path) else {
             return
         }
-        try FileManager.default.removeItem(at: lockFileURL)
+        try Self.withFinalizationOwnershipMutex(folderURL: folderURL) {
+            guard FileManager.default.fileExists(atPath: lockFileURL.path) else { return }
+            try FileManager.default.removeItem(at: lockFileURL)
+        }
     }
 
     public func discoverOrphans(meetingsRoot: URL) throws -> [MeetingRecordingLockFile] {

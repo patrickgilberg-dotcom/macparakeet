@@ -2501,6 +2501,16 @@ public final class DatabaseManager: Sendable {
             }
         }
 
+        migrator.registerMigration("v0.51-live-chat-recovery-receipts") { db in
+            // A content-free receipt survives explicit chat/meeting deletion so
+            // an unsettled recording lock cannot resurrect an imported chat.
+            try db.create(table: "chat_recovery_imports") { t in
+                t.column("id", .blob).primaryKey()
+                t.column("transcriptionId", .blob).notNull()
+                t.column("createdAt", .datetime).notNull()
+            }
+        }
+
         return migrator
     }
 

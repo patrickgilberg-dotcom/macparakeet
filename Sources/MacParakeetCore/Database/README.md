@@ -176,6 +176,13 @@ folder move. Recording snapshots survive draft deletion and remain independent
 of transcription completion's full-row metadata merge. These repositories do no
 network, artifact refresh, inference or calendar polling.
 
+**Recovered chat import receipts contain no message text.** `chat_recovery_imports`
+records the stable conversation UUID and transcription UUID in the same
+transaction as the first recovery import. It has no cascading foreign key:
+explicitly deleting an imported chat or meeting must not allow a retained lock
+to restore it again. Existing edited or cleared conversations win over a lock
+snapshot. Use normal GRDB UUID encoding for receipt lookups.
+
 **Never use raw SQL `WHERE id = ?` with `uuid.uuidString`.**
 GRDB stores UUID values via Codable encoding, which produces a
 representation that is not always equal to `UUID.uuidString`. Use

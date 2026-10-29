@@ -158,13 +158,59 @@ Verification for this extension:
 - Independent source review converged. Local no-mistakes and Greptile CLI were
   unavailable; this personal fork reports no hosted CI checks.
 
-The new Google-selected recording-to-project workflow and a real project-grounded
-cloud answer were not replayed in a native recording during this qualification.
-Their integration boundaries have automated coverage; earlier microphone/system
-capture, shortcut and recording-finalization checks retain their historical
-labels. No new speed distribution or accuracy guarantee is established for
-project context. No credentials, private calendar content, database backup or
-user transcripts are included in published evidence.
+The initial quiet qualification above preceded the integrated native recording
+replay below. That replay qualifies the combined short-context workflow while
+retaining the earlier performance reports' measured source labels. No general
+speed distribution or accuracy guarantee is established for project context.
+No credentials, private calendar content, database backup or user transcripts
+are included in published evidence.
+
+## Integrated calendar/project native test and crash-chat repair
+
+The requested integrated test was run in installed source `14851bd6a0c6` using
+two labeled synthetic reference recordings in a dedicated QA project, a real
+Google occurrence with private synthetic preparation, and two spoken updates.
+The preparation and project survived Save/reopen. Three terminal-completed
+native Live Ask answers passed:
+
+- The answer used the current spoken $7,000 budget, the event-only 48-hour
+  rollback-drill requirement, and Nina's Thursday checklist action from the
+  latest prior meeting. It kept launch conditional on approval and the drill.
+- A separate question returned the event-only preparation reference and the
+  code name from the latest reference. Older-only owner/budget/code canaries
+  were absent.
+- After a later spoken correction, the answer used $6,500, approved security
+  review and delivered checklist status, while withholding a Friday commitment
+  because the drill remained incomplete.
+
+Native UI first-text readings were 2.44, 2.12 and 2.11 seconds; first-sentence
+readings were 2.71, 2.28 and 2.33 seconds. These are rounded observations for
+three short synthetic contexts, not percentiles or acoustic speech-end timing.
+The native capture lasted **411.277 seconds** with quiet intervals between
+clips. Scheduled context updates were observed at three and six minutes. Its
+1,495-character final transcript fit the full raw-context allowance, so this
+run does not qualify long semantic compaction or two hours of native capture.
+
+Normal finalization retained the exact Unicode Google title, project membership,
+typed note, transcript and all six chat messages. Microphone source, system
+source and mixed playback all passed full strict FFmpeg decoding. The test's
+private Google title and account identifiers are omitted from published evidence.
+
+A separate **132.073-second** recording was deliberately interrupted by SIGKILL
+and recovered through the installed app's native launch prompt. Exact title,
+project, preparation, note, transcript and all three strict-decodable audio
+files survived. However, its completed live chat was absent: the old application
+only promoted in-memory chat during normal Stop. This failed case is retained
+in `2026-10-28-calendar-project-native-e2e.json` rather than presented as success.
+
+The repair checkpoints accepted questions before provider dispatch and successful
+assistant turns before terminal UI success into the actor-owned recording lock.
+It serializes cancellation rollback with End, validates recording/revision
+ownership, and reads the authoritative claimed lock during recovery. Stop still
+ends audio if a chat checkpoint or database promotion fails, retaining the lock
+instead of allowing settlement. Import receipts preserve later edits and explicit
+deletion without retaining message content. Recovery never replays inference.
+Installed post-repair qualification is recorded after its final gate below.
 
 ## Rolling whole-meeting memory: qualified source and synthetic cloud flow
 

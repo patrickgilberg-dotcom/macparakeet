@@ -131,6 +131,11 @@ struct LiveAskPaneView: View {
     /// above. Owns the bottom of the panel.
     private var composerArea: some View {
         VStack(spacing: 0) {
+            if let error = viewModel.liveChatPersistenceError {
+                errorRow(error)
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+                    .padding(.vertical, DesignSystem.Spacing.sm)
+            }
             if viewModel.usesDirectLiveAnswers {
                 liveAnswerControls
             }

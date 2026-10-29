@@ -89,6 +89,13 @@ plus meaningful text for success. Usage limits, incomplete events, malformed
 framing, interrupted connections and cancellation cannot mark a partial answer
 complete. The UI marks failed partial answers incomplete.
 
+During recording, local chat checkpoints preserve admitted questions and only
+terminal-completed assistant turns. This is app-owned recovery state, not
+ChatGPT account history. Local saving can fail independently of inference;
+that failure remains visible and never causes a silent provider replay. Native
+interruption recovery restores the stable conversation before settling the
+recording lock and preserves any conversation the user already edited.
+
 The spoken opening targets 8–12 words with an 18-word maximum, followed by at
 most two supporting bullets. Accuracy and necessary conditions take priority;
 output is never mechanically truncated to force a word count.

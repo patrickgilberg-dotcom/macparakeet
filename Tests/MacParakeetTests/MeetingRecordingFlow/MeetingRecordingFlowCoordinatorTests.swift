@@ -19,6 +19,99 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
+    func testLiveChatCheckpointsBelongToTheOwnedRecordingBeforeNormalStop() async throws {
+        let output = makeRecordingOutput()
+        let service = MeetingRecordingServiceSpy(output: output)
+        let coordinator = makeQuitTeardownCoordinator(recordingService: service)
+        coordinator.handleURLCommand(.start(title: "Recovery chat"))
+        try await waitForLiveRecording(coordinator)
+        let chat = try XCTUnwrap(coordinator.testHook_panelViewModel?.chatViewModel)
+        try await completeSyntheticLiveAnswer(chat)
+        let checkpoints = await service.liveChatCheckpoints
+        XCTAssertTrue(checkpoints.allSatisfy { $0.recordingID == output.sessionID })
+        XCTAssertEqual(checkpoints.filter { !$0.messages.isEmpty }.map(\.messages.count), [1, 2])
+        XCTAssertEqual(checkpoints.first?.conversationID, checkpoints.last?.conversationID)
+        XCTAssertNil(chat.liveChatPersistenceError)
+        XCTAssertTrue(coordinator.stopRecording())
+        await coordinator.testHook_waitForActionTask()
+        let stops = await service.stopCallCount
+        XCTAssertEqual(stops, 1)
+        await coordinator.testHook_waitForMeetingTranscriptionQueue()
+    }
+
+    func testCheckpointFailureStillStopsAudioAndDoesNotQueueOrPromoteTheMeeting() async throws {
+        let service = MeetingRecordingServiceSpy(output: makeRecordingOutput())
+        await service.failCompletedLiveChatCheckpoints()
+        let transcription = MockTranscriptionService()
+        let coordinator = makeQuitTeardownCoordinator(
+            recordingService: service, transcriptionService: transcription)
+        coordinator.handleURLCommand(.start(title: "Save failure"))
+        try await waitForLiveRecording(coordinator)
+        let chat = try XCTUnwrap(coordinator.testHook_panelViewModel?.chatViewModel)
+        try await completeSyntheticLiveAnswer(chat)
+        XCTAssertNotNil(chat.liveChatPersistenceError)
+        XCTAssertTrue(coordinator.stopRecording())
+        await coordinator.testHook_waitForActionTask()
+        let stops = await service.stopCallCount
+        let preparedRows = await transcription.prepareMeetingCallCount
+        XCTAssertEqual(stops, 1, "A failed local chat save must not leave capture running after End")
+        XCTAssertEqual(preparedRows, 0, "Retain the recovery lock instead of publishing an unsaved chat")
+        XCTAssertNotNil(chat.liveChatPersistenceError)
+    }
+
+    func testFailedChatDatabasePromotionDoesNotQueueAwayTheRecoveryCheckpoint() async throws {
+        let service = MeetingRecordingServiceSpy(output: makeRecordingOutput())
+        let transcription = MockTranscriptionService()
+        let conversations = MockChatConversationRepository()
+        conversations.saveError = CocoaError(.fileWriteOutOfSpace)
+        let coordinator = makeQuitTeardownCoordinator(
+            recordingService: service, transcriptionService: transcription, conversationRepo: conversations)
+        coordinator.handleURLCommand(.start(title: "Database save failure"))
+        try await waitForLiveRecording(coordinator)
+        let chat = try XCTUnwrap(coordinator.testHook_panelViewModel?.chatViewModel)
+        try await completeSyntheticLiveAnswer(chat)
+        XCTAssertNil(chat.liveChatPersistenceError, "The recording checkpoint succeeded before End")
+        XCTAssertTrue(coordinator.stopRecording())
+        await coordinator.testHook_waitForActionTask()
+        await coordinator.testHook_waitForMeetingTranscriptionQueue()
+        let stops = await service.stopCallCount
+        let preparedRows = await transcription.prepareMeetingCallCount
+        let finalizedRows = await transcription.finalizeMeetingCallCount
+        XCTAssertEqual(stops, 1)
+        XCTAssertEqual(preparedRows, 1)
+        XCTAssertEqual(finalizedRows, 0, "Failed promotion must retain its lock instead of allowing settlement")
+        XCTAssertNotNil(chat.errorMessage)
+    }
+
+    private func waitForLiveRecording(_ coordinator: MeetingRecordingFlowCoordinator) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while coordinator.testHook_state != .recording, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        XCTAssertEqual(coordinator.testHook_state, .recording)
+        // Permission checking replaces its action task with the actual start
+        // task. Wait for that owned task, not only the earlier permission task.
+        await coordinator.testHook_waitForActionTask()
+    }
+
+    private func completeSyntheticLiveAnswer(_ chat: TranscriptChatViewModel) async throws {
+        chat.configureDirectLiveAnswers(
+            prepareTranscript: {},
+            stream: { _ in
+                AsyncThrowingStream { continuation in
+                    continuation.yield("The test remains conditional on the review.")
+                    continuation.finish()
+                }
+            })
+        chat.helpMeAnswer()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while chat.isStreaming, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        XCTAssertFalse(chat.isStreaming)
+        XCTAssertEqual(chat.messages.last?.content, "The test remains conditional on the review.")
+    }
+
     func testURLStopWaitsForStartBeforeSessionExistsThenSavesExactlyOnce() async throws {
         let service = MeetingRecordingServiceSpy(
             output: makeRecordingOutput(), blocksStart: true, publishesSessionAfterStart: true)
@@ -1770,6 +1863,8 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
 
     private func makeQuitTeardownCoordinator(
         recordingService: MeetingRecordingServiceSpy? = nil,
+        transcriptionService: MockTranscriptionService? = nil,
+        conversationRepo: (any ChatConversationRepositoryProtocol)? = nil,
         shouldShowFloatingMeetingPill: @escaping @MainActor @Sendable () -> Bool = { true },
         pillViewModel: MeetingRecordingPillViewModel? = nil,
         permissionService: any PermissionServiceProtocol = MockPermissionService(),
@@ -1779,10 +1874,10 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         let recordingService = recordingService ?? MeetingRecordingServiceSpy(output: makeRecordingOutput())
         return MeetingRecordingFlowCoordinator(
             meetingRecordingService: recordingService,
-            transcriptionService: MockTranscriptionService(),
+            transcriptionService: transcriptionService ?? MockTranscriptionService(),
             permissionService: permissionService,
             transcriptionRepo: MockTranscriptionRepository(),
-            conversationRepo: MockChatConversationRepository(),
+            conversationRepo: conversationRepo ?? MockChatConversationRepository(),
             quickPromptRepo: NoOpQuickPromptRepository(),
             configStore: NoOpLLMConfigStore(),
             shouldShowFloatingMeetingPill: shouldShowFloatingMeetingPill,
@@ -2050,6 +2145,17 @@ private actor MeetingRecordingServiceSpy: MeetingRecordingServiceProtocol {
     var muteCallCount = 0
     var startTitles: [String?] = []
     var calendarEventSnapshots: [MeetingCalendarSnapshot?] = []
+    var liveChatCheckpoints: [MeetingLiveChatSnapshot] = []
+    private var shouldFailCompletedLiveChatCheckpoints = false
+
+    func failCompletedLiveChatCheckpoints() { shouldFailCompletedLiveChatCheckpoints = true }
+
+    func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws {
+        liveChatCheckpoints.append(snapshot)
+        if shouldFailCompletedLiveChatCheckpoints, snapshot.messages.last?.role == .assistant {
+            throw CocoaError(.fileWriteOutOfSpace)
+        }
+    }
     private var paused = false
     private var captureFailureSessionID = UUID()
     private var captureFailureSignaled = false
