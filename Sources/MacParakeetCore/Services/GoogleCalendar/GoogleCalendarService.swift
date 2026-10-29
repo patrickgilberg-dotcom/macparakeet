@@ -72,11 +72,14 @@ public actor GoogleCalendarService: CalendarServicing {
         guard let connection = await auth.connection(), connection.id == authorization.accountID else {
             throw Self.changedError
         }
+        let calendars = try await calendarList(authorization: authorization)
+        // Discovery is unfiltered. Startup can install persisted exclusions
+        // while it awaits Google, so bind the current selection only once that
+        // list is ready. Changes after event reads begin still invalidate them.
         let selection = selectionGeneration
         let excluded = excludedCalendarIDs
         let dropAllDay = excludeAllDay
         let dropDeclined = excludeDeclined
-        let calendars = try await calendarList(authorization: authorization)
         try validateSelection(selection)
         var events: [CalendarEvent] = []
         var seenIDs: Set<String> = []

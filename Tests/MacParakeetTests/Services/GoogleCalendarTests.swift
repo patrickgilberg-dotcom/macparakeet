@@ -344,7 +344,31 @@ final class GoogleCalendarTests: XCTestCase {
         XCTAssertNil(cancelled.calendarEvent(calendar: calendar, accountEmail: "patrick@example.invalid"))
     }
 
-    func testSelectionChangeDiscardsInFlightResultsAndExclusionsAvoidRequests() async throws {
+    func testStartupSelectionInstalledDuringDiscoveryAppliesWithoutFailedFirstLoad() async throws {
+        let scenario = GoogleScenario(
+            calendarDelay: 0.1,
+            calendarHandler: { request in
+                if request.url!.path.hasSuffix("calendarList") {
+                    return [
+                        "items": [["id": "primary", "summary": "Primary"], ["id": "shared", "summary": "Shared"]]
+                    ]
+                }
+                return ["items": [Self.event(id: "one")]]
+            })
+        let fixture = try GoogleFixture(scenario: scenario)
+        defer { fixture.cleanup() }
+        let service = GoogleCalendarService(auth: fixture.auth, session: fixture.session)
+        let pending = Task { try await service.fetchUpcomingEvents(from: Self.referenceDate, days: 1) }
+        try await waitForRequest("/calendar/v3/users/me/calendarList", scenario: scenario)
+        await service.setExcludedCalendarIDs(["shared"])
+        let events = try await pending.value
+        XCTAssertEqual(events.count, 1)
+        XCTAssertEqual(events.first?.calendarIdentifier, "primary")
+        XCTAssertEqual(scenario.requests.filter { $0.url?.path.hasSuffix("calendarList") == true }.count, 1)
+        XCTAssertFalse(scenario.requests.contains { $0.url?.path == "/calendar/v3/calendars/shared/events" })
+    }
+
+    func testSelectionChangeAfterEventReadBeginsStillDiscardsStaleResults() async throws {
         let scenario = GoogleScenario(
             calendarDelay: 0.1,
             calendarHandler: { request in
@@ -357,13 +381,14 @@ final class GoogleCalendarTests: XCTestCase {
         defer { fixture.cleanup() }
         let service = GoogleCalendarService(auth: fixture.auth, session: fixture.session)
         let pending = Task { try await service.fetchUpcomingEvents(from: Self.referenceDate, days: 1) }
-        try await waitForRequest("/calendar/v3/users/me/calendarList", scenario: scenario)
+        try await waitForRequest("/calendar/v3/calendars/shared/events", scenario: scenario)
         await service.setExcludedCalendarIDs(["shared"])
-        do { _ = try await pending.value; XCTFail("Stale selection published") } catch let error as GoogleCalendarError
+        do { _ = try await pending.value; XCTFail("Stale event results published") } catch let error
+            as GoogleCalendarError
         { XCTAssertEqual(error.code, "calendar_selection_changed") }
         let events = try await service.fetchUpcomingEvents(from: Self.referenceDate, days: 1)
         XCTAssertTrue(events.isEmpty)
-        XCTAssertFalse(scenario.requests.contains { $0.url?.path.hasSuffix("/events") == true })
+        XCTAssertEqual(scenario.requests.filter { $0.url?.path.hasSuffix("/events") == true }.count, 1)
     }
 
     func testDisconnectDiscardsInFlightCalendarPage() async throws {
