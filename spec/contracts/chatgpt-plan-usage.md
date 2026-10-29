@@ -33,6 +33,13 @@ authorization URL belongs in logs, source control or benchmark reports.
 
 ## Inference
 
+Automatic final minutes use a dedicated `ChatGPTLiveClient` instance through the
+same authorized plan and pinned session validation. Its physical socket is
+separate from foreground Live Ask; no named stream lane or new credential is
+introduced. A weak process registry ensures account switches and disconnects
+cancel requests on both foreground and background clients. See
+[automatic minutes](live-meeting-minutes.md) for source scope and retry rules.
+
 `ChatGPTLiveClient` implements the existing `LLMClientProtocol`. It uses a
 persistent native URLSession directly with the OAuth bearer token. Model choices
 come from the selected account's public `/v1/models` catalog (`models`, `slug`,

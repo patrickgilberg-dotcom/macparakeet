@@ -4,6 +4,17 @@ This personal fork retains local recording, durable audio, final transcription,
 notes, and the existing live Ask panel. Live Ask uses `ChatGPTLiveClient` directly;
 it never selects an API-key provider, CLI, connector, or agent fallback.
 
+An optional personal answer-style profile is read from the saved isolated
+preferences for each explicit Ask. Its instructions and approved writing
+samples are bounded user-data JSON, not meeting evidence. Stable system rules
+keep the spoken opening, factual sources, uncertainty and approval conditions
+ahead of wording preferences. Samples are not added to chat history or supplied
+to current/project memory summaries or final meeting minutes. Disabling the
+profile preserves the established request shape. ChatGPT sign-in does not import
+account conversations or personal memory. The editable starter reflects only
+the user's requested concise, direct wording; no biography or example messages
+are invented. See [meeting preferences](live-meeting-preferences-v1.md).
+
 - Help me answer this and custom questions prepare whole-meeting context and then
   perform one final streamed answer call. Periodic and catch-up summaries can
   make additional model calls through the same approved ChatGPT client.

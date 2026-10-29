@@ -49,6 +49,11 @@ struct LLMSettingsView: View {
         VStack(spacing: DesignSystem.Spacing.md) {
             ChatGPTConnectionView()
 
+            if LiveAppIdentity.isLive {
+                Divider()
+                LiveMeetingPreferencesView()
+            }
+
             Divider()
 
             setupStatusSection

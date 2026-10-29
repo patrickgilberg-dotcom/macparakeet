@@ -183,6 +183,33 @@ explicitly deleting an imported chat or meeting must not allow a retained lock
 to restore it again. Existing edited or cleared conversations win over a lock
 snapshot. Use normal GRDB UUID encoding for receipt lookups.
 
+**Automatic meeting minutes are durable private work, not a second transcript.**
+`meeting_minutes_jobs` (v0.52) owns immutable effective-transcript and personal-skill
+snapshots, exact evidence-text and canonical result hashes, ordered completed
+chunk receipts, bounded semantic maps and candidate evidence ranges. Its
+`transcriptionID` foreign key cascades deletion of this private work with the
+source meeting. Status queries select only metadata, never source bodies.
+The unique source/skill/policy identity deduplicates automatic completion calls.
+
+One attempt UUID owns each running job. A completed chunk is checkpointed only
+after terminal provider success and local quotation validation. Safe yielding
+returns the job to pending between requests; a process interruption instead
+becomes a visible failed job requiring explicit Retry. An uncertain accepted
+request is never silently replayed. Explicit Retry can create a new job for an
+edited source/skill; unchanged retries retain completed checkpoints. A provider
+identity change cannot silently reuse another identity's partial ledger.
+
+Final publication re-resolves the source/correction branch inside one database
+transaction, verifies complete contiguous source coverage, fresh-inserts a
+`PromptResult`, then marks the job completed. Failed, malformed or cancelled work
+never replaces existing minutes or user edits. The result's
+`sourceTranscriptHash` uses `PromptResultFreshness`'s word hash; the job's separate
+`sourceHash` fingerprints exact formatted evidence text. `resultID` has no
+foreign key so deleting only a result retains the completed job receipt and does
+not cause automatic resurrection. This row still contains private source/skill
+provenance while its meeting exists; it is not a content-free receipt like
+`chat_recovery_imports`.
+
 **Never use raw SQL `WHERE id = ?` with `uuid.uuidString`.**
 GRDB stores UUID values via Codable encoding, which produces a
 representation that is not always equal to `UUID.uuidString`. Use

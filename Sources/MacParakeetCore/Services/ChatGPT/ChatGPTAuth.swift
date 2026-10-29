@@ -47,6 +47,9 @@ public actor ChatGPTAuth {
     private let interactiveStoreFactory: (@Sendable () -> any KeyValueStore)?
     private let cancelRequests: @Sendable () -> Void
     private var cachedVault: Vault?
+    private var accountTransitionID: UUID?
+    private var disconnecting = false
+    private var authorizationGeneration: UInt64 = 0
     private var signingIn = false
     private var signInAttemptID: UUID?
     private var signInListener: ChatGPTLoopbackListener?
@@ -60,7 +63,7 @@ public actor ChatGPTAuth {
             .appendingPathComponent("MacParakeet-Live/ChatGPT", isDirectory: true)
         store = KeychainKeyValueStore(service: Self.service)
         interactiveStoreFactory = { KeychainKeyValueStore(service: Self.service, allowUserInteraction: true) }
-        cancelRequests = { ChatGPTLiveClient.shared.cancelAll() }
+        cancelRequests = { ChatGPTLiveClient.cancelAllClients() }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil
         configuration.urlCredentialStorage = nil
@@ -125,15 +128,20 @@ public actor ChatGPTAuth {
     }
 
     public func activeAccount() -> ChatGPTAccount? {
+        guard accountTransitionID == nil else { return nil }
         if let vault = try? loadVault() { cachedVault = vault }
         guard let vault = cachedVault else { return nil }
         return vault.registrations.first { $0.id == vault.activeID && $0.subject != nil }?.account
     }
 
     public func selectAccount(id: String) async throws {
+        guard !disconnecting, accountTransitionID == nil || signingIn else { throw Self.transitionError }
         cancelSignIn()
+        let transition = beginAccountTransition()
+        defer { endAccountTransition(transition) }
         let lock = try await acquireLock()
         defer { lock.release() }
+        guard accountTransitionID == transition else { throw CancellationError() }
         var vault = try loadVault()
         guard vault.registrations.contains(where: { $0.id == id && $0.subject != nil }) else {
             throw ChatGPTAuthError("account_missing", "That saved ChatGPT account is unavailable.")
@@ -146,13 +154,18 @@ public actor ChatGPTAuth {
     /// Opens the browser only once the loopback listener is accepting requests.
     /// Pass an existing registration ID to reconnect; nil adds a separate account.
     public func signIn(accountID: String? = nil, requestPlanConsent: Bool = false) async throws -> ChatGPTAccount {
+        guard !disconnecting, accountTransitionID == nil || signingIn else { throw Self.transitionError }
         guard !signingIn else {
             throw ChatGPTAuthError("sign_in_pending", "Complete or cancel the current ChatGPT sign-in first.")
         }
         signingIn = true
+        let transition = beginAccountTransition()
         let attemptID = UUID()
         signInAttemptID = attemptID
-        defer { signingIn = false; signInListener?.cancel(); signInListener = nil }
+        defer {
+            signingIn = false; signInListener?.cancel(); signInListener = nil
+            endAccountTransition(transition)
+        }
         let vault = try loadVault()
         let previous =
             accountID.flatMap { id in vault.registrations.first { $0.id == id } }
@@ -286,8 +299,10 @@ public actor ChatGPTAuth {
     /// Performs preparation/refresh outside the UI actor. A file lease serializes
     /// rotating refresh tokens across the GUI and its bundled CLI.
     public func accessToken(expectedAccountID: String? = nil) async throws -> String {
+        let epoch = try authorizationEpoch()
         let lock = try await acquireLock()
         defer { lock.release() }
+        try validateAuthorizationEpoch(epoch)
         var vault = try loadVault()
         try Self.checkActiveAccount(vault.activeID, expected: expectedAccountID)
         guard let index = vault.registrations.firstIndex(where: { $0.id == vault.activeID }),
@@ -305,6 +320,7 @@ public actor ChatGPTAuth {
             // A rotated token survived a key-service outage. Verify that checkpoint
             // before using it; never reuse the refresh token it replaced.
             try await validateRotation(pending, registration: registration)
+            try validateAuthorizationEpoch(epoch)
             registration.credentials = pending.credentials
             registration.scopes = pending.credentials.scopes
             registration.idToken = pending.idToken ?? registration.idToken
@@ -323,6 +339,7 @@ public actor ChatGPTAuth {
             throw ChatGPTAuthError("not_connected", "This ChatGPT account needs to be connected again.")
         }
         if credentials.expiresAt.timeIntervalSinceNow > 90 {
+            try validateAuthorizationEpoch(epoch)
             try Self.checkActiveAccount(try loadVault().activeID, expected: expectedAccountID)
             return credentials.accessToken
         }
@@ -343,7 +360,11 @@ public actor ChatGPTAuth {
             registration.pendingRefresh = pending
             vault.registrations[index] = registration
             try saveVault(vault)
+            // Preserve a rotated refresh token even if an account transition
+            // began during the request. Its owner can now revoke the new token.
+            try validateAuthorizationEpoch(epoch)
             try await validateRotation(pending, registration: registration)
+            try validateAuthorizationEpoch(epoch)
             registration.credentials = replacement
             registration.scopes = replacement.scopes
             registration.idToken = response.idToken ?? registration.idToken
@@ -356,6 +377,7 @@ public actor ChatGPTAuth {
                     "ChatGPT plan permission was removed. Enable it again before requesting answers.")
             }
             try Self.checkActiveAccount(try loadVault().activeID, expected: expectedAccountID)
+            try validateAuthorizationEpoch(epoch)
             return replacement.accessToken
         } catch let error as ChatGPTAuthError {
             let terminal = [
@@ -375,8 +397,11 @@ public actor ChatGPTAuth {
     }
 
     public func disconnect() async throws {
+        guard !disconnecting else { throw Self.transitionError }
+        disconnecting = true
         cancelSignIn()
-        cancelRequests()
+        let transition = beginAccountTransition()
+        defer { endAccountTransition(transition); disconnecting = false }
         let lock = try await acquireLock()
         defer { lock.release() }
         var vault = try loadVault()
@@ -412,6 +437,34 @@ public actor ChatGPTAuth {
             )
         }
     }
+
+    /// Local authorization attempts invalidate already-bound sessions even when
+    /// reconnecting/selecting the same account. Normal refresh leaves this stable.
+    func authorizationEpoch() throws -> UInt64 {
+        guard accountTransitionID == nil else { throw Self.transitionError }
+        try Task.checkCancellation()
+        return authorizationGeneration
+    }
+
+    private func beginAccountTransition() -> UUID {
+        authorizationGeneration &+= 1
+        let transition = UUID()
+        accountTransitionID = transition
+        cancelRequests()
+        return transition
+    }
+
+    private func endAccountTransition(_ transition: UUID) {
+        if accountTransitionID == transition { accountTransitionID = nil }
+    }
+
+    private func validateAuthorizationEpoch(_ epoch: UInt64) throws {
+        try Task.checkCancellation()
+        guard accountTransitionID == nil, authorizationGeneration == epoch else { throw CancellationError() }
+    }
+
+    private static let transitionError = ChatGPTAuthError(
+        "account_transition", "ChatGPT account settings are changing. Wait for that operation to finish.")
 
     private func validateSignInAttempt(_ attemptID: UUID) async throws {
         guard signInAttemptID == attemptID && !Task.isCancelled else {

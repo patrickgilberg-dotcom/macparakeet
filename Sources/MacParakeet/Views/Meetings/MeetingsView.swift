@@ -25,6 +25,7 @@ struct MeetingsView: View {
     @State private var showingPromptLibrary = false
     @State private var showingMeetingImport = false
     @State private var preparingEvent: CalendarEvent?
+    @Bindable private var liveMinutes = LiveMeetingMinutesViewModel.shared
     @FocusState private var recentMeetingsSelectionFocused: Bool
 
     private static let rightRailWidth: CGFloat = 300
@@ -459,36 +460,44 @@ struct MeetingsView: View {
 
     private var intelligenceSection: some View {
         MeetingsSection(title: "Intelligence", icon: "sparkles") {
-            switch viewModel.intelligenceStatus {
-            case .setupNeeded:
+            if LiveAppIdentity.isLive {
                 MeetingsInlineState(
-                    icon: "sparkles",
-                    title: "AI not configured",
-                    detail: "Summaries and meeting chat stay off until you choose a provider.",
-                    actionTitle: "Set Up AI",
-                    actionIcon: "gearshape",
-                    action: onOpenAISettings
-                )
-            case .ready(let displayName, let isLocal):
-                IntelligenceReadyRow(
-                    displayName: displayName,
-                    locality: isLocal ? "Local" : "External",
-                    localityIcon: isLocal ? "lock" : "cloud",
-                    detail: isLocal
-                        ? "Meeting summaries and chat use \(displayName) on this Mac."
-                        : nil,
-                    tint: isLocal ? DesignSystem.Colors.successGreen : DesignSystem.Colors.textSecondary,
-                    onOpenSettings: onOpenAISettings
-                )
-            case .cannotConnect(let displayName, let message):
-                MeetingsInlineState(
-                    icon: "exclamationmark.triangle",
-                    title: "\(displayName) unavailable",
-                    detail: message,
-                    actionTitle: "Open AI Settings",
-                    actionIcon: "gearshape",
-                    action: onOpenAISettings
-                )
+                    icon: "sparkles", title: "ChatGPT Live",
+                    detail:
+                        "Live answers and meeting minutes use your ChatGPT connection. Edit your personal answer style in AI settings.",
+                    actionTitle: "AI & Personal Style", actionIcon: "gearshape", action: onOpenAISettings)
+            } else {
+                switch viewModel.intelligenceStatus {
+                case .setupNeeded:
+                    MeetingsInlineState(
+                        icon: "sparkles",
+                        title: "AI not configured",
+                        detail: "Summaries and meeting chat stay off until you choose a provider.",
+                        actionTitle: "Set Up AI",
+                        actionIcon: "gearshape",
+                        action: onOpenAISettings
+                    )
+                case .ready(let displayName, let isLocal):
+                    IntelligenceReadyRow(
+                        displayName: displayName,
+                        locality: isLocal ? "Local" : "External",
+                        localityIcon: isLocal ? "lock" : "cloud",
+                        detail: isLocal
+                            ? "Meeting summaries and chat use \(displayName) on this Mac."
+                            : nil,
+                        tint: isLocal ? DesignSystem.Colors.successGreen : DesignSystem.Colors.textSecondary,
+                        onOpenSettings: onOpenAISettings
+                    )
+                case .cannotConnect(let displayName, let message):
+                    MeetingsInlineState(
+                        icon: "exclamationmark.triangle",
+                        title: "\(displayName) unavailable",
+                        detail: message,
+                        actionTitle: "Open AI Settings",
+                        actionIcon: "gearshape",
+                        action: onOpenAISettings
+                    )
+                }
             }
         }
     }
@@ -496,7 +505,14 @@ struct MeetingsView: View {
     @ViewBuilder
     private var autoNotesSection: some View {
         MeetingsSection(title: "After Each Meeting", icon: "wand.and.stars") {
-            if viewModel.isAutoNotesConfigured {
+            if LiveAppIdentity.isLive {
+                MeetingsInlineState(
+                    icon: "doc.text.magnifyingglass",
+                    title: liveMinutes.automaticMinutesEnabled ? "Automatic meeting minutes" : "Automatic minutes paused",
+                    detail:
+                        "Your saved meeting skill runs after the final transcript is saved. Open a meeting to view minutes, progress, or retry a failed attempt.",
+                    actionTitle: "Edit Meeting Skill", actionIcon: "square.and.pencil", action: onOpenAISettings)
+            } else if viewModel.isAutoNotesConfigured {
                 autoNotesContent
             } else {
                 MeetingsInlineState(

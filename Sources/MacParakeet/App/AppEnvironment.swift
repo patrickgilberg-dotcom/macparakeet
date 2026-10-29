@@ -40,6 +40,10 @@ final class AppEnvironment {
     let promptCollectionRepo: PromptCollectionRepository
     let promptEditingService: PromptEditingService
     let promptResultRepo: PromptResultRepository
+    let liveMinutesRepository: MeetingMinutesJobRepository
+    let liveMinutesEngine: MeetingMinutesEngine
+    let liveMinutesClient: ChatGPTLiveClient
+    let liveMinutes: LiveMeetingMinutesViewModel
     let meetingArtifactStore: MeetingArtifactStore
     let meetingSplitRepo: MeetingSplitRepository
     let meetingSplitService: MeetingSplitService
@@ -129,6 +133,11 @@ final class AppEnvironment {
         promptCollectionRepo = PromptCollectionRepository(dbQueue: databaseManager.dbQueue)
         promptEditingService = PromptEditingService(dbQueue: databaseManager.dbQueue)
         promptResultRepo = PromptResultRepository(dbQueue: databaseManager.dbQueue)
+        liveMinutesRepository = MeetingMinutesJobRepository(dbQueue: databaseManager.dbQueue)
+        liveMinutesEngine = MeetingMinutesEngine(repository: liveMinutesRepository)
+        // A separate physical socket prevents background minutes from holding Live Ask's request lease.
+        liveMinutesClient = ChatGPTLiveClient()
+        liveMinutes = .shared
         meetingSplitRepo = MeetingSplitRepository(dbQueue: databaseManager.dbQueue)
         meetingArtifactStore = MeetingArtifactStore(
             speakerAttributionReader: speakerAttributionReader,
@@ -503,7 +512,7 @@ final class AppEnvironment {
             }
         )
 
-        let savedAudioCompletionService = SavedAudioAutoPromptCompletionService(
+        let legacySavedAudioCompletionService = SavedAudioAutoPromptCompletionService(
             promptRepo: promptRepo,
             promptResultRepo: promptResultRepo,
             llmService: llmService,
@@ -516,6 +525,11 @@ final class AppEnvironment {
                 runtimePreferences.meetingAIOutputLanguagePolicy
             }
         )
+        let savedAudioCompletionService = ConfiguredSavedAudioAutoPromptCompletionService(
+            delegate: legacySavedAudioCompletionService,
+            isConfigured: { [llmConfigStore] in
+                !LiveAppIdentity.isLive || (try? llmConfigStore.loadRouteMetadata(for: .analysis)) != nil
+            })
         meetingSplitService = MeetingSplitService(
             transcriptionRepo: transcriptionRepo,
             splitRepo: meetingSplitRepo,

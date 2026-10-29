@@ -357,6 +357,40 @@ final class AppEnvironmentConfigurer {
             return true
         }
 
+        if LiveAppIdentity.isLive {
+            let defaults = AppPaths.sharedAppDefaults()
+            let activationKey = "liveMeetingMinutesAutomaticStartDate"
+            let activationDate = defaults.object(forKey: activationKey) as? Date ?? Date()
+            if defaults.object(forKey: activationKey) == nil { defaults.set(activationDate, forKey: activationKey) }
+            let minutesArtifacts = MeetingMinutesArtifactRefresher(
+                transcriptionRepository: env.transcriptionRepo,
+                promptResultRepository: env.promptResultRepo,
+                speakerAttributionReader: env.speakerAttributionReader,
+                artifactStore: env.meetingArtifactStore)
+            let minutesClient = env.liveMinutesClient
+            env.liveMinutes.configure(
+                repository: env.liveMinutesRepository, engine: env.liveMinutesEngine,
+                preferencesProvider: { try await LiveMeetingPreferencesStore.shared.snapshot() },
+                sessionProvider: { try await minutesClient.liveAnswerSession() },
+                activeCaptureProvider: { [weak meetingPill] in
+                    switch meetingPill?.state {
+                    case .starting, .recording, .paused, .completing, .transcribing: return true
+                    case .idle, .completed, .error, nil: return false
+                    }
+                },
+                automaticStartDate: activationDate,
+                artifactRefresh: { id in try await minutesArtifacts.refresh(transcriptionID: id) },
+                onSaved: { [weak self] transcriptionID, _ in
+                    guard let self else { return }
+                    if self.transcriptionViewModel.currentTranscription?.id == transcriptionID {
+                        self.promptResultsViewModel.loadPromptResults(transcriptionId: transcriptionID)
+                    }
+                    self.libraryViewModel.loadTranscriptions()
+                    self.meetingsWorkspaceViewModel.refreshRecentMeetings()
+                })
+            env.liveMinutes.start()
+        }
+
         transcriptionViewModel.onTranscribingChanged = { _ in
             callbacks.onMenuBarIconUpdate()
         }
@@ -451,17 +485,23 @@ final class AppEnvironmentConfigurer {
             finalizationOwnershipClaimer: env.meetingRecordingLockFileStore,
             onMenuBarIconUpdate: { _ in callbacks.onMenuBarIconUpdate() },
             onTranscriptionReady: { [weak self] transcription in
+                Task { await env.liveMinutes.meetingCompleted(transcriptionID: transcription.id) }
                 self?.handleMeetingTranscriptReady(
                     transcription,
                     preferences: env.runtimePreferences,
+                    runLegacyAutoPrompts: !LiveAppIdentity.isLive
+                        || (try? env.llmConfigStore.loadRouteMetadata(for: .analysis)) != nil,
                     canPresent: true,
                     openMainWindow: callbacks.onOpenMainWindow
                 )
             },
             onQueuedTranscriptionReady: { [weak self] transcription, canPresent in
+                Task { await env.liveMinutes.meetingCompleted(transcriptionID: transcription.id) }
                 self?.handleMeetingTranscriptReady(
                     transcription,
                     preferences: env.runtimePreferences,
+                    runLegacyAutoPrompts: !LiveAppIdentity.isLive
+                        || (try? env.llmConfigStore.loadRouteMetadata(for: .analysis)) != nil,
                     canPresent: canPresent,
                     openMainWindow: callbacks.onOpenMainWindow
                 )
@@ -647,6 +687,7 @@ final class AppEnvironmentConfigurer {
     private func handleMeetingTranscriptReady(
         _ transcription: Transcription,
         preferences: AppRuntimePreferencesProtocol,
+        runLegacyAutoPrompts: Bool,
         canPresent: Bool,
         openMainWindow: () -> Void
     ) {
@@ -654,7 +695,7 @@ final class AppEnvironmentConfigurer {
         transcriptionViewModel.presentCompletedTranscription(
             transcription,
             autoSave: true,
-            runAutoPrompts: true,
+            runAutoPrompts: runLegacyAutoPrompts,
             selectTranscription: shouldOpen
         )
         libraryViewModel.loadTranscriptions()

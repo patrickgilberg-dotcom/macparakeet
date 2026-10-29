@@ -4,15 +4,18 @@ import Foundation
 /// model or policy changes rather than silently routing a later chunk elsewhere.
 public struct LiveAnswerStreamSession: Sendable {
     public let cacheKey: String
+    public let modelName: String?
     private let streamClosure: @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>
     private let validation: @Sendable () async throws -> Void
 
     public init(
         cacheKey: String,
+        modelName: String? = nil,
         validate: @escaping @Sendable () async throws -> Void = {},
         stream: @escaping @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>
     ) {
         self.cacheKey = cacheKey
+        self.modelName = modelName
         validation = validate
         streamClosure = stream
     }

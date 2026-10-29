@@ -176,6 +176,34 @@ private final class ChatGPTRequestRegistry: @unchecked Sendable {
     }
 }
 
+/// Each client owns its transport lane, but account changes must cancel every
+/// lane. Weak entries keep short-lived clients from becoming process globals.
+private final class ChatGPTClientRegistry: @unchecked Sendable {
+    private final class Entry {
+        weak var client: ChatGPTLiveClient?
+        init(_ client: ChatGPTLiveClient) { self.client = client }
+    }
+
+    private let lock = NSLock()
+    private var entries: [Entry] = []
+
+    func register(_ client: ChatGPTLiveClient) {
+        lock.withLock {
+            entries.removeAll { $0.client == nil }
+            entries.append(Entry(client))
+        }
+    }
+
+    func cancelAll() {
+        let clients = lock.withLock {
+            entries.removeAll { $0.client == nil }
+            return entries.compactMap(\.client)
+        }
+        // Transport cancellation must not execute under the registry lock.
+        for client in clients { client.cancelAll() }
+    }
+}
+
 private final class ChatGPTNoRedirect: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(
         _ session: URLSession, task: URLSessionTask,
@@ -202,6 +230,7 @@ private actor ChatGPTModelCache {
 
 /// OAuth-only provider. There is deliberately no API-key, CLI, or paid fallback.
 public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
+    private static let clients = ChatGPTClientRegistry()
     public static let shared = ChatGPTLiveClient()
     public let transport: ChatGPTTransport
     private let session: URLSession
@@ -228,6 +257,13 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
             config.urlCredentialStorage = nil
             self.session = URLSession(configuration: config)
         }
+        Self.clients.register(self)
+    }
+
+    /// Called by the app-owned authentication session before an account change
+    /// or disconnect. Does not initialize the shared client as a side effect.
+    public static func cancelAllClients() {
+        clients.cancelAll()
     }
 
     public func models(refresh: Bool = false) async throws -> [ChatGPTModel] {
@@ -276,10 +312,16 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         let accountID: String
         let selection: ChatGPTModelSelection
         let transport: ChatGPTTransport
+        let authorizationEpoch: UInt64
         let policy = "rolling-meeting-memory-v1"
+
+        // Epoch rejects old in-process sessions, including same-account ABA.
+        // Durable minutes checkpoints keep their provider identity on restart.
+        enum CodingKeys: String, CodingKey { case accountID, selection, transport, policy }
     }
 
     private func meetingSessionIdentity() async throws -> MeetingSessionIdentity {
+        let epoch = try await auth.authorizationEpoch()
         guard let account = await auth.activeAccount(), account.planUsageEnabled else {
             throw ChatGPTLiveError.disconnected
         }
@@ -287,7 +329,9 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         guard let current = await auth.activeAccount(), current.id == account.id, current.planUsageEnabled else {
             throw CancellationError()
         }
-        return MeetingSessionIdentity(accountID: account.id, selection: chosen, transport: transport)
+        guard try await auth.authorizationEpoch() == epoch else { throw CancellationError() }
+        return MeetingSessionIdentity(
+            accountID: account.id, selection: chosen, transport: transport, authorizationEpoch: epoch)
     }
 
     private func validateMeetingSession(_ expected: MeetingSessionIdentity) async throws {
@@ -302,7 +346,8 @@ public final class ChatGPTLiveClient: LLMClientProtocol, Sendable {
         encoder.outputFormatting = [.sortedKeys]
         let key = SHA256.hash(data: try encoder.encode(identity)).map { String(format: "%02x", $0) }.joined()
         return LiveAnswerStreamSession(
-            cacheKey: key, validate: { [self] in try await validateMeetingSession(identity) }
+            cacheKey: key, modelName: identity.selection.model,
+            validate: { [self] in try await validateMeetingSession(identity) }
         ) { [self] messages in
             let events = detailedStream(
                 messages: messages, model: identity.selection.model,

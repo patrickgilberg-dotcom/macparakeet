@@ -2511,6 +2511,34 @@ public final class DatabaseManager: Sendable {
             }
         }
 
+        migrator.registerMigration("v0.52-evidence-first-meeting-minutes") { db in
+            try db.create(table: "meeting_minutes_jobs") { t in
+                t.column("id", .blob).primaryKey()
+                t.column("transcriptionID", .blob).notNull().references("transcriptions", onDelete: .cascade)
+                t.column("identityKey", .text).notNull().unique()
+                t.column("state", .text).notNull()
+                t.column("skillRevision", .text).notNull()
+                t.column("sourceHash", .text).notNull()
+                t.column("coveredCharacters", .integer).notNull()
+                t.column("totalCharacters", .integer).notNull()
+                // No FK: deleting minutes preserves the completed job receipt.
+                t.column("resultID", .blob)
+                t.column("errorMessage", .text)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+                t.column("sourceJSON", .text).notNull()
+                t.column("skillJSON", .text).notNull()
+                t.column("progressJSON", .text).notNull()
+                t.column("attemptID", .blob)
+                t.column("providerIdentity", .text)
+                t.column("providerSnapshot", .text)
+                t.column("modelSnapshot", .text)
+                t.column("allowsProviderRebind", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(index: "meeting_minutes_jobs_state", on: "meeting_minutes_jobs", columns: ["state", "createdAt"])
+            try db.create(index: "meeting_minutes_jobs_source", on: "meeting_minutes_jobs", columns: ["transcriptionID", "createdAt"])
+        }
+
         return migrator
     }
 

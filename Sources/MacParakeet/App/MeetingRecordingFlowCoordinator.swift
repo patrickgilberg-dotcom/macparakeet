@@ -781,6 +781,9 @@ final class MeetingRecordingFlowCoordinator {
                 cliConfigStore: cliConfigStore
             )
             if LiveAppIdentity.isLive {
+                panelVM.chatViewModel.configureLiveAnswerPreferences {
+                    try await LiveMeetingPreferencesStore.shared.snapshot()
+                }
                 panelVM.chatViewModel.livePreparationContext =
                     AppPaths.sharedAppDefaults().string(forKey: "livePreparationContext") ?? ""
                 panelVM.chatViewModel.configureDirectLiveAnswers(

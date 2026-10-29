@@ -119,6 +119,129 @@ final class ChatGPTLiveSessionTests: XCTestCase, @unchecked Sendable {
         XCTAssertTrue(fixture.scenario.responseRequests.isEmpty)
     }
 
+    func testDisconnectCancelsForegroundAndDedicatedClientStreams() async throws {
+        let fixture = try LiveSessionFixture(cancelAllClientsOnAuthChange: true)
+        defer { fixture.cleanup() }
+        let dedicated = ChatGPTLiveClient(auth: fixture.auth, session: fixture.session, transport: .httpSSE)
+        fixture.scenario.holdResponses = true
+        let foregroundSession = try await fixture.client.liveAnswerSession()
+        let dedicatedSession = try await dedicated.liveAnswerSession()
+        let foregroundOutcome = LiveSessionCancellationOutcome()
+        let dedicatedOutcome = LiveSessionCancellationOutcome()
+        let foreground = collectUntilFinished(foregroundSession, outcome: foregroundOutcome)
+        let background = collectUntilFinished(dedicatedSession, outcome: dedicatedOutcome)
+        defer { foreground.cancel(); background.cancel(); dedicated.cancelAll() }
+        try await waitUntil { fixture.scenario.responseRequests.count == 2 }
+
+        try await fixture.auth.disconnect()
+
+        try await waitUntil { foregroundOutcome.finished && dedicatedOutcome.finished }
+        XCTAssertFalse(foregroundOutcome.succeeded)
+        XCTAssertFalse(dedicatedOutcome.succeeded)
+        await assertRejected(foregroundSession)
+        await assertRejected(dedicatedSession)
+        XCTAssertEqual(fixture.scenario.responseRequests.count, 2, "Disconnect must not replay either request")
+    }
+
+    func testAccountSwitchCancelsDedicatedStreamAndRejectsItsOldScope() async throws {
+        let fixture = try LiveSessionFixture(cancelAllClientsOnAuthChange: true)
+        defer { fixture.cleanup() }
+        let dedicated = ChatGPTLiveClient(auth: fixture.auth, session: fixture.session, transport: .httpSSE)
+        fixture.scenario.holdResponses = true
+        let original = try await dedicated.liveAnswerSession()
+        let outcome = LiveSessionCancellationOutcome()
+        let pending = collectUntilFinished(original, outcome: outcome)
+        defer { pending.cancel(); dedicated.cancelAll() }
+        try await waitUntil { fixture.scenario.responseRequests.count == 1 }
+
+        try await fixture.auth.selectAccount(id: fixture.accountB)
+
+        try await waitUntil { outcome.finished }
+        XCTAssertFalse(outcome.succeeded)
+        let replacement = try await dedicated.liveAnswerSession()
+        XCTAssertNotEqual(original.cacheKey, replacement.cacheKey)
+        await assertRejected(original)
+        XCTAssertEqual(fixture.scenario.responseRequests.count, 1, "Old scope cannot send on the replacement account")
+    }
+
+    func testCancellationRegistryDoesNotRetainAnUnusedDedicatedClient() throws {
+        let fixture = try LiveSessionFixture()
+        defer { fixture.cleanup() }
+        var dedicated: ChatGPTLiveClient? = ChatGPTLiveClient(
+            auth: fixture.auth, session: fixture.session, transport: .httpSSE)
+        weak var observed = dedicated
+        dedicated = nil
+        XCTAssertNil(observed, "Registering a transport lane must not keep its client alive")
+    }
+
+    func testDisconnectInvalidatesIdleSessionsBeforeRevocationFinishes() async throws {
+        let fixture = try LiveSessionFixture(cancelAllClientsOnAuthChange: true, renewable: true)
+        defer { fixture.cleanup() }
+        let bound = try await fixture.client.liveAnswerSession()
+        fixture.scenario.holdRevocation = true
+        let disconnection = Task { try await fixture.auth.disconnect() }
+        defer { disconnection.cancel(); fixture.scenario.releaseRevocation() }
+        try await waitUntil { fixture.scenario.revocationIsWaiting }
+
+        XCTAssertTrue(try fixture.store.activeRegistrationIsAuthorized(), "Remote revocation is still gated")
+        let active = await fixture.auth.activeAccount()
+        XCTAssertNil(active)
+        do { try await bound.validate(); XCTFail("An idle session survived disconnect intent") } catch {}
+        do {
+            _ = try await fixture.client.liveAnswerSession()
+            XCTFail("A new session was admitted during disconnect")
+        } catch {}
+        do {
+            _ = try await fixture.auth.accessToken(expectedAccountID: fixture.accountA)
+            XCTFail("Credentials escaped during disconnect")
+        } catch {}
+        XCTAssertTrue(fixture.scenario.responseRequests.isEmpty)
+
+        fixture.scenario.releaseRevocation()
+        try await disconnection.value
+        do { try await bound.validate(); XCTFail("A disconnected session became valid again") } catch {}
+    }
+
+    func testSameAccountTransitionRejectsOldSessionWithoutChangingDurableProviderKey() async throws {
+        let fixture = try LiveSessionFixture(cancelAllClientsOnAuthChange: true)
+        defer { fixture.cleanup() }
+        let original = try await fixture.client.liveAnswerSession()
+        try await fixture.auth.selectAccount(id: fixture.accountA)
+        let replacement = try await fixture.client.liveAnswerSession()
+
+        do { try await original.validate(); XCTFail("Same-account transition revived the old session") } catch {}
+        try await replacement.validate()
+        XCTAssertEqual(original.cacheKey, replacement.cacheKey, "A local epoch is not durable provider identity")
+        let restartedAuth = ChatGPTAuth(
+            store: fixture.store, storageDirectory: fixture.directory, session: fixture.session)
+        let restartedClient = ChatGPTLiveClient(auth: restartedAuth, session: fixture.session, transport: .httpSSE)
+        let restarted = try await restartedClient.liveAnswerSession()
+        XCTAssertEqual(restarted.cacheKey, replacement.cacheKey, "Safe checkpoints must survive app restart")
+        XCTAssertTrue(fixture.scenario.responseRequests.isEmpty)
+    }
+
+    private func collectUntilFinished(
+        _ session: LiveAnswerStreamSession, outcome: LiveSessionCancellationOutcome
+    ) -> Task<Void, Never> {
+        Task {
+            do {
+                _ = try await collect(session)
+                outcome.finish(succeeded: true)
+            } catch {
+                outcome.finish(succeeded: false)
+            }
+        }
+    }
+
+    private func waitUntil(_ condition: @Sendable () -> Bool) async throws {
+        for _ in 0..<400 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        XCTFail("Synthetic client cancellation did not settle")
+        throw URLError(.timedOut)
+    }
+
     private func collect(_ session: LiveAnswerStreamSession) async throws -> String {
         var text = ""
         for try await delta in session.stream(messages: [.init(role: .user, content: "Synthetic question.")]) {
@@ -151,20 +274,22 @@ private final class LiveSessionFixture: @unchecked Sendable {
     let auth: ChatGPTAuth
     let client: ChatGPTLiveClient
 
-    init() throws {
+    init(cancelAllClientsOnAuthChange: Bool = false, renewable: Bool = false) throws {
         directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             "macparakeet-live-bound-session-" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         func registration(id: String, suffix: String) -> [String: Any] {
-            [
+            var credentials: [String: Any] = [
+                "accessToken": "synthetic-live-access-" + suffix,
+                "expiresAt": Date().addingTimeInterval(3_600).timeIntervalSinceReferenceDate,
+                "scopes": Self.scopes,
+            ]
+            if renewable { credentials["refreshToken"] = "synthetic-live-refresh-" + suffix }
+            return [
                 "id": id, "clientID": "oaiapp_synthetic_" + suffix,
                 "subject": "synthetic-subject-" + suffix, "authorized": true,
                 "scopes": Self.scopes,
-                "credentials": [
-                    "accessToken": "synthetic-live-access-" + suffix,
-                    "expiresAt": Date().addingTimeInterval(3_600).timeIntervalSinceReferenceDate,
-                    "scopes": Self.scopes,
-                ],
+                "credentials": credentials,
             ]
         }
         let vault = try JSONSerialization.data(withJSONObject: [
@@ -180,7 +305,11 @@ private final class LiveSessionFixture: @unchecked Sendable {
         configuration.urlCredentialStorage = nil
         configuration.urlCache = nil
         session = URLSession(configuration: configuration)
-        auth = ChatGPTAuth(store: store, storageDirectory: directory, session: session)
+        auth = ChatGPTAuth(
+            store: store, storageDirectory: directory, session: session,
+            cancelRequests: {
+                if cancelAllClientsOnAuthChange { ChatGPTLiveClient.cancelAllClients() }
+            })
         client = ChatGPTLiveClient(auth: auth, session: session, transport: .httpSSE)
         try saveSelection(.init(model: Self.modelA, reasoningEffort: "none"), for: accountA)
         try saveSelection(.init(model: Self.modelA, reasoningEffort: "none"), for: accountB)
@@ -192,6 +321,7 @@ private final class LiveSessionFixture: @unchecked Sendable {
     }
 
     func cleanup() {
+        scenario.releaseRevocation()
         client.cancelAll()
         session.invalidateAndCancel()
         LiveSessionProtocol.registry.remove(id: identifier)
@@ -217,6 +347,14 @@ private final class LiveSessionStore: KeyValueStore, @unchecked Sendable {
                 decoding: try JSONSerialization.data(withJSONObject: vault), as: UTF8.self)
         }
     }
+    func activeRegistrationIsAuthorized() throws -> Bool {
+        try lock.withLock {
+            let vault = try JSONSerialization.jsonObject(with: Data(values["connections-v1"]!.utf8)) as! [String: Any]
+            let registrations = vault["registrations"] as! [[String: Any]]
+            return registrations.first { $0["id"] as? String == vault["activeID"] as? String }?["authorized"] as? Bool
+                == true
+        }
+    }
 }
 
 private final class LiveSessionScenario: @unchecked Sendable {
@@ -229,7 +367,36 @@ private final class LiveSessionScenario: @unchecked Sendable {
     private var requests: [Request] = []
     private var catalogHook: (@Sendable () throws -> Void)?
     private var terminalHook: (@Sendable () throws -> Void)?
+    private var holdsResponses = false
+    private var holdsRevocation = false
+    private var pendingRevocation: (@Sendable () -> Void)?
     var responseRequests: [Request] { lock.withLock { requests } }
+    var holdResponses: Bool {
+        get { lock.withLock { holdsResponses } }
+        set { lock.withLock { holdsResponses = newValue } }
+    }
+    var holdRevocation: Bool {
+        get { lock.withLock { holdsRevocation } }
+        set { lock.withLock { holdsRevocation = newValue } }
+    }
+    var revocationIsWaiting: Bool { lock.withLock { pendingRevocation != nil } }
+    func receiveRevocation(_ completion: @escaping @Sendable () -> Void) {
+        let held = lock.withLock {
+            guard holdsRevocation else { return false }
+            pendingRevocation = completion
+            return true
+        }
+        if !held { completion() }
+    }
+    func releaseRevocation() {
+        let completion = lock.withLock {
+            holdsRevocation = false
+            let completion = pendingRevocation
+            pendingRevocation = nil
+            return completion
+        }
+        completion?()
+    }
     var beforeCatalog: (@Sendable () throws -> Void)? {
         get { lock.withLock { catalogHook } }
         set { lock.withLock { catalogHook = newValue } }
@@ -259,6 +426,14 @@ private final class LiveSessionScenario: @unchecked Sendable {
     }
 }
 
+private final class LiveSessionCancellationOutcome: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Bool?
+    var finished: Bool { lock.withLock { result != nil } }
+    var succeeded: Bool { lock.withLock { result == true } }
+    func finish(succeeded: Bool) { lock.withLock { result = succeeded } }
+}
+
 private final class LiveSessionRegistry: @unchecked Sendable {
     private let lock = NSLock()
     private var scenarios: [String: LiveSessionScenario] = [:]
@@ -279,6 +454,17 @@ private final class LiveSessionProtocol: URLProtocol, @unchecked Sendable {
         }
         do {
             switch url.path {
+            case "/.well-known/openid-configuration":
+                let data = try JSONSerialization.data(withJSONObject: [
+                    "issuer": "https://auth.openai.com",
+                    "authorization_endpoint": "https://auth.openai.com/api/accounts/authorize",
+                    "token_endpoint": "https://auth.openai.com/api/accounts/oauth/token",
+                    "revocation_endpoint": "https://auth.openai.com/api/accounts/oauth/revoke",
+                    "jwks_uri": "https://auth.openai.com/.well-known/jwks.json",
+                ])
+                receive(data, type: "application/json", url: url)
+            case "/api/accounts/oauth/revoke":
+                scenario.receiveRevocation { [self] in receive(Data(), type: "application/json", url: url) }
             case "/v1/models":
                 try scenario.beforeCatalog?()
                 let data = try JSONSerialization.data(withJSONObject: [
@@ -298,6 +484,7 @@ private final class LiveSessionProtocol: URLProtocol, @unchecked Sendable {
                     didLoad: Data(
                         "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Synthetic completed answer.\"}\n\n"
                             .utf8))
+                if scenario.holdResponses { return }
                 try scenario.beforeTerminal?()
                 client?.urlProtocol(self, didLoad: Data("data: {\"type\":\"response.completed\"}\n\n".utf8))
                 client?.urlProtocolDidFinishLoading(self)

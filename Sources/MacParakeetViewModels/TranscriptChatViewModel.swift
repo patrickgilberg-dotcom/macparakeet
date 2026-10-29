@@ -107,6 +107,7 @@ public final class TranscriptChatViewModel {
     private var userNotesProvider: (@MainActor () -> String?)?
     private var prepareLiveTranscript: (@MainActor () async throws -> Void)?
     private var directLiveSessionProvider: (@Sendable () async throws -> LiveAnswerStreamSession)?
+    private var liveAnswerPreferencesProvider: (@Sendable () async throws -> LiveMeetingPreferences)?
     private var liveMeetingMemory = LiveMeetingMemory()
     // Mutated only on MainActor; deinit only cancels the Sendable task handles.
     @ObservationIgnored nonisolated(unsafe) private var summaryTimerTask: Task<Void, Never>?
@@ -125,6 +126,13 @@ public final class TranscriptChatViewModel {
 
     public var canSendMessage: Bool {
         llmService != nil || directLiveSessionProvider != nil
+    }
+
+    /// Read saved preferences for each explicit Ask; never include writing samples in summaries.
+    public func configureLiveAnswerPreferences(
+        _ provider: @escaping @Sendable () async throws -> LiveMeetingPreferences
+    ) {
+        liveAnswerPreferencesProvider = provider
     }
 
     /// The stream-only overload keeps injected local test providers simple.
@@ -564,6 +572,7 @@ public final class TranscriptChatViewModel {
         let projectGeneration = projectConfigurationGeneration
         let capturedProjectSourceProvider = projectSourceProvider
         let capturedEventPreparation = eventPreparationContext
+        let capturedPreferencesProvider = liveAnswerPreferencesProvider
         if directLiveSessionProvider != nil { liveAnswerTiming = LiveAnswerTiming() }
 
         let assistantID = UUID()
@@ -632,6 +641,8 @@ public final class TranscriptChatViewModel {
                 let userNotes = directLiveSessionProvider == nil ? capturedNotes : userNotesProvider?()
                 let stream: AsyncThrowingStream<String, Error>
                 if let session = liveSession {
+                    let answerPreferences = try await capturedPreferencesProvider?()
+                    try Task.checkCancellation()
                     let memory = liveMeetingMemory
                     let memorySnapshot = try await memory.prepare(
                         transcript: transcript, question: question, cacheKey: session.cacheKey,
@@ -675,11 +686,17 @@ public final class TranscriptChatViewModel {
                     let projectScope = preparedProjectContext?.scopeKey
                     if projectScope != lastAnswerProjectScopeKey { liveHistoryStartIndex = historyForRequest.count }
                     let scopedHistory = Array(historyForRequest.dropFirst(liveHistoryStartIndex))
-                    let contextMessages = LiveAnswerContext.messages(
+                    var contextMessages = LiveAnswerContext.messages(
                         question: question, context: memorySnapshot, notes: userNotes,
                         preparation: livePreparationContext, history: scopedHistory,
                         eventPreparation: capturedEventPreparation,
                         previousMeeting: preparedProjectContext?.quotedContext ?? "")
+                    if let answerPreferences {
+                        contextMessages = LiveAnswerStyleContext.applying(
+                            to: contextMessages, enabled: answerPreferences.answerStyleEnabled,
+                            preferences: answerPreferences.answerStyleInstructions,
+                            examples: answerPreferences.answerStyleExamples)
+                    }
                     liveAnswerTiming?.requestStartedMs = LiveAnswerTiming.milliseconds(
                         requestStarted.duration(to: .now))
                     stream = session.stream(messages: contextMessages)

@@ -9,6 +9,38 @@ private actor LiveAnswerRequestCapture {
 
 @MainActor
 final class LiveAnswerTests: XCTestCase {
+    func testExplicitAskUsesSavedStyleAsDataAlongsideFreshMeetingFacts() async throws {
+        let vm = TranscriptChatViewModel()
+        let capture = LiveAnswerRequestCapture()
+        let profile = LiveMeetingPreferences(
+            skillMarkdown: "Minutes skill is not sent to live Ask.",
+            answerStyleInstructions: "Use simple, direct sentences.",
+            answerStyleExamples: "Synthetic sample: We approved the $90,000 design last month.")
+        vm.configureLiveAnswerPreferences { profile }
+        vm.configure(llmService: nil, transcriptText: "Current budget is $7,000 and approval is pending.")
+        vm.configureDirectLiveAnswers(prepareTranscript: {}, stream: { messages in
+            AsyncThrowingStream { continuation in
+                Task {
+                    await capture.record(messages)
+                    continuation.yield("Approval is pending; I’ll confirm the next step.")
+                    continuation.finish()
+                }
+            }
+        })
+        vm.helpMeAnswer()
+        try await waitUntilSettled(vm)
+        let requests = await capture.requests
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertTrue(requests[0][1].content.contains("Use simple, direct sentences."))
+        XCTAssertEqual(requests[0][1].role, .user)
+        XCTAssertTrue(requests[0].last!.content.contains("Current budget is $7,000"))
+        XCTAssertFalse(requests[0].first!.content.contains("$90,000"))
+        XCTAssertFalse(requests[0].contains { $0.content.contains("Minutes skill is not sent") })
+        XCTAssertTrue(requests[0].first!.content.contains("not evidence"))
+        XCTAssertEqual(vm.liveAnswerTiming?.outcome, "completed")
+        vm.stopLiveMeetingMemory()
+    }
+
     func testRollingSnapshotIncludesSummaryExactExcerptsAndLatestRawSpeechAsQuotedContext() {
         let snapshot = LiveMeetingMemorySnapshot(
             recentTranscript: "Lee: The Friday deadline changed to Monday. Can you confirm it?",

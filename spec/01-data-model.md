@@ -1525,6 +1525,39 @@ extension PromptResult: FetchableRecord, PersistableRecord {
 }
 ```
 
+### MeetingMinutesJob
+
+Migration `v0.52-evidence-first-meeting-minutes` adds private durable
+`meeting_minutes_jobs`. Public `MeetingMinutesJob` is lightweight status metadata;
+the repository's internal work record holds immutable source/skill snapshots
+and the resumable evidence ledger.
+
+| Column | Storage and purpose |
+| --- | --- |
+| `id` | UUID BLOB primary key |
+| `transcriptionID` | UUID BLOB foreign key to `transcriptions`, delete cascades |
+| `identityKey` | Unique hash of source, skill revision and integrity policy |
+| `state` | `pending`, `running`, `failed`, `completed` |
+| `skillRevision`, `sourceHash` | Exact skill/evidence-text SHA-256 provenance |
+| `coveredCharacters`, `totalCharacters` | Ordered unique source coverage |
+| `sourceJSON`, `skillJSON` | Private immutable source and skill snapshots |
+| `progressJSON` | Completed chunk ranges, bounded meeting map and exact evidence ranges |
+| `attemptID` | UUID lease for one running attempt |
+| `providerIdentity`, `providerSnapshot`, `modelSnapshot` | Pinned provider identity and available model receipts |
+| `allowsProviderRebind` | Explicit retry may restart checkpoints for a changed provider |
+| `resultID` | Successful `summaries` UUID, deliberately no FK |
+| `errorMessage` | Bounded user-visible failure, without provider response content |
+| `createdAt`, `updatedAt` | Job lifecycle timestamps |
+
+Source deletion removes private snapshots and pending work. Deleting only the
+minutes result leaves the completed job receipt, preventing automatic
+regeneration of content the user deleted. Interrupted running work requires an
+explicit retry; pending work and complete checkpoints survive restart. Final
+result insertion and completed-state publication share the source-revalidation
+transaction and never replace an existing valid/user-edited result. Exact
+evidence text has a separate hash from the canonical word hash stored in
+`PromptResult.sourceTranscriptHash`.
+
 ### QuickPrompt
 
 ```swift
@@ -1887,6 +1920,9 @@ migrator.registerMigration("v0.7-prompts-and-summaries") { db in
 // v0.47-meeting-ai-output-language — summaries.outputLanguagePolicySnapshot
 // v0.48-prompt-result-source-transcript — summaries.sourceTranscriptHash
 // v0.49-ask-conversations — independent Ask history and cross-process run lease
+// v0.50-project-meeting-preparation — local project/event-preparation associations
+// v0.51-live-chat-recovery-receipts — content-free import/deletion receipts
+// v0.52-evidence-first-meeting-minutes — durable private full-source minutes jobs
 ```
 
 ### Migration Rules

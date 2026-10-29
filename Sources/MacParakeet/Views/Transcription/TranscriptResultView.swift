@@ -2043,7 +2043,19 @@ struct TranscriptResultView: View {
 
     @ViewBuilder
     private var contentArea: some View {
-        Group {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            if LiveAppIdentity.isLive, activeTranscription.sourceType == .meeting,
+                activeTranscription.status == .completed
+            {
+                LiveMeetingMinutesStatusView(transcriptionID: activeTranscription.id) { resultID in
+                    promptResultsViewModel.loadPromptResults(transcriptionId: activeTranscription.id)
+                    if promptResultsViewModel.promptResults.contains(where: { $0.id == resultID }) {
+                        viewModel.selectedTab = .result(id: resultID)
+                        return true
+                    }
+                    return false
+                }
+            }
             if viewModel.showTabs {
                 switch viewModel.selectedTab {
                 case .transcript:

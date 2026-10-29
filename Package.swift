@@ -206,12 +206,13 @@ let package = Package(
                 "Calendar/README.md",
                 "Database/README.md",
                 "Licensing/README.md",
-                "Resources",
+                "Resources/community-prompts.json",
                 "Services/System/README.md",
                 "Services/VoiceControl/README.md",
                 "STT/README.md",
                 "TextProcessing/README.md",
             ],
+            resources: [.copy("Resources/MeetingSkillDefault.md")],
             swiftSettings: whisperKitSwiftSettings
         ),
         // ViewModels library (testable, depends on Core + AppKit/SwiftUI)
