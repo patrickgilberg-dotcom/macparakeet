@@ -24,11 +24,15 @@ Project folders organize local transcripts without moving media. Live Ask combin
 - [x] Preparation/project UI and whole-folder transcript browsing/moves.
 - [x] Latest-project memory, prefetch, exact excerpts, source revalidation and scope-safe chat history.
 - [x] Independent source review and focused tests: 309 affected-area, 78 calendar, 75 recovery/project checks passed.
-- [ ] Once-per-task full regression gate.
-- [ ] Supported persistent-signed Release build and installation after local DB backup.
-- [ ] Actual app Google sign-in, shared calendars, preparation/project UI and end-to-end qualification.
-- [ ] Commit/push final qualification and update the existing personal-fork PR.
+- [x] Once-per-task full regression gate: 8,417 XCTest tests, 35 skipped, zero failures; 30 Swift Testing tests passed.
+- [x] Supported persistent-signed Release build and installation after verified local DB backup.
+- [x] Actual app Google sign-in and primary/shared calendar reads; native preparation/project UI inspection; existing permissions and completed ChatGPT connection check.
+- [x] Commit/push final qualification and update the existing personal-fork PR.
 
 ## Runtime setup
 
-The dedicated Google project and Desktop OAuth client were created; the user completed account verification and required Google policy/API activation. The app-owned installed-client registration is stored privately outside the repository. Do not publish that file or any user calendar content. The existing installed app remains the earlier rolling-memory Release until this task's Release is installed.
+The dedicated Google project and Desktop OAuth client were created; the user completed account verification and required Google policy/API activation. The installed signed Release is `14851bd6a0c6`, and its own Google connection successfully reads both requested calendars. The app-owned installed-client registration is stored privately outside the repository. Do not publish that file or any user calendar content. The configured Workspace Internal audience covers the tested work account; external accounts are not qualified.
+
+## Qualification limits
+
+The native preparation sheet and new-project controls were inspected and cancelled without creating test user data. A new calendar-selected recording-to-project flow and a real project-grounded cloud answer were not replayed; focused/full tests cover their persistence, recovery, source selection and history boundaries. Earlier audio/hotkey and rolling-memory cloud measurements retain their measured revisions. No new project-context latency distribution is claimed. Full evidence is in `docs/macparakeet-live-validation.md`.

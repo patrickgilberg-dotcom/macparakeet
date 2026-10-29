@@ -152,12 +152,20 @@ authorization is introduced. See [Live answers](live-answer.md) and
 
 ## Qualification
 
-The Google/project extension is pending integrated focused tests and installed
-runtime verification. Source-only Swift 5/6 typechecks and synthetic test code
-do not establish browser consent, Workspace audience eligibility, shared-calendar
-visibility, capture binding, cloud grounding, or production latency. Earlier
-ChatGPT/rolling-memory performance reports do not measure this additional
-project-context policy. Do not claim its speed or end-to-end success yet.
+Installed Release source `14851bd6a0c6` completed native Google browser sign-in
+and read upcoming events from the primary and Ajay shared calendars. Native
+preparation/project controls were inspected without saving test user data.
+The dedicated deployment uses a Workspace Internal audience; external-account
+eligibility is not qualified. The supported signed build/installation, focused
+integration tests and once-per-task full regression gate passed: 8,417 XCTest
+tests with 35 skipped and zero failures, plus 30 Swift Testing tests. See
+[qualification evidence](../../docs/macparakeet-live-validation.md).
+
+A new calendar-selected native recording and project-grounded cloud answer were
+not replayed. Capture association, recovery and project-source boundaries have
+automated coverage. Earlier ChatGPT/rolling-memory performance reports do not
+measure this additional project-context policy; no new latency distribution or
+real-meeting accuracy guarantee is established.
 
 Relevant focused areas are `GoogleCalendarTests`, `CalendarRecordingIdentityTests`,
 `MeetingProjectPreparationRepositoryTests` and `LiveProjectMeetingMemoryTests`,

@@ -2,15 +2,14 @@
 
 Qualification date: October 28, 2026 (America/Edmonton).
 
-Last qualified installed source: `d8d6477875b5`, branch `feat/macparakeet-live`,
+Last qualified installed source: `14851bd6a0c6`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
-Capture and provider reports identify their measured revisions separately. The
-latest qualified native replay and optimized WebSocket run used `d8d6477875b5`
-with the prior bounded recent-text/extractive-anchor context policy. Earlier
-recordings and experiments retain their original source labels. That build adds
-a ten-second idle reuse bound; only completed responses refresh that activity.
-The source now adds rolling whole-meeting memory. Its separate qualification is
-pending below; the earlier latency and accuracy observations do not measure it.
+The installed Release includes direct Google Calendar sign-in, private event
+preparation, project folders and latest-project-meeting grounding. Native Google
+SSO/calendar reads and quiet connection/permission checks passed. The sections
+below distinguish automated coverage from actual recording and cloud checks.
+Capture and performance reports retain their measured revision labels; earlier
+speed observations do not measure the added project-context payload.
 
 ## Installed build
 
@@ -114,6 +113,58 @@ benchmark run, and the persisted pair was read back. Settings now persists model
 changes only from explicit Picker edits; a view reload cannot overwrite a newer
 benchmark choice. The prior reload race was possible, but the cause of the observed
 preference change was not proven.
+
+## Direct Google Calendar and project context: installed qualification
+
+Source `14851bd6a0c6` passed the supported optimized Release build and installer
+with the existing persistent Apple Development identity. Before replacement, a
+private SQLite backup was created and passed `PRAGMA quick_check`. The installed
+bundle passes deep/strict signature verification, and the original app executable
+retains the hash above. No recording was running during replacement.
+
+The installed app completed its own system-browser Google sign-in and populated
+upcoming events from the primary and Ajay shared calendars. Both are selected;
+holiday calendars are excluded. No Codex connector token or browser cookie was
+used. The dedicated Google project uses a Workspace **Internal** audience; this
+successful work-account sign-in does not qualify external Google accounts.
+The client registration stays in private deployment configuration outside Git,
+and user tokens remain in the app's isolated Keychain service.
+
+Native inspection confirmed individual upcoming occurrences, the exact event
+title/date in the preparation sheet, its project selector and context editor,
+and the New Project Folder controls. The inspection was cancelled without saving
+test preparation or creating a folder. Google Calendar remained read-only. The
+app still reports microphone, Accessibility and Screen & System Audio access
+granted. Its saved ChatGPT plan connection completed a quiet Settings test with
+first text at 2,146 ms and first sentence at 2,231 ms. This single synthetic
+connection check does not measure meeting context, speech freshness or project
+grounding latency. Live is left open in Meetings with no recording running.
+
+Verification for this extension:
+
+- Affected-area runs passed 309 focused checks, then 78 calendar checks and
+  75 recovery/project checks after their respective changes. These overlap and
+  are not a count of unique tests.
+- The once-per-task full regression gate passed **8,417 XCTest tests**, with
+  35 skipped and zero failures, plus **30 Swift Testing tests**.
+- Coverage includes Google callback/refresh/revoke races, shared-calendar
+  participation, duplicate occurrence selection, exact title protection,
+  preparation/project persistence, interrupted-recording association recovery,
+  planner save failures, latest-row readiness, edited source invalidation,
+  cancellation and project-safe model history.
+- Changed/new Swift formatting and whitespace checks passed for the reviewed
+  areas. Existing whole-file formatting in `DatabaseManager.swift` and
+  `SettingsViewModel.swift` was preserved to keep those diffs focused.
+- Independent source review converged. Local no-mistakes and Greptile CLI were
+  unavailable; this personal fork reports no hosted CI checks.
+
+The new Google-selected recording-to-project workflow and a real project-grounded
+cloud answer were not replayed in a native recording during this qualification.
+Their integration boundaries have automated coverage; earlier microphone/system
+capture, shortcut and recording-finalization checks retain their historical
+labels. No new speed distribution or accuracy guarantee is established for
+project context. No credentials, private calendar content, database backup or
+user transcripts are included in published evidence.
 
 ## Rolling whole-meeting memory: qualified source and synthetic cloud flow
 
