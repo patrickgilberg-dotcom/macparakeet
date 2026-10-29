@@ -1,5 +1,7 @@
 # Live context end-to-end and recording recovery qualification
 
+Status: implemented and locally qualified; personal-fork PR remains open.
+
 ## Requested outcome
 
 Qualify the installed calendar title, private event preparation, only-latest project meeting and fresh spoken corrections through actual completed Live Ask responses. Exercise normal artifact finalization, native interruption/recovery and bounded accelerated long-media durability. Recommend five next improvements, including editable personal-skill minutes and personal answer style; do not imply the ChatGPT login supplies account history.
@@ -24,8 +26,9 @@ Qualify the installed calendar title, private event preparation, only-latest pro
 - [x] Read-only long-session audit and 142 focused baseline checks, including synthetic process-kill/recovery journeys.
 - [x] Add and independently review monotonic recording-owned chat checkpoints, cancellation/ownership guards, idempotent recovery import and content-free deletion receipts.
 - [x] Focused integration tests, bounded accelerated two-hour writer test and once-per-task full gate: 8,434 XCTest / 36 skipped / zero failures plus 30 Swift Testing.
-- [ ] Persistent-signed build/install after DB backup, actual post-fix native interruption/recovery and normal save checks.
-- [ ] Restore blank event preparation, publish content-free evidence and update personal-fork PR.
+- [x] Persistent-signed build/install after DB backup; native 173.076-second interrupted recovery restored four messages and 198.734-second normal Stop preserved two messages. Both retained exact title/project/context/note and all validated artifacts/audio.
+- [x] Restore blank event preparation and no project through Save/reopen, preserving frozen recording snapshots; publish content-free evidence and update personal-fork PR.
+- [x] Fix the additionally reproduced calendar startup selection race; 63 focused checks plus native startup passed without manual Refresh. Final installed source is `a0f4b3c6ce15`.
 
 ## Known limits
 
@@ -33,7 +36,10 @@ At the first disk check only about 2.2 GiB was free. Two hours of dual AAC sourc
 
 The new long writer test initially exposed harness issues (accelerated encoder drain timing and a Foundation process-wait hang); retain those failed logs alongside the final qualified outcome. A two-hour encoded fixture is not a two-hour real-time meeting soak.
 
-Signed source `9447f78bcb2e` is built/installed after a verified backup. Final native
-replay is waiting for the user to unlock the Mac; no recording was started while
-locked. The async unlock question is pending. Do not mark that replay or cleanup
-complete until it actually runs.
+Signed source `9447f78bcb2e` passed the native interruption/recovery and normal-save
+replays after the user unlocked the Mac. The final calendar-only startup repair
+`a0f4b3c6ce15` passed its focused gate and installed native startup check. The full
+regression run is attributed to `9447f78bcb2e`; it was not repeated. Cleanup is
+complete, all three macOS grants remain active, and no recording locks remain.
+Detailed limits, source labels and the observed recognition conflict are in
+`docs/macparakeet-live-validation.md`.

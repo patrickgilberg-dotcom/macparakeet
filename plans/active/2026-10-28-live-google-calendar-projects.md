@@ -1,5 +1,7 @@
 # Direct Google Calendar and project meeting context
 
+Status: implemented and locally qualified; personal-fork PR remains open.
+
 ## Intended behavior
 
 MacParakeet Live offers its own Sign in with Google button and a read-only calendar picker. Upcoming shows individual occurrences from selected personal/shared calendars. Saved private preparation and project selection follow an explicit Google event instance across title/time changes. Record carries the exact calendar event title into protected recording/transcription/recovery metadata. Generic recording matches one relevant occurrence or asks the user to choose overlapping candidates.
@@ -31,8 +33,8 @@ Project folders organize local transcripts without moving media. Live Ask combin
 
 ## Runtime setup
 
-The dedicated Google project and Desktop OAuth client were created; the user completed account verification and required Google policy/API activation. The installed signed Release is `14851bd6a0c6`, and its own Google connection successfully reads both requested calendars. The app-owned installed-client registration is stored privately outside the repository. Do not publish that file or any user calendar content. The configured Workspace Internal audience covers the tested work account; external accounts are not qualified.
+The dedicated Google project and Desktop OAuth client were created; the user completed account verification and required Google policy/API activation. Initial installed qualification used `14851bd6a0c6`; the current signed Release is `a0f4b3c6ce15`. Its own Google connection reads the requested calendars and loads upcoming occurrences after restart without manual Refresh. The app-owned installed-client registration is stored privately outside the repository. Do not publish that file or any user calendar content. The configured Workspace Internal audience covers the tested work account; external accounts are not qualified.
 
 ## Qualification limits
 
-The native preparation sheet and new-project controls were inspected and cancelled without creating test user data. A new calendar-selected recording-to-project flow and a real project-grounded cloud answer were not replayed; focused/full tests cover their persistence, recovery, source selection and history boundaries. Earlier audio/hotkey and rolling-memory cloud measurements retain their measured revisions. No new project-context latency distribution is claimed. Full evidence is in `docs/macparakeet-live-validation.md`.
+The initial quiet UI inspection was followed by actual calendar-selected recordings, private synthetic preparation, project assignment and completed cloud answers. Native replay verified latest-prior selection and current corrections; interrupted recovery and normal Stop preserved exact title/context/project, notes, completed chat and validated audio/artifacts. Test preparation was restored to blank/no project. These short transcripts fit raw context; the accelerated two-hour writer case is not a native multi-hour hardware soak. Earlier audio/hotkey and rolling-memory measurements retain their source labels, and no general project-context latency distribution is claimed. Full evidence is in `docs/macparakeet-live-validation.md`.

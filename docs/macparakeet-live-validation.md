@@ -2,14 +2,15 @@
 
 Qualification dates: October 28–29, 2026 (America/Edmonton).
 
-Installed source: `9447f78bcb2e`, branch `feat/macparakeet-live`,
+Installed source: `a0f4b3c6ce15`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
 The installed Release includes direct Google Calendar sign-in, private event
 preparation, project folders, latest-project grounding and live-chat recovery.
-The integrated native recording/answer checks below used `14851bd6a0c6`; the
-recovery repair passed its full automated gate and signed installation in
-`9447f78bcb2e`. Its final native replay is pending because the Mac locked before
-the app could be opened. The sections below distinguish those verification stages.
+The initial integrated native recording/answer checks used `14851bd6a0c6`;
+`9447f78bcb2e` passed the full regression gate, native interruption recovery and
+normal Stop with completed chat. The final narrow calendar-startup repair in
+`a0f4b3c6ce15` passed 63 focused checks and native startup without manual Refresh.
+The sections below distinguish those verification stages.
 Capture and performance reports retain their measured revision labels; earlier
 speed observations do not measure the added project-context payload.
 
@@ -244,11 +245,50 @@ Installed post-repair qualification is recorded after its final gate below.
   Local no-mistakes and Greptile CLI are unavailable; the personal fork has no
   hosted CI checks.
 
-The final native post-fix interruption/recovery check is still required. The
-first attempt to open the newly installed app encountered the Mac lock screen;
-the user has been asked to unlock it. No capture was started while locked.
-The temporary calendar preparation must be restored to its original blank/no-project
-state after that replay; frozen QA recording artifacts remain in the labeled folder.
+After the user unlocked the Mac, the installed repair completed another native
+recording and two cloud questions. It used the current $6,500/security/checklist
+corrections, preserved the event-only reference and 48-hour drill requirement,
+and distinguished historical $7,000/pending status from today's update. A second
+answer correctly refused to invent an agreed code name from an older project
+meeting or the folder name. These two native UI text/sentence readings were
+4.73/4.76 seconds and 3.04/3.28 seconds; they are small rounded observations,
+not a controlled speed comparison. The first answer used three supporting
+bullets, exceeding the prompt's two-bullet target while retaining the facts.
+
+The recording was deliberately SIGKILLed with **four messages** already in its
+local checkpoint. Native launch recovery restored **173.076 seconds** of media,
+the exact calendar title, project, frozen preparation, exact typed note and all
+four messages under the same conversation identity. The recovered answers were
+also visibly opened in Chat. One import receipt existed and the lock settled.
+All three audio files passed complete strict decoding. Manifest, meeting Markdown,
+transcript JSON, notes Markdown, capture metadata and prompt-result JSON existed;
+JSON parsed and the notes sidecar contained the exact note.
+
+A separate **198.734-second** native normal-Stop replay preserved its note,
+both messages, exact title/project/context, one receipt and the same validated
+artifact set. Its saved answer was visibly opened in Chat. Live recognition in
+that spoken fixture introduced conflicting $7,000/$2,000 amounts; inspection
+confirmed both were in the live transcript, and the AI disclosed uncertainty.
+This is not proof of perfect speech recognition. Its 3.55/3.86-second native
+text/sentence reading overlapped focused compilation and is not used for a
+performance comparison.
+
+Both native recordings above used `9447f78bcb2e`. Restarting also reproduced a
+separate calendar startup race: saved exclusions arrived while unfiltered
+calendar discovery was pending, invalidating the first event fetch. The final
+`a0f4b3c6ce15` repair binds selection after discovery while retaining account,
+cancellation and event-stage selection checks. Its **63 focused tests** passed;
+the once-per-task 8,434-test full run above remains attributed to `9447f78bcb2e`.
+The final signed Release was installed and natively opened: **77 upcoming event
+controls loaded automatically**, with no selection error or manual Refresh.
+All three macOS grants remained active. No new capture/recovery code changed
+after the successful native replays.
+
+The calendar preparation was restored through the app to blank with no project,
+saved, reopened and verified. Database reads confirmed frozen recording context
+and project were retained. Both repaired native recordings passed all artifact
+checks, database `quick_check` returned `ok`, and no recording locks remained.
+The app is left idle in Meetings; labeled QA recordings remain inspectable.
 
 Long-recording limits remain material: observed free storage ranged down to about
 2.2 GiB; two hours of dual-source audio plus playback is roughly 230 MB, and each

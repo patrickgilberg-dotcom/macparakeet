@@ -129,8 +129,9 @@ extractive-anchor policy; they do not measure periodic summaries, semantic
 retention or catch-up latency. Qualification of this rolling-memory policy is
 recorded in [the validation report](../../docs/macparakeet-live-validation.md):
 focused and full tests pass, the signed Release app is installed, and the
-synthetic cloud memory/answer flow completed. The native 180-second wall-clock
-cadence and capture-to-answer timing were not re-measured in this revision.
-The subsequent Google Calendar/event-preparation/latest-project extension is
-pending its new integrated tests and installed runtime qualification. Those
-earlier measurements do not establish its additional grounding or latency.
+synthetic cloud memory/answer flow completed. Later native calendar/project
+replays verified completed combined answers, fresh corrections, three/six-minute
+context refreshes, normal saving and interrupted chat recovery. Their short
+transcripts fit raw context; they do not measure long native semantic compaction
+or establish acoustic speech-end timing. The validation report identifies each
+measured revision and the additional focused calendar-startup repair separately.

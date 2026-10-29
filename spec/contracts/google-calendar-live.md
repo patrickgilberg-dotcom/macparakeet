@@ -152,7 +152,7 @@ authorization is introduced. See [Live answers](live-answer.md) and
 
 ## Qualification
 
-Installed Release source `14851bd6a0c6` completed native Google browser sign-in
+Initial qualification of Release `14851bd6a0c6` completed native Google browser sign-in
 and read upcoming events from the primary and Ajay shared calendars. Native
 preparation/project controls were inspected without saving test user data.
 The dedicated deployment uses a Workspace Internal audience; external-account
@@ -166,10 +166,15 @@ saved event context, latest-project selection and current spoken corrections
 through three completed cloud answers. Two scheduled context refreshes and
 normal artifact saving were observed. Its short synthetic transcript fit raw
 context; this is not long-meeting semantic or multi-hour hardware qualification.
-An interrupted native recording exposed the previous chat-save gap, addressed
-by the local checkpoint/recovery contract. See the linked qualification evidence
-for final build and post-repair replay status. No general latency distribution
-or real-meeting accuracy guarantee is established.
+An interrupted native recording exposed the previous chat-save gap. Source
+`9447f78bcb2e` then passed native interruption recovery and normal Stop with exact
+completed chat, notes, title/project/context and validated audio/artifacts.
+Final installed `a0f4b3c6ce15` adds the calendar-startup selection repair, with
+63 focused checks and automatic native event loading after restart. Selection
+binds after unfiltered discovery; account/cancellation checks and selection
+invalidation during event reads remain enforced. See the linked qualification
+evidence for measured source boundaries and limits. No general latency
+distribution or real-meeting accuracy guarantee is established.
 
 Relevant focused areas are `GoogleCalendarTests`, `CalendarRecordingIdentityTests`,
 `MeetingProjectPreparationRepositoryTests` and `LiveProjectMeetingMemoryTests`,

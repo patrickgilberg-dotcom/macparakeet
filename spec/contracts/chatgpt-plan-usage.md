@@ -179,8 +179,11 @@ and before accepting the final answer; provider account/model/effort/transport/
 policy remains pinned across every summary and answer. Old reference content
 cannot continue through a changed scope or imported external memory/tools.
 See [the Google Calendar/project contract](google-calendar-live.md) for identities,
-limits and private storage. This extension is pending its new integrated tests
-and installed runtime qualification; existing benchmarks do not measure it.
+limits and private storage. Installed native replays have qualified combined
+calendar/preparation/latest-project answers and interrupted/normal chat saving.
+The validation report separates their short raw-context fixtures, accelerated
+long-media test and measured source revisions; existing benchmarks do not
+establish general project-context speed or accuracy.
 
 ## Reproducible benchmark
 
