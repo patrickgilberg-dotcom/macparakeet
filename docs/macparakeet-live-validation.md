@@ -115,7 +115,7 @@ changes only from explicit Picker edits; a view reload cannot overwrite a newer
 benchmark choice. The prior reload race was possible, but the cause of the observed
 preference change was not proven.
 
-## Rolling whole-meeting memory: qualification pending
+## Rolling whole-meeting memory: qualified source and synthetic cloud flow
 
 After the measurements below, the user explicitly requested and authorized
 automatic cloud summaries every three minutes while recording, alongside fresh
@@ -157,17 +157,43 @@ The first focused gate passed 91 tests: memory/source coverage, timer updates,
 empty/unchanged-source skipping, pause/resume, Ask preemption, account/model/effort
 pinning, transcript freshness, final-answer context and recording coordination.
 Changed Swift sources pass strict formatter lint and independent source review.
-The final regression suite and signed Release build are in progress.
+The once-per-task full regression run then passed **8,342 XCTest tests** with
+35 skipped and zero failures, plus **30 Swift Testing tests**. The optimized
+Release app at `b0afb122e5b4` was built with the supported script, persistently
+signed, installed and opened. Its native Settings connection test completed;
+all three permissions remained granted. The original installed app executable
+retained its verified SHA-256. No new authorization or permission prompt was
+needed.
 
-Pending runtime qualification: installed three-minute cadence, unchanged-source skipping,
-pause/stop cancellation and Ask preemption; long-meeting coverage/corrections,
-identity changes, summary failure and source-gap handling; and separately timed
-background summaries, first long Ask, cache reuse and catch-up. Existing provider
+The production pinned session and memory actor completed four synthetic summary
+updates over simulated source snapshots at 3/6/9/12 minutes, then two questions
+against the 15-minute, 21,201-character fixture. The early unrelated route/owner,
+later $45,000-to-$38,000 correction, approval conditions and latest question were
+retained. Both answer outputs were reviewed against the source; all lexical
+qualification checks passed. Both context preparations took about 8 ms and made
+zero additional summary calls. Their first-text times were 1.081/1.051 seconds;
+first-sentence times were 1.222/1.181 seconds. Summary updates took
+2.401/1.733/1.658/1.955 seconds. Every model stream reached terminal completion.
+The complete synthetic report is
+[`2026-10-28-b0afb122-rolling-memory-contextcheck.json`](../benchmarks/chatgpt-live/results/2026-10-28-b0afb122-rolling-memory-contextcheck.json).
+
+These snapshots advance source time without wall-clock waits. Summary updates
+ran back-to-back, not after real three-minute idle gaps; the socket policy may
+open a new connection after a real gap. The two warm answers are individual
+observations, not latency percentiles or general accuracy guarantees. No build,
+test, audio playback or capture was active during the synthetic cloud run.
+The native connection check overlapped helper compilation and is excluded from
+speed claims. Actual native 180-second cadence and capture-to-answer timing were
+not re-measured for this revision; accelerated timer tests cover scheduling,
+empty/unchanged-source skipping, pause/stop, cancellation and Ask priority.
+Catch-up, source edits/gaps, identity changes and summary failures have focused
+coverage, rather than additional private meeting recordings. Existing provider
 fixtures and all saved measurements through `d8d6477875b5` use the prior bounded
 context projection. They do not establish semantic recall, new plan usage/cost,
 memory behavior or latency for this change. A final answer is still streamed,
-but it may now follow additional summary calls. No new speed or accuracy result
-is claimed until this policy is measured and its outputs are reviewed.
+but it may now follow additional summary calls. The new observations above
+qualify this synthetic source and warm sequence; they do not establish
+unconditional recall or latency in arbitrary meetings.
 
 ## Automated verification before rolling memory
 

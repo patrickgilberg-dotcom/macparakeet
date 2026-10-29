@@ -200,3 +200,12 @@ Focused tests: `ChatGPTAuthTests`, `ChatGPTLiveClientTests`,
 `LiveMeetingMemoryViewModelTests`, `LiveAnswerTests`.
 Synthetic tests do not establish account eligibility, completed cloud inference,
 microphone/system-audio capture, TCC authorization, or installed-app performance.
+
+`contextcheck --model gpt-6-luna --transport websocket --output /absolute/report.json`
+uses the saved model/effort selection and production pinned session. It advances
+a synthetic meeting through 3/6/9/12-minute snapshots without wall-clock waits,
+then asks two questions against its15-minute source. The report separates
+summary update, context preparation and final answer timing, checks complete
+source-range coverage/cache reuse, and retains synthetic outputs for review.
+This qualifies memory and provider behavior; it does not measure native capture
+or actual 180-second idle gaps.

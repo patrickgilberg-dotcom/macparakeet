@@ -105,4 +105,7 @@ latency must be verified separately in the installed Release app. Earlier saved
 performance reports used the prior 12,000-character recent/4,000-character
 extractive-anchor policy; they do not measure periodic summaries, semantic
 retention or catch-up latency. Qualification of this rolling-memory policy is
-pending until its focused tests, build and installed-app checks are completed.
+recorded in [the validation report](../../docs/macparakeet-live-validation.md):
+focused and full tests pass, the signed Release app is installed, and the
+synthetic cloud memory/answer flow completed. The native 180-second wall-clock
+cadence and capture-to-answer timing were not re-measured in this revision.
