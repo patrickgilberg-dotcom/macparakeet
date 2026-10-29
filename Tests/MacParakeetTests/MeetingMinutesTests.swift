@@ -84,6 +84,91 @@ final class MeetingMinutesTests: XCTestCase {
         XCTAssertNil(try fixture.repo.result(jobID: fixture.job.id))
     }
 
+    func testRejectedAcceptanceIsReconciledBeforeLaterAuditsAndFourNotes() async throws {
+        let quote = "Unknown: Nina, please send the revised checklist by Monday.\nOthers1: Yes, I will send it."
+        let secondQuote = "Lee: I will update the agenda."
+        let corrected =
+            "Nina was asked to send the revised checklist by Monday. The accepting speaker is unidentified, so Nina's acceptance is not established."
+        let fixture = try Fixture(text: quote + "\n" + secondQuote)
+        let model = Model(
+            quote: quote, reviewApproves: false, extraQuote: secondQuote,
+            extractionMap: "Nina accepted the checklist task. She committed to sending it by Monday.",
+            correctedMeetingMap: corrected, echoNotesMap: true)
+        let result = try await MeetingMinutesEngine(repository: fixture.repo).run(
+            jobID: fixture.job.id, session: model.session())
+        let output = try XCTUnwrap(result?.content)
+        let reviewMaps = await model.reviewMaps
+        XCTAssertEqual(reviewMaps.count, 2)
+        XCTAssertTrue(reviewMaps[0].contains("Nina accepted"))
+        XCTAssertEqual(reviewMaps[1], corrected, "Later audits must retain the previous correction")
+        let notesMaps = await model.notesMaps
+        XCTAssertEqual(notesMaps, [corrected])
+        XCTAssertEqual(try fixture.progress().meetingMap, corrected)
+        XCTAssertFalse(output.contains("Nina accepted"))
+        XCTAssertTrue(output.contains("Nina's acceptance is not established"))
+        XCTAssertTrue(output.contains("No confirmed action items"))
+    }
+
+    func testInvalidReconciledMapNeverMarksCandidateReviewedOrPublishesMinutes() async throws {
+        for corrected in [" \n ", String(repeating: "x", count: 8_001)] {
+            let fixture = try Fixture(text: "Unknown: I will send the report.")
+            let model = Model(quote: "I will send the report.", correctedMeetingMap: corrected)
+            do {
+                _ = try await MeetingMinutesEngine(repository: fixture.repo).run(
+                    jobID: fixture.job.id, session: model.session())
+                XCTFail("An invalid reconciled map was published")
+            } catch let error as MeetingMinutesError { XCTAssertEqual(error, .invalidResponse) }
+            XCTAssertNil(try fixture.repo.result(jobID: fixture.job.id))
+            XCTAssertFalse(try fixture.progress().candidates[0].reviewed)
+            let notesMaps = await model.notesMaps
+            XCTAssertTrue(notesMaps.isEmpty)
+        }
+    }
+
+    func testLegacyReviewedCheckpointIsReconciledAfterYieldWithoutRereadingSource() async throws {
+        let fixture = try Fixture(text: "Unknown: Nina, please send it. Others1: Yes, I will.")
+        let work = try fixture.repo.claim(
+            jobID: fixture.job.id, providerIdentity: "synthetic-session", provider: "chatgpt-plan", model: nil)
+        let attempt = try XCTUnwrap(work.attemptID)
+        var legacy = MeetingMinutesProgress()
+        legacy.chunks = [.init(start: 0, end: fixture.source.transcript.count, requestStart: 0)]
+        legacy.meetingMap = "Nina accepted the task. She committed to sending it."
+        legacy.candidates = [
+            .init(
+                kind: .excluded, headline: "Nina accepted the task", description: "Unsupported named acceptance.",
+                owner: "Nina", recipient: nil, dueDate: nil, trigger: nil, ownerCertainty: "Unsupported",
+                why: "The speaker is not identifiable.", doNotOverstate: "Do not infer acceptance.",
+                quoteStart: 0, quoteEnd: fixture.source.transcript.count, reviewed: true)
+        ]
+        // Old JSON had no auditPolicy key at all.
+        var legacyJSON = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? [String: Any])
+        legacyJSON.removeValue(forKey: "auditPolicy")
+        legacy = try JSONDecoder().decode(
+            MeetingMinutesProgress.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+        try fixture.repo.checkpoint(jobID: fixture.job.id, attemptID: attempt, progress: legacy)
+        try fixture.repo.yield(jobID: fixture.job.id, attemptID: attempt)
+
+        let corrected = "Nina was asked to send it. The reply's speaker cannot be identified as Nina."
+        let model = Model(reviewApproves: false, correctedMeetingMap: corrected)
+        let engine = MeetingMinutesEngine(repository: fixture.repo)
+        let yielded = try await engine.run(
+            jobID: fixture.job.id, session: model.session(), shouldYield: { await model.reviewCount > 0 })
+        XCTAssertNil(yielded)
+        let saved = try fixture.progress()
+        XCTAssertEqual(saved.chunks, legacy.chunks)
+        XCTAssertEqual(saved.meetingMap, corrected)
+        XCTAssertNotNil(saved.auditPolicy)
+        XCTAssertTrue(saved.candidates[0].reviewed)
+        _ = try await engine.run(jobID: fixture.job.id, session: model.session())
+        let extractions = await model.extractionCount
+        let reviews = await model.reviewCount
+        XCTAssertEqual(extractions, 0, "Complete source chunks must not be replayed")
+        XCTAssertEqual(reviews, 1, "A completed reconciled checkpoint is reusable")
+        let notesMaps = await model.notesMaps
+        XCTAssertEqual(notesMaps, [corrected])
+    }
+
     func testYieldResumesCompletedChunksWithoutReplayingThem() async throws {
         let fixture = try Fixture(text: String(repeating: "Ordinary source detail.\n", count: 50))
         let model = Model()
@@ -281,16 +366,30 @@ private actor Model {
     private let reviewApproves: Bool
     private let noteCount: Int
     private let blockNotes: Bool
+    private let extraQuote: String?
+    private let extractionMap: String
+    private let correctedMeetingMap: String?
+    private let echoNotesMap: Bool
     private var notesGate: CheckedContinuation<Void, Never>?
     private(set) var waitingForNotes = false
     private(set) var extractions: [Extraction] = []
     private(set) var reviewCount = 0
     private(set) var totalCalls = 0
     private(set) var systemInstructions: [String] = []
+    private(set) var reviewMaps: [String] = []
+    private(set) var notesMaps: [String] = []
     var extractionCount: Int { extractions.count }
-    init(quote: String? = nil, reviewApproves: Bool = true, noteCount: Int = 4, blockNotes: Bool = false) {
+    init(
+        quote: String? = nil, reviewApproves: Bool = true, noteCount: Int = 4, blockNotes: Bool = false,
+        extraQuote: String? = nil,
+        extractionMap: String =
+            "The team discussed delivery and unresolved requirements. No additional facts were inferred.",
+        correctedMeetingMap: String? = nil, echoNotesMap: Bool = false
+    ) {
         self.quote = quote; self.reviewApproves = reviewApproves; self.noteCount = noteCount;
         self.blockNotes = blockNotes
+        self.extraQuote = extraQuote; self.extractionMap = extractionMap
+        self.correctedMeetingMap = correctedMeetingMap; self.echoNotesMap = echoNotesMap
     }
     nonisolated func session(key: String = "synthetic-session") -> LiveAnswerStreamSession {
         LiveAnswerStreamSession(
@@ -320,7 +419,7 @@ private actor Model {
             extractions.append(
                 .init(start: payload["newSourceStartsAt"] as! Int, end: payload["sourceEnd"] as! Int, source: source))
             var candidates: [[String: Any]] = []
-            if let quote {
+            for quote in [quote, extraQuote].compactMap({ $0 }) {
                 candidates.append([
                     "classification": "confirmed", "headline": "Send the report",
                     "description": "Send the report as explicitly committed.", "quote": quote,
@@ -330,26 +429,31 @@ private actor Model {
                 ])
             }
             object = [
-                "meetingMap":
-                    "The team discussed delivery and unresolved requirements. No additional facts were inferred.",
+                "meetingMap": extractionMap,
                 "candidates": candidates,
             ]
         case "review":
             reviewCount += 1
+            let map = payload["meetingMap"] as! String
+            reviewMaps.append(map)
             object = [
                 "approved": reviewApproves, "futureWork": reviewApproves, "concreteDeliverable": reviewApproves,
                 "commitment": reviewApproves, "attributionSupported": reviewApproves, "scopeMatches": reviewApproves,
                 "classification": reviewApproves ? "confirmed" : "excluded",
                 "reason": reviewApproves
                     ? "The exact quote creates this obligation." : "A capability is not a future assignment.",
+                "correctedMeetingMap": correctedMeetingMap ?? map,
             ]
         case "notes":
+            let map = payload["meetingMap"] as! String
+            notesMaps.append(map)
             if blockNotes { waitingForNotes = true; await withCheckedContinuation { notesGate = $0 } }
             object = [
                 "notes": (0..<noteCount).map {
                     [
                         "headline": "Material point \($0 + 1)",
-                        "description": "The team discussed the source. The issue remained unresolved.",
+                        "description": echoNotesMap && $0 == 0
+                            ? map : "The team discussed the source. The issue remained unresolved.",
                     ]
                 }
             ]

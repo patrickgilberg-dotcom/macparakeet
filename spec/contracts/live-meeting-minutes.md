@@ -55,6 +55,14 @@ attribution and scope before an action may remain confirmed. Confirmed actions,
 conditional/proposed follow-ups and excluded candidates render separately.
 Unknown owners, recipients and dates remain explicit. No actions is valid.
 
+Every candidate kind receives an audit. Each accepted audit checkpoints its
+verdict and a reconciled bounded meeting map together, preserving earlier audit
+corrections. The four notes receive that reconciled map instead of the pre-audit
+narrative. An optional progress audit-policy marker lets older pending
+checkpoints re-audit candidates while retaining completed source chunks.
+Completed historical results are preserved. Model semantic judgment still
+requires review; reconciliation does not prove every narrative sentence.
+
 The default evidence-first format renders exactly four numbered summary notes,
 each with a substantive headline and two to four sentences. The editable skill
 guides content and wording within the four-note/evidence structure. Its worked

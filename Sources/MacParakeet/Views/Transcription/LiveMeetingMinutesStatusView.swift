@@ -83,13 +83,16 @@ struct LiveMeetingMinutesStatusView: View {
             if !model.automaticMinutesEnabled { return "Automatic minutes are paused in Settings → AI." }
             return "Queued using your saved meeting skill."
         case .running:
+            if job.coveredCharacters == job.totalCharacters {
+                return "Checking source quotes and writing the four notes…"
+            }
             return
                 "Reading the final transcript: \(job.coveredCharacters.formatted()) of \(job.totalCharacters.formatted()) characters reviewed."
         case .failed:
             return job.errorMessage
                 ?? "Minutes did not finish. Your recording and transcript are saved. Retry when ready."
         case .completed:
-            return "Saved from the final transcript. Skill revision \(job.skillRevision.prefix(8))."
+            return "Saved from the final transcript using the skill version queued for this meeting."
         }
     }
 }

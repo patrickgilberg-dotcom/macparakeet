@@ -131,6 +131,9 @@ struct MeetingMinutesProgress: Codable, Sendable, Equatable {
     var chunks: [MeetingMinutesChunkReceipt] = []
     var meetingMap = ""
     var candidates: [MeetingMinutesCandidate] = []
+    // Missing in legacy checkpoints. Completed source receipts remain valid,
+    // but narrative reconciliation must be rerun under the current audit rules.
+    var auditPolicy: String? = nil
     var coveredCharacters: Int { chunks.last?.end ?? 0 }
 }
 
