@@ -3,7 +3,7 @@ import Foundation
 
 /// Centralized path management for MacParakeet runtime files.
 public enum AppPaths {
-    public static let preferencesSuiteName = "com.macparakeet.MacParakeet"
+    public static let preferencesSuiteName = LiveAppIdentity.preferencesSuiteName
     public static let meetingArtifactsFolderKey = "meetingArtifactsFolder"
     public static let debugAppStateDirEnvironmentKey = "MACPARAKEET_DEBUG_APP_STATE_DIR"
     /// Bundle ID of the `scripts/dev/run_app.sh` build (`MacParakeet-Dev.app`).
@@ -17,7 +17,7 @@ public enum AppPaths {
             .first?
             .path
             ?? (NSHomeDirectory() + "/Library/Application Support")
-        return base + "/MacParakeet-Dev"
+        return base + "/MacParakeet-Live-Dev"
     }
 
     /// Application Support directory
@@ -38,7 +38,7 @@ public enum AppPaths {
             .first?
             .path
             ?? (NSHomeDirectory() + "/Library/Application Support")
-        return path + "/MacParakeet"
+        return path + "/" + LiveAppIdentity.applicationSupportFolder
     }
 
     /// Database file path
@@ -139,7 +139,7 @@ public enum AppPaths {
             .first?
             .path
             ?? (NSHomeDirectory() + "/Library")
-        return path + "/Logs/MacParakeet"
+        return path + "/Logs/" + LiveAppIdentity.applicationSupportFolder
     }
 
     /// Voice Control session traces. Stays on this Mac; never uploaded.
@@ -159,9 +159,8 @@ public enum AppPaths {
 
     /// FluidAudio model cache base.
     ///
-    /// Production intentionally delegates to FluidAudio's own default resolver.
-    /// Developer/test runs with `MACPARAKEET_DEBUG_APP_STATE_DIR` keep FluidAudio
-    /// models inside the same throwaway state root as the rest of MacParakeet.
+    /// All fork-owned models remain inside Live storage. Developer/test runs with
+    /// `MACPARAKEET_DEBUG_APP_STATE_DIR` use their isolated state root as well.
     public static var fluidAudioModelsDir: String {
         fluidAudioModelsDirURL.path
     }
@@ -197,7 +196,10 @@ public enum AppPaths {
                 .appendingPathComponent("Models", isDirectory: true)
                 .standardizedFileURL
         }
-        return MLModelConfigurationUtils.defaultModelsDirectory()
+        return URL(fileURLWithPath: resolvedAppSupportDir(environment: environment), isDirectory: true)
+            .appendingPathComponent("FluidAudio", isDirectory: true)
+            .appendingPathComponent("Models", isDirectory: true)
+            .standardizedFileURL
     }
 
     static func resolvedFluidAudioModelDirectory(for repo: Repo, environment: [String: String]) -> URL {
@@ -264,7 +266,7 @@ public enum AppPaths {
 
     /// Temp directory for audio processing
     public static var tempDir: String {
-        "\(NSTemporaryDirectory())macparakeet"
+        "\(NSTemporaryDirectory())macparakeet-live"
     }
 
     /// Runtime directories shared by initialization and non-mutating health checks.

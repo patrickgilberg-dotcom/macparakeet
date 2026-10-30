@@ -2,8 +2,8 @@
 
 ## Purpose
 
-MacParakeet's shared Keychain store must not open system authentication dialogs
-from reads, writes, or deletes. This includes startup, status rendering, AI
+MacParakeet's shared Keychain store is noninteractive by default and must not
+open system authentication dialogs from ordinary reads, writes, or deletes. This includes startup, status rendering, AI
 requests, retained licensing I/O, and share maintenance. An inaccessible item
 returns an error; only `errSecItemNotFound` means no saved item.
 
@@ -26,11 +26,31 @@ returns an error; only `errSecItemNotFound` means no saved item.
 
 ## Stable behavior
 
+**MacParakeet Live fork:** all credential services use the
+`com.patrickgilberg.macparakeet-live.` prefix and its app/CLI preferences use
+`com.patrickgilberg.macparakeet-live`. No upstream keys or preferences are
+migrated or read. This deliberate isolation supersedes upstream app/dev/CLI
+sharing statements below. Item security attributes remain unchanged. Ordinary
+access remains noninteractive; the explicit ChatGPT unlock action below is the
+only opt-in interactive exception. See [Live isolation](live-app-isolation.md).
+
 The existing services, account names, and app/dev/CLI sharing stay unchanged.
 This change does not migrate, clear, or weaken access controls on stored keys.
 File-based Keychain calls run with user interaction disabled inside a serialized
 scope that restores the previous process-wide setting, including when the call
 fails. The scope covers each whole read, write, or delete.
+
+**Explicit ChatGPT unlock:** `ChatGPTAuth.credentialStatus()` reports an unreadable
+saved connection separately from a missing one. `unlockCredentialAccess()` may
+be invoked only by an explicit user action. It uses
+`KeychainKeyValueStore(service: "com.patrickgilberg.macparakeet-live.chatgpt",
+allowUserInteraction: true)` so macOS can ask the user to Allow or Always Allow
+the installed app to access its own `connections-v1` item. This is necessary
+when a separately signed CLI created that item. Interactive and noninteractive
+operations share the same lock and restore the prior process-wide flag. The
+app never edits an ACL or trusts another executable automatically. Failed or
+declined access preserves the credentials and reports the error. Injected tests
+use only in-memory stores and fake network sessions.
 
 Provider presence, task routes, and displayed provider/model names use metadata
 without reading credential values. A credential read failure must not hide or
@@ -46,7 +66,9 @@ rotate, or remove a key. If the key field has not been edited, a successful
 retry restores the saved value. Task-only validation uses cached key presence
 from setup, route selection, or Retry; Save still reads current credentials.
 Saved-provider health stays separate from unsaved provider errors.
-Authorization changes occur only in the system Keychain Access app.
+For ordinary provider keys, authorization changes occur only in the system
+Keychain Access app. The explicit ChatGPT unlock action uses the system access
+prompt described above.
 
 Existing save transactions must still stop on credential errors before changing
 route metadata or removing an unreadable optional API key. Actual AI requests
@@ -68,7 +90,7 @@ migration plan that keeps existing saved keys readable.
 
 ## Tests that enforce this
 
-`KeychainInteractionTests`, `LLMConfigStoreTests`, `LLMSettingsViewModelTests`,
+`ChatGPTSessionTests`, `KeychainInteractionTests`, `LLMConfigStoreTests`, `LLMSettingsViewModelTests`,
 `PromptsViewModelTests`, `PromptResultsViewModelTests`, and
 `AppEnvironmentTests`. Runtime verification uses synthetic credentials; never
 reproduce by reading, changing, or deleting a user's saved API keys.

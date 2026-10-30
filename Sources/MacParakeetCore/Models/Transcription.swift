@@ -180,7 +180,8 @@ public struct Transcription: Codable, Identifiable, Sendable {
         self.engine = engine
         self.engineVariant = engineVariant
         self.calendarEventSnapshot = calendarEventSnapshot
-        self.titleOverride = Self.normalizedTitleOverride(from: titleOverride)
+        self.titleOverride = Self.protectedTitleOverride(
+            from: titleOverride, calendarEventSnapshot: calendarEventSnapshot)
         self.derivedTitle = derivedTitle
         self.derivedSnippet = derivedSnippet
         self.splitProvenance = splitProvenance
@@ -242,24 +243,46 @@ extension Transcription {
     /// that produced no word timings — so the speaker count alone is not enough.
     public var hasSpeakerLabeledWords: Bool {
         guard let speakers, !speakers.isEmpty,
-              let wordTimestamps else { return false }
+            let wordTimestamps
+        else { return false }
         return wordTimestamps.contains { $0.speakerId != nil }
     }
 
     public static func normalizedTitleOverride(from title: String?) -> String? {
         guard let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty else {
+            !trimmed.isEmpty
+        else {
             return nil
         }
         return trimmed
     }
 
+    /// Calendar-owned titles retain the exact event spelling. Ordinary custom
+    /// titles keep their established whitespace normalization and can override
+    /// a calendar name without being replaced by it.
+    public static func protectedTitleOverride(
+        from title: String?, calendarEventSnapshot: MeetingCalendarSnapshot?
+    ) -> String? {
+        guard let normalized = normalizedTitleOverride(from: title) else { return nil }
+        if let calendarTitle = calendarEventSnapshot?.title,
+            normalizedTitleOverride(from: calendarTitle) == normalized
+        {
+            return calendarTitle
+        }
+        return normalized
+    }
+
     public var normalizedTitleOverride: String? {
-        Self.normalizedTitleOverride(from: titleOverride)
+        Self.protectedTitleOverride(from: titleOverride, calendarEventSnapshot: calendarEventSnapshot)
     }
 
     public var effectiveDisplayTitle: String {
         if sourceType == .meeting {
+            if let protected = normalizedTitleOverride,
+                Self.normalizedTitleOverride(from: fileName) == Self.normalizedTitleOverride(from: protected)
+            {
+                return protected
+            }
             let name = fileName.trimmingCharacters(in: .whitespacesAndNewlines)
             return name.isEmpty ? fileName : name
         }
@@ -270,7 +293,8 @@ extension Transcription {
             return fileName
         }
         if let derived = derivedTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !derived.isEmpty {
+            !derived.isEmpty
+        {
             return derived
         }
         return fileName
@@ -335,7 +359,8 @@ public struct SpeakerInfo: Codable, Sendable, Equatable {
     /// speaker.
     public static func participants(in speakers: [SpeakerInfo]) -> [SpeakerInfo] {
         let systemID = AudioSource.system.rawValue
-        let isUnattributedBucket = speakers.contains { $0.id.hasPrefix("\(systemID):") }
+        let isUnattributedBucket =
+            speakers.contains { $0.id.hasPrefix("\(systemID):") }
             || speakers.contains { $0.id == systemID && $0.label == unattributedSystemLabel }
         guard isUnattributedBucket else { return speakers }
         return speakers.filter { $0.id != systemID }
@@ -407,9 +432,9 @@ public struct TranscriptSegmentRecord: Codable, Sendable, Equatable, Identifiabl
         using speakers: [SpeakerInfo]?
     ) -> [TranscriptSegmentRecord]? {
         guard var segments,
-              !segments.isEmpty,
-              let speakers,
-              !speakers.isEmpty
+            !segments.isEmpty,
+            let speakers,
+            !speakers.isEmpty
         else {
             return segments
         }
@@ -421,7 +446,7 @@ public struct TranscriptSegmentRecord: Codable, Sendable, Equatable, Identifiabl
 
         for index in segments.indices {
             guard let speakerId = segments[index].speakerId,
-                  let label = labelsBySpeakerID[speakerId]
+                let label = labelsBySpeakerID[speakerId]
             else { continue }
             segments[index].speakerLabel = label
         }
@@ -439,11 +464,14 @@ extension Transcription: FetchableRecord, PersistableRecord {
     public static let databaseTableName = "transcriptions"
 
     public enum Columns: String, ColumnExpression {
-        case id, createdAt, audioRetentionStartedAt, fileName, filePath, audioTrackOrdinal, meetingArtifactFolderPath, fileSizeBytes, durationMs
+        case id, createdAt, audioRetentionStartedAt, fileName, filePath, audioTrackOrdinal, meetingArtifactFolderPath,
+            fileSizeBytes, durationMs
         case rawTranscript, cleanTranscript, wordTimestamps, language
         case speakerCount, speakers, diarizationSegments, transcriptSegments, chatMessages
         case status, errorMessage, exportPath, sourceURL
-        case thumbnailURL, channelName, videoDescription, isFavorite, sourceType, meetingTypeId, recoveredFromCrash, isTranscriptEdited, userNotes, meetingStartContext, meetingCaptureReport, engine, engineVariant, titleOverride, derivedTitle, derivedSnippet, updatedAt
+        case thumbnailURL, channelName, videoDescription, isFavorite, sourceType, meetingTypeId, recoveredFromCrash,
+            isTranscriptEdited, userNotes, meetingStartContext, meetingCaptureReport, engine, engineVariant,
+            titleOverride, derivedTitle, derivedSnippet, updatedAt
         case calendarEventSnapshot
         case splitProvenance
     }
@@ -489,7 +517,8 @@ extension Transcription: FetchableRecord, PersistableRecord {
             }
         }
 
-        diarizationSegments = try container.decodeIfPresent([DiarizationSegmentRecord].self, forKey: .diarizationSegments)
+        diarizationSegments = try container.decodeIfPresent(
+            [DiarizationSegmentRecord].self, forKey: .diarizationSegments)
         transcriptSegments = try container.decodeIfPresent([TranscriptSegmentRecord].self, forKey: .transcriptSegments)
         chatMessages = try container.decodeIfPresent([ChatMessage].self, forKey: .chatMessages)
         status = try container.decode(TranscriptionStatus.self, forKey: .status)
@@ -511,18 +540,23 @@ extension Transcription: FetchableRecord, PersistableRecord {
         recoveredFromCrash = try container.decodeIfPresent(Bool.self, forKey: .recoveredFromCrash) ?? false
         isTranscriptEdited = try container.decodeIfPresent(Bool.self, forKey: .isTranscriptEdited) ?? false
         userNotes = try container.decodeIfPresent(String.self, forKey: .userNotes)
-        meetingStartContext = (try? container.decodeIfPresent(MeetingStartContext.self, forKey: .meetingStartContext)) ?? nil
-        meetingCaptureReport = (try? container.decodeIfPresent(
-            MeetingCaptureReport.self,
-            forKey: .meetingCaptureReport
-        )) ?? nil
+        meetingStartContext =
+            (try? container.decodeIfPresent(MeetingStartContext.self, forKey: .meetingStartContext)) ?? nil
+        meetingCaptureReport =
+            (try? container.decodeIfPresent(
+                MeetingCaptureReport.self,
+                forKey: .meetingCaptureReport
+            )) ?? nil
         engine = try container.decodeIfPresent(String.self, forKey: .engine)
         engineVariant = try container.decodeIfPresent(String.self, forKey: .engineVariant)
-        calendarEventSnapshot = (try? container.decodeIfPresent(
-            MeetingCalendarSnapshot.self,
-            forKey: .calendarEventSnapshot
-        )) ?? nil
-        titleOverride = Self.normalizedTitleOverride(from: try container.decodeIfPresent(String.self, forKey: .titleOverride))
+        calendarEventSnapshot =
+            (try? container.decodeIfPresent(
+                MeetingCalendarSnapshot.self,
+                forKey: .calendarEventSnapshot
+            )) ?? nil
+        titleOverride = Self.protectedTitleOverride(
+            from: try container.decodeIfPresent(String.self, forKey: .titleOverride),
+            calendarEventSnapshot: calendarEventSnapshot)
         derivedTitle = try container.decodeIfPresent(String.self, forKey: .derivedTitle)
         derivedSnippet = try container.decodeIfPresent(String.self, forKey: .derivedSnippet)
         splitProvenance = try container.decodeIfPresent(

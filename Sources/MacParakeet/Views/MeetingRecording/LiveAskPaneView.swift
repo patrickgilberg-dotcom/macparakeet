@@ -14,6 +14,8 @@ struct LiveAskPaneView: View {
     @FocusState private var inputFocused: Bool
     @State private var showingPromptMenu = false
     @State private var showingPromptsSheet = false
+    @State private var showingPreparation = false
+    @State private var showingAnswerContext = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -57,11 +59,14 @@ struct LiveAskPaneView: View {
                 Telemetry.send(.askMenuOpened)
             }
         }
-        .sheet(isPresented: $showingPromptsSheet, onDismiss: {
-            // Refresh after the user closes the sheet so any edits / new pills
-            // / restored defaults take effect immediately in the live pane.
-            quickPromptsViewModel.refresh()
-        }) {
+        .sheet(
+            isPresented: $showingPromptsSheet,
+            onDismiss: {
+                // Refresh after the user closes the sheet so any edits / new pills
+                // / restored defaults take effect immediately in the live pane.
+                quickPromptsViewModel.refresh()
+            }
+        ) {
             AskPromptsSheet(viewModel: quickPromptsViewModel)
         }
     }
@@ -126,9 +131,18 @@ struct LiveAskPaneView: View {
     /// above. Owns the bottom of the panel.
     private var composerArea: some View {
         VStack(spacing: 0) {
+            if let error = viewModel.liveChatPersistenceError {
+                errorRow(error)
+                    .padding(.horizontal, DesignSystem.Spacing.lg)
+                    .padding(.vertical, DesignSystem.Spacing.sm)
+            }
+            if viewModel.usesDirectLiveAnswers {
+                liveAnswerControls
+            }
             if !viewModel.messages.isEmpty
                 && viewModel.canSendMessage
-                && !quickPromptsViewModel.visiblePinned.isEmpty {
+                && !quickPromptsViewModel.visiblePinned.isEmpty
+            {
                 followUpRow
             }
             inputBar
@@ -137,6 +151,174 @@ struct LiveAskPaneView: View {
         .overlay(alignment: .top) {
             Divider()
         }
+    }
+
+    private var liveAnswerControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Button {
+                    viewModel.helpMeAnswer()
+                } label: {
+                    Label("Help me answer this", systemImage: "bolt.fill")
+                }
+                .parakeetAction(.primary)
+                .keyboardShortcut(
+                    .space,
+                    modifiers: viewModel.liveAnswerGlobalShortcutIncludesControl
+                        ? [.control, .command, .option] : [.command, .option]
+                )
+                .help(
+                    viewModel.liveAnswerGlobalShortcutAvailable
+                        ? "\(viewModel.liveAnswerGlobalShortcutLabel) from any app during this recording."
+                        : "Use this button to request an answer.")
+                Spacer()
+                Button(showingPreparation ? "Hide context" : "Prepare context") {
+                    showingPreparation.toggle()
+                }
+                .parakeetAction(.secondary)
+                .controlSize(.small)
+            }
+            Text(
+                viewModel.liveAnswerGlobalShortcutAvailable
+                    ? (viewModel.liveAnswerGlobalShortcutIncludesControl
+                        ? "⌥⌘Space is in use. Use \(viewModel.liveAnswerGlobalShortcutLabel) from any app."
+                        : "\(viewModel.liveAnswerGlobalShortcutLabel) from any app during this recording.")
+                    : "Global shortcut unavailable. The button works here."
+            )
+            .font(.caption)
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
+            Text(
+                "Summaries refresh every 3 minutes. Answers focus on the latest completed window and fresh speech, with general meeting background."
+            )
+            .font(.caption)
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
+            if let updatedAt = viewModel.liveMeetingMemoryLastUpdated {
+                HStack(spacing: 3) {
+                    Text("Summaries updated")
+                    Text(updatedAt, style: .relative)
+                    Text("ago")
+                }
+                .font(.caption2)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .accessibilityElement(children: .combine)
+            }
+            if let error = viewModel.liveMeetingMemoryBackgroundError {
+                Text("Summary refresh couldn’t finish. \(error)")
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            if viewModel.liveMeetingMemoryProgress != nil {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text("Reviewing earlier discussion…")
+                        .font(.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("live-answer-context-progress")
+            }
+            if let projectStatus = viewModel.liveProjectContextStatus {
+                Text(projectStatus)
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            if let projectContext = viewModel.lastLiveProjectContext {
+                DisclosureGroup("Previous project meeting used for this answer") {
+                    ScrollView {
+                        Text(projectContext.quotedContext).font(.system(size: 12)).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }.frame(maxHeight: 150)
+                }.font(.caption)
+            }
+            if let context = viewModel.lastLiveMeetingMemory {
+                DisclosureGroup("Context for last completed answer", isExpanded: $showingAnswerContext) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Recent focus").fontWeight(.semibold)
+                        if let focus = context.focusSummary {
+                            Text(
+                                "Latest completed window: \(focusWindowLabel(startMs: focus.startMs, endMs: focus.endMs))"
+                            )
+                            contextSummaryText(focus.text)
+                        } else if context.focusSource?.transcript.isEmpty == true {
+                            Text("No recognized speech in the recent three-minute window.")
+                        } else {
+                            Text("Waiting for a recent summary. This answer includes the available live transcript.")
+                        }
+                        Text("General meeting background").fontWeight(.semibold)
+                        if context.earlierSummary.isEmpty {
+                            Text("No general summary is ready yet. The available transcript supplies background.")
+                        } else {
+                            contextSummaryText(context.earlierSummary)
+                        }
+                        switch context.coverage.mode {
+                        case .fullRaw:
+                            Text("The full available live transcript was included.")
+                        case .allEarlierSummarized:
+                            Text(
+                                "Earlier discussion was summarized, so some details may be missing. Check the transcript for exact wording."
+                            )
+                        }
+                        Text(
+                            "Includes speech available when you asked. These summaries belong to this completed answer."
+                        )
+                    }
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                    .padding(.top, 4)
+                }
+                .font(.caption)
+                .accessibilityIdentifier("live-answer-context-disclosure")
+            }
+            if showingPreparation {
+                Text("Account facts and meeting goals · saved only on this Mac")
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+                TextEditor(text: $viewModel.livePreparationContext)
+                    .font(.system(size: 12))
+                    .frame(height: 90)
+                    .onChange(of: viewModel.livePreparationContext) { _, value in
+                        AppPaths.sharedAppDefaults().set(value, forKey: "livePreparationContext")
+                    }
+            }
+            if viewModel.liveTranscriptHasEarlierGap {
+                Text("Earlier live-preview words may be missing. The full recording is preserved.")
+                    .font(.caption)
+                    .foregroundStyle(DesignSystem.Colors.textSecondary)
+            }
+            if let timing = viewModel.liveAnswerTiming {
+                Text(liveTimingLabel(timing))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(DesignSystem.Colors.textTertiary)
+            }
+        }
+        .padding(.horizontal, DesignSystem.Spacing.md)
+        .padding(.top, 8)
+    }
+
+    private func contextSummaryText(_ text: String) -> some View {
+        ScrollView {
+            Text(text)
+                .font(.system(size: 12))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 150)
+    }
+
+    private func focusWindowLabel(startMs: Int, endMs: Int) -> String {
+        func timestamp(_ milliseconds: Int) -> String {
+            let seconds = max(0, milliseconds / 1_000)
+            return String(format: "%d:%02d", seconds / 60, seconds % 60)
+        }
+        return "\(timestamp(startMs))–\(timestamp(endMs))"
+    }
+
+    private func liveTimingLabel(_ timing: LiveAnswerTiming) -> String {
+        func seconds(_ milliseconds: Double?) -> String {
+            milliseconds.map { String(format: "%.2fs", $0 / 1_000) } ?? "—"
+        }
+        return
+            "\(timing.outcome.capitalized) · text \(seconds(timing.firstTextMs)) · sentence \(seconds(timing.firstSentenceMs))"
     }
 
     private var followUpRow: some View {
@@ -179,11 +361,12 @@ struct LiveAskPaneView: View {
     /// Pill tap → bubble shows the short label, LLM gets the comprehensive prompt.
     private func fire(_ entry: QuickPrompt, source: TelemetryAskPromptSource) {
         guard viewModel.canSendMessage, !viewModel.isStreaming else { return }
-        Telemetry.send(.askPromptFired(
-            source: source,
-            group: telemetryGroup(for: entry),
-            label: telemetryLabel(for: entry)
-        ))
+        Telemetry.send(
+            .askPromptFired(
+                source: source,
+                group: telemetryGroup(for: entry),
+                label: telemetryLabel(for: entry)
+            ))
         viewModel.inputText = entry.label
         viewModel.sendMessage(richPrompt: entry.prompt)
         inputFocused = true
@@ -277,11 +460,13 @@ struct LiveAskPaneView: View {
                 .font(DesignSystem.Typography.body.weight(.medium))
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
 
-            Text("MacParakeet can use a local AI app, your API key, or a command-line AI tool. Recording works without this.")
-                .font(DesignSystem.Typography.caption)
-                .foregroundStyle(DesignSystem.Colors.textTertiary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "MacParakeet can use a local AI app, your API key, or a command-line AI tool. Recording works without this."
+            )
+            .font(DesignSystem.Typography.caption)
+            .foregroundStyle(DesignSystem.Colors.textTertiary)
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
 
             Button {
                 NotificationCenter.default.post(
@@ -372,14 +557,19 @@ struct LiveAskPaneView: View {
             .help("Stop response")
             .accessibilityLabel("Stop response")
         } else {
-            let canSend = !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let canSend =
+                !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 && viewModel.canSendMessage
-            Button { send() } label: {
+            Button {
+                send()
+            } label: {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 24))
-                    .foregroundStyle(canSend
-                        ? DesignSystem.Colors.accent
-                        : DesignSystem.Colors.accent.opacity(0.3))
+                    .foregroundStyle(
+                        canSend
+                            ? DesignSystem.Colors.accent
+                            : DesignSystem.Colors.accent.opacity(0.3)
+                    )
                     .accessibilityHidden(true)
             }
             .buttonStyle(.plain)
@@ -445,21 +635,25 @@ private struct PromptMenuButton: View {
         } label: {
             Image(systemName: "sparkles")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(isOpen
-                    ? DesignSystem.Colors.accent
-                    : DesignSystem.Colors.accent.opacity(isHovered ? 0.85 : 0.7))
+                .foregroundStyle(
+                    isOpen
+                        ? DesignSystem.Colors.accent
+                        : DesignSystem.Colors.accent.opacity(isHovered ? 0.85 : 0.7)
+                )
                 .frame(width: 28, height: 28)
                 .background(
                     Circle()
-                        .fill(isOpen
-                            ? DesignSystem.Colors.surfaceElevated
-                            : DesignSystem.Colors.surfaceElevated.opacity(isHovered ? 0.55 : 0.32))
+                        .fill(
+                            isOpen
+                                ? DesignSystem.Colors.surfaceElevated
+                                : DesignSystem.Colors.surfaceElevated.opacity(isHovered ? 0.55 : 0.32))
                 )
                 .overlay(
                     Circle()
-                        .strokeBorder(isOpen
-                            ? DesignSystem.Colors.accent.opacity(0.4)
-                            : DesignSystem.Colors.border.opacity(0.35),
+                        .strokeBorder(
+                            isOpen
+                                ? DesignSystem.Colors.accent.opacity(0.4)
+                                : DesignSystem.Colors.border.opacity(0.35),
                             lineWidth: 1)
                 )
         }
@@ -500,9 +694,10 @@ private struct StarterPromptPill: View {
             .padding(.vertical, 7)
             .background(
                 RoundedRectangle(cornerRadius: 10)
-                    .fill(isHovered
-                        ? DesignSystem.Colors.surfaceElevated
-                        : DesignSystem.Colors.surfaceElevated.opacity(0.32))
+                    .fill(
+                        isHovered
+                            ? DesignSystem.Colors.surfaceElevated
+                            : DesignSystem.Colors.surfaceElevated.opacity(0.32))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
@@ -545,16 +740,19 @@ private struct FollowUpPill: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isHovered
-                    ? DesignSystem.Colors.textPrimary
-                    : DesignSystem.Colors.textSecondary)
+                .foregroundStyle(
+                    isHovered
+                        ? DesignSystem.Colors.textPrimary
+                        : DesignSystem.Colors.textSecondary
+                )
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(isHovered
-                            ? DesignSystem.Colors.surfaceElevated
-                            : DesignSystem.Colors.surfaceElevated.opacity(0.32))
+                        .fill(
+                            isHovered
+                                ? DesignSystem.Colors.surfaceElevated
+                                : DesignSystem.Colors.surfaceElevated.opacity(0.32))
                 )
                 .overlay(
                     Capsule()

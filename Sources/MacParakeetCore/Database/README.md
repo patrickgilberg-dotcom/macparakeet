@@ -32,6 +32,8 @@ processes own their connections.
   - `PromptLabelPolicyRepository.swift` — active label availability and fallback policies.
   - `MeetingLabelRepository.swift` / `TranscriptionMeetingLabelRepository.swift` — reusable labels across sources.
   - `MeetingTypeRepository.swift` / `PromptMeetingPolicyRepository.swift` — retained legacy classification compatibility.
+  - `MeetingProjectRepository.swift` — virtual project folders, transactional single-folder membership and latest-prior-meeting read models.
+  - `MeetingPreparationRepository.swift` — user-authored Google-occurrence preparation and frozen recording associations.
   - `PromptVersionRepository.swift` — immutable prompt request versions.
   - `PromptResultRepository.swift` — saved prompt outputs.
   - `QuickPromptRepository.swift` — quick-prompt entries (Ask tab).
@@ -154,6 +156,59 @@ diarization timing JSON as `NULL`; on a real library that JSON is over 90% of
 a page's bytes. Transcript text and metadata stay, so search and previews
 are unchanged. Reload a summary row by ID before persisting it, exporting
 it, or opening it in transcript detail.
+
+**Project folders do not move source files.** `meeting_projects` and the separate
+`transcription_project_memberships` table preserve all transcription columns and
+artifact paths. Bulk assignment validates every source before changing any row
+inside one transaction. Deleting a project unfiles its transcripts; it never
+deletes them. The latest-prior read selects the newest same-project meeting
+before the current start, excluding the active source and split children, before
+examining readiness. A processing, failed, cancelled or empty latest row does not
+fall back to an older completed one. Effective speaker/text corrections and
+their revision/fingerprint are resolved in the same read transaction.
+
+**Preparation is user-authored context, not a calendar cache.** Its unique key is
+the selected Google calendar ID and event/instance ID, never a title or current
+scheduled time. Recording intent is frozen under a native recording UUID before
+a transcription exists. Later `bindRecording` attaches the Library ID and folder
+membership atomically. It is idempotent and never reverses a later explicit user
+folder move. Recording snapshots survive draft deletion and remain independent
+of transcription completion's full-row metadata merge. These repositories do no
+network, artifact refresh, inference or calendar polling.
+
+**Recovered chat import receipts contain no message text.** `chat_recovery_imports`
+records the stable conversation UUID and transcription UUID in the same
+transaction as the first recovery import. It has no cascading foreign key:
+explicitly deleting an imported chat or meeting must not allow a retained lock
+to restore it again. Existing edited or cleared conversations win over a lock
+snapshot. Use normal GRDB UUID encoding for receipt lookups.
+
+**Automatic meeting minutes are durable private work, not a second transcript.**
+`meeting_minutes_jobs` (v0.52) owns immutable effective-transcript and personal-skill
+snapshots, exact evidence-text and canonical result hashes, ordered completed
+chunk receipts, bounded semantic maps and candidate evidence ranges. Its
+`transcriptionID` foreign key cascades deletion of this private work with the
+source meeting. Status queries select only metadata, never source bodies.
+The unique source/skill/policy identity deduplicates automatic completion calls.
+
+One attempt UUID owns each running job. A completed chunk is checkpointed only
+after terminal provider success and local quotation validation. Safe yielding
+returns the job to pending between requests; a process interruption instead
+becomes a visible failed job requiring explicit Retry. An uncertain accepted
+request is never silently replayed. Explicit Retry can create a new job for an
+edited source/skill; unchanged retries retain completed checkpoints. A provider
+identity change cannot silently reuse another identity's partial ledger.
+
+Final publication re-resolves the source/correction branch inside one database
+transaction, verifies complete contiguous source coverage, fresh-inserts a
+`PromptResult`, then marks the job completed. Failed, malformed or cancelled work
+never replaces existing minutes or user edits. The result's
+`sourceTranscriptHash` uses `PromptResultFreshness`'s word hash; the job's separate
+`sourceHash` fingerprints exact formatted evidence text. `resultID` has no
+foreign key so deleting only a result retains the completed job receipt and does
+not cause automatic resurrection. This row still contains private source/skill
+provenance while its meeting exists; it is not a content-free receipt like
+`chat_recovery_imports`.
 
 **Never use raw SQL `WHERE id = ?` with `uuid.uuidString`.**
 GRDB stores UUID values via Codable encoding, which produces a

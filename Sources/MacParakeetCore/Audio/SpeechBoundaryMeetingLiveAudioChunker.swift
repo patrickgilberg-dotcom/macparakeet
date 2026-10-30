@@ -182,6 +182,35 @@ actor SpeechBoundaryMeetingLiveAudioChunker: MeetingLiveAudioChunking {
 
     // MARK: - VAD streaming
 
+    func flushForLiveAnswer() async -> AudioChunker.AudioChunk? {
+        // Preserve the sub-window tail even before VAD has enough samples to
+        // classify it. Signal filtering remains in MeetingRecordingService.
+        let tail = pendingVAD
+        pendingVAD.removeAll()
+        buffer.append(contentsOf: tail)
+        if !tail.isEmpty, !fellBackToFixed, let state = vadState {
+            do {
+                let result = try await vad.processStreamingChunk(tail, state: state, config: config)
+                vadState = result.state
+                switch result.event {
+                case .speechStart: sawSpeechSinceLastEmit = true
+                case .speechEnd: sawSpeechSinceLastEmit = false
+                case .none: break
+                }
+            } catch {
+                // The VAD frontier can no longer match the sample frontier.
+                // Fixed fallback retains the original absolute sample counters.
+                fellBackToFixed = true
+                diag.fellBackToFixed = true
+                diag.vadErrors += 1
+            }
+        }
+        guard !buffer.isEmpty else { return nil }
+        // An explicit cut can land mid-utterance. Keep the speech flag aligned
+        // with vadState so continuing .none events cannot discard that speech.
+        return makeChunk(length: buffer.count, tailOverlap: 0)
+    }
+
     private func process(
         window: [Float],
         into emitted: inout [AudioChunker.AudioChunk]

@@ -6,11 +6,16 @@ public struct MeetingTranscriptUpdate: Sendable, Equatable {
     /// `true` when live-preview chunks were recently dropped due to STT backpressure.
     /// The UI can use this to show a "transcription lagging" indicator.
     public let isTranscriptionLagging: Bool
+    public let hasEarlierPreviewGap: Bool
 
-    public init(words: [WordTimestamp], speakers: [SpeakerInfo], isTranscriptionLagging: Bool = false) {
+    public init(
+        words: [WordTimestamp], speakers: [SpeakerInfo], isTranscriptionLagging: Bool = false,
+        hasEarlierPreviewGap: Bool = false
+    ) {
         self.words = words
         self.speakers = speakers
         self.isTranscriptionLagging = isTranscriptionLagging
+        self.hasEarlierPreviewGap = hasEarlierPreviewGap
     }
 }
 
@@ -114,12 +119,14 @@ struct MeetingTranscriptAssembler {
     ) -> [WordTimestamp] {
         let rawTokens = text.split { $0.isWhitespace }.map(String.init)
         let hasTemporalOverlap = committedThroughMs.map { $0 > chunk.startMs } ?? false
-        let tokens = hasTemporalOverlap
+        let tokens =
+            hasTemporalOverlap
             ? trimOverlappingPrefix(rawTokens, committedWords: committedWords)
             : rawTokens
         guard !tokens.isEmpty else { return [] }
 
-        let startBoundary = committedThroughMs
+        let startBoundary =
+            committedThroughMs
             .map { max(chunk.startMs, min($0, chunk.endMs)) }
             ?? chunk.startMs
         guard startBoundary < chunk.endMs else { return [] }
@@ -145,7 +152,8 @@ struct MeetingTranscriptAssembler {
         guard !tokens.isEmpty, !committedWords.isEmpty else { return tokens }
 
         let normalizedTokens = tokens.map(normalizeOverlapToken)
-        let normalizedCommitted = committedWords
+        let normalizedCommitted =
+            committedWords
             .suffix(syntheticOverlapAnchorLength)
             .map { normalizeOverlapToken($0.word) }
         var overlap = min(normalizedTokens.count, normalizedCommitted.count)
@@ -242,22 +250,24 @@ struct MeetingTranscriptAssembler {
             if speakerId == currentSpeaker, word.startMs - currentEnd <= 1500 {
                 currentEnd = max(currentEnd, word.endMs)
             } else {
-                segments.append(DiarizationSegmentRecord(
-                    speakerId: currentSpeaker,
-                    startMs: currentStart,
-                    endMs: currentEnd
-                ))
+                segments.append(
+                    DiarizationSegmentRecord(
+                        speakerId: currentSpeaker,
+                        startMs: currentStart,
+                        endMs: currentEnd
+                    ))
                 currentSpeaker = speakerId
                 currentStart = word.startMs
                 currentEnd = word.endMs
             }
         }
 
-        segments.append(DiarizationSegmentRecord(
-            speakerId: currentSpeaker,
-            startMs: currentStart,
-            endMs: currentEnd
-        ))
+        segments.append(
+            DiarizationSegmentRecord(
+                speakerId: currentSpeaker,
+                startMs: currentStart,
+                endMs: currentEnd
+            ))
         return segments
     }
 

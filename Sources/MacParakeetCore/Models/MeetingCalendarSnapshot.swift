@@ -17,6 +17,11 @@ public struct MeetingCalendarSnapshot: Codable, Sendable, Equatable {
     public var meetingURL: String?
     public var meetingService: String?
     public var capturedAt: Date
+    /// Explicit provider occurrence keys for local preparation lookup. Legacy
+    /// and non-Google snapshots do not imply a Google event association.
+    public var calendarIdentifier: String?
+    public var providerEventID: String?
+    public var provider: CalendarEventProvider?
 
     public init(
         confidence: Confidence,
@@ -29,7 +34,10 @@ public struct MeetingCalendarSnapshot: Codable, Sendable, Equatable {
         organizer: MeetingCalendarPerson? = nil,
         meetingURL: String? = nil,
         meetingService: String? = nil,
-        capturedAt: Date = Date()
+        capturedAt: Date = Date(),
+        calendarIdentifier: String? = nil,
+        providerEventID: String? = nil,
+        provider: CalendarEventProvider? = nil
     ) {
         self.confidence = confidence
         self.eventIdentifier = eventIdentifier
@@ -42,6 +50,9 @@ public struct MeetingCalendarSnapshot: Codable, Sendable, Equatable {
         self.meetingURL = meetingURL
         self.meetingService = meetingService
         self.capturedAt = capturedAt
+        self.calendarIdentifier = calendarIdentifier
+        self.providerEventID = providerEventID
+        self.provider = provider
     }
 }
 
@@ -78,14 +89,19 @@ public extension MeetingCalendarSnapshot {
             scheduledStartAt: event.startTime,
             scheduledEndAt: event.endTime,
             attendees: event.participants.map {
-                MeetingCalendarPerson(name: $0.name, email: $0.email, status: $0.status.rawValue, kind: $0.kind?.rawValue)
+                MeetingCalendarPerson(
+                    name: $0.name, email: $0.email, status: $0.status.rawValue, kind: $0.kind?.rawValue)
             },
             organizer: event.organizer.map {
-                MeetingCalendarPerson(name: $0.name, email: $0.email, status: $0.status.rawValue, kind: $0.kind?.rawValue)
+                MeetingCalendarPerson(
+                    name: $0.name, email: $0.email, status: $0.status.rawValue, kind: $0.kind?.rawValue)
             },
             meetingURL: event.meetUrl,
             meetingService: MeetingLinkParser.shared.identifyService(from: event.meetUrl),
-            capturedAt: capturedAt
+            capturedAt: capturedAt,
+            calendarIdentifier: event.preparationCalendarID,
+            providerEventID: event.preparationEventID,
+            provider: event.provider
         )
     }
 }

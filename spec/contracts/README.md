@@ -44,6 +44,8 @@ Planned contracts are listed separately below; they do not describe available pa
 - [Meeting Import v1](meeting-import-v1.md) — one-file app/CLI import, managed-media ownership, recovery, and durable results
 - [Split and Transcribe](meeting-splitting.md) — implemented shared Core, native app, and public CLI lifecycle
 - [Saved-Audio Auto-Prompt Completion](saved-audio-auto-prompt-completion.md)
+- [Live meeting minutes](live-meeting-minutes.md) — durable whole-transcript minutes through the personal fork's approved ChatGPT plan
+- [Live meeting preferences v1](live-meeting-preferences-v1.md) — versioned private skill and personal answer-style settings
 
 - [Meeting Artifacts v1](meeting-artifacts-v1.md)
 - [Meeting Recovery and Retention Safety](meeting-recovery-retention.md)

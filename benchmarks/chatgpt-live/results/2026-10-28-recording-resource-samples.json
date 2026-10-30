@@ -1,0 +1,201 @@
+{
+  "process_id": 22819,
+  "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+  "condition": "Final signed Release app during dual-source recording with VAD preview. The sampled window is approximately 48.3\u201378.3 seconds after recording startup. Parent-reported synthetic audio in the first eight seconds is outside this sample window; later acoustic content was not observed by sampler. No UI or audio driven by sampler.",
+  "baseline": {
+    "timestamp_utc": "2026-10-28T15:38:02Z",
+    "cpu_percent": 0.1,
+    "rss_kib": 47184,
+    "rss_mib": 46.078125,
+    "condition": "Idle, awaiting credential approvals; no recording or answer yet."
+  },
+  "sampling": {
+    "interval_seconds": 2,
+    "target_duration_seconds": 30,
+    "cpu_method": "ps %cpu, OS-reported smoothed per-process CPU percentage",
+    "memory_method": "ps rss in KiB, resident memory of this process; not a complete unified GPU/ANE memory measure"
+  },
+  "samples": [
+    {
+      "timestamp_utc": "2026-10-28T15:40:25.609Z",
+      "elapsed_seconds": 0.004,
+      "pid": 22819,
+      "cpu_percent": 9.2,
+      "rss_kib": 116320,
+      "rss_mib": 113.59375,
+      "process_elapsed": "04:11",
+      "seconds_since_recording_started": 48.324
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:27.614Z",
+      "elapsed_seconds": 2.009,
+      "pid": 22819,
+      "cpu_percent": 8.1,
+      "rss_kib": 116224,
+      "rss_mib": 113.5,
+      "process_elapsed": "04:13",
+      "seconds_since_recording_started": 50.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:29.614Z",
+      "elapsed_seconds": 4.011,
+      "pid": 22819,
+      "cpu_percent": 18.0,
+      "rss_kib": 123552,
+      "rss_mib": 120.65625,
+      "process_elapsed": "04:15",
+      "seconds_since_recording_started": 52.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:31.614Z",
+      "elapsed_seconds": 6.012,
+      "pid": 22819,
+      "cpu_percent": 9.7,
+      "rss_kib": 134800,
+      "rss_mib": 131.640625,
+      "process_elapsed": "04:17",
+      "seconds_since_recording_started": 54.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:33.611Z",
+      "elapsed_seconds": 8.008,
+      "pid": 22819,
+      "cpu_percent": 9.1,
+      "rss_kib": 129760,
+      "rss_mib": 126.71875,
+      "process_elapsed": "04:19",
+      "seconds_since_recording_started": 56.326
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:35.614Z",
+      "elapsed_seconds": 10.011,
+      "pid": 22819,
+      "cpu_percent": 9.2,
+      "rss_kib": 129184,
+      "rss_mib": 126.15625,
+      "process_elapsed": "04:21",
+      "seconds_since_recording_started": 58.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:37.613Z",
+      "elapsed_seconds": 12.011,
+      "pid": 22819,
+      "cpu_percent": 10.0,
+      "rss_kib": 128624,
+      "rss_mib": 125.609375,
+      "process_elapsed": "04:23",
+      "seconds_since_recording_started": 60.328
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:39.611Z",
+      "elapsed_seconds": 14.008,
+      "pid": 22819,
+      "cpu_percent": 11.6,
+      "rss_kib": 135152,
+      "rss_mib": 131.984375,
+      "process_elapsed": "04:25",
+      "seconds_since_recording_started": 62.326
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:41.613Z",
+      "elapsed_seconds": 16.01,
+      "pid": 22819,
+      "cpu_percent": 9.4,
+      "rss_kib": 133920,
+      "rss_mib": 130.78125,
+      "process_elapsed": "04:27",
+      "seconds_since_recording_started": 64.328
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:43.613Z",
+      "elapsed_seconds": 18.011,
+      "pid": 22819,
+      "cpu_percent": 10.3,
+      "rss_kib": 131120,
+      "rss_mib": 128.046875,
+      "process_elapsed": "04:29",
+      "seconds_since_recording_started": 66.328
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:45.610Z",
+      "elapsed_seconds": 20.008,
+      "pid": 22819,
+      "cpu_percent": 9.4,
+      "rss_kib": 122416,
+      "rss_mib": 119.546875,
+      "process_elapsed": "04:31",
+      "seconds_since_recording_started": 68.325
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:47.614Z",
+      "elapsed_seconds": 22.012,
+      "pid": 22819,
+      "cpu_percent": 8.7,
+      "rss_kib": 104176,
+      "rss_mib": 101.734375,
+      "process_elapsed": "04:33",
+      "seconds_since_recording_started": 70.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:49.613Z",
+      "elapsed_seconds": 24.011,
+      "pid": 22819,
+      "cpu_percent": 9.6,
+      "rss_kib": 108496,
+      "rss_mib": 105.953125,
+      "process_elapsed": "04:35",
+      "seconds_since_recording_started": 72.328
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:51.614Z",
+      "elapsed_seconds": 26.012,
+      "pid": 22819,
+      "cpu_percent": 8.4,
+      "rss_kib": 108832,
+      "rss_mib": 106.28125,
+      "process_elapsed": "04:37",
+      "seconds_since_recording_started": 74.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:53.614Z",
+      "elapsed_seconds": 28.011,
+      "pid": 22819,
+      "cpu_percent": 9.0,
+      "rss_kib": 108736,
+      "rss_mib": 106.1875,
+      "process_elapsed": "04:39",
+      "seconds_since_recording_started": 76.329
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:40:55.613Z",
+      "elapsed_seconds": 30.011,
+      "pid": 22819,
+      "cpu_percent": 8.5,
+      "rss_kib": 108928,
+      "rss_mib": 106.375,
+      "process_elapsed": "04:41",
+      "seconds_since_recording_started": 78.328
+    }
+  ],
+  "summary": {
+    "cpu_percent": {
+      "n": 16,
+      "min": 8.1,
+      "median": 9.3,
+      "p95_nearest_rank": 18.0,
+      "max": 18.0
+    },
+    "rss_mib": {
+      "n": 16,
+      "min": 101.734375,
+      "median": 120.1015625,
+      "p95_nearest_rank": 131.984375,
+      "max": 131.984375
+    }
+  },
+  "observed_duration_seconds": 30.011,
+  "caveat": "One short recording interval, 16 samples. p95 is the maximum at this sample count. No battery or long-meeting stress measurement; CPU values are ps-smoothed, and RSS does not account for all GPU/ANE allocations.",
+  "recording_started_utc": "2026-10-28T15:39:37.285Z",
+  "meeting_session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+  "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D"
+}

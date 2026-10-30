@@ -58,6 +58,34 @@ Classification names are local user data and are not telemetry dimensions.
 SQLite is the mutable source of truth; meeting artifact JSON and Markdown are
 materialized projections refreshed after classification changes.
 
+## Project folders and event preparation (personal Live fork)
+
+`v0.50-project-meeting-preparation` adds virtual folders and user-authored context.
+It does not alter existing transcription columns, audio paths or calendar event
+records. Folder membership is separate from labels and prompt applicability.
+
+| Table | Identity and fields | Deletion/ownership |
+| --- | --- | --- |
+| `meeting_projects` | UUID `id`; case-insensitive unique nonempty `name`; `sortOrder`, `isArchived`, `createdAt`, `updatedAt`. | Explicit local user folders. Delete unfiles transcripts rather than deleting source data. |
+| `transcription_project_memberships` | Primary key `transcriptionID`; required `projectID`; `assignedAt`. One folder per transcript. Index `(projectID, transcriptionID)`. | Both foreign keys cascade only this membership. Moves validate all selected IDs and commit atomically. |
+| `meeting_preparations` | UUID `id`; unique case-sensitive `(calendarID, eventID)` for an explicit Google occurrence; user `context`; optional project; exact `titleSnapshot`, optional scheduled start/end snapshots; created/updated dates. | This is not an event inventory or attendee cache. Project deletion sets its project ID to null and preserves preparation. Rename/reschedule updates display snapshots without changing occurrence identity. |
+| `recording_meeting_associations` | Primary key native `recordingID`; optional unique `transcriptionID`; historical `preparationID`; optional project; frozen title/context/calendar/event/schedule/project-name snapshots and creation date. | Recording ID has no transcription foreign key, allowing intent before the Library row exists. Later binding assigns membership in one transaction. Source deletion nulls `transcriptionID`; project deletion nulls `projectID`. Preparation ID deliberately has no live foreign key, preserving original provenance after its editable draft is deleted. |
+
+Association snapshots are inserted once. Conflicting reuse of a recording UUID
+fails rather than overwriting context. Repeating the same final binding leaves a
+later user folder move intact, and normal transcription completion cannot
+overwrite these separate tables.
+
+The latest previous meeting query joins folder membership across the complete
+database, filters `sourceType=meeting`, `createdAt < current recording start`,
+excludes the active recording/transcription and split-derived children, then
+orders by `createdAt DESC, id DESC`. Explicitly assigned meeting imports are
+eligible. It selects one row before evaluating ready/processing/failed/cancelled/
+empty state, without an older fallback. Ready content uses the effective edited
+transcript projection, with exact-text SHA-256, source fingerprint and correction
+revision. Project/event/prior context is intended for Live AI only; these
+repositories do not add it to current transcript text or generic prompt runs.
+
 ## Experimental speaker identity memory (2026-09-10)
 
 Migrations v0.39–v0.41 add optional local voice profiles. The compiled release
@@ -637,6 +665,18 @@ CREATE UNIQUE INDEX idx_text_snippets_trigger ON text_snippets(trigger COLLATE N
 ### `chat_conversations` (v0.5)
 
 Stores multi-conversation chat history per transcription. Migrated from the `chatMessages` JSON field on `transcriptions` (v0.4) to a proper table for multi-conversation support. Each transcription can have multiple conversations.
+
+Live capture checkpoints accepted questions and terminal-completed assistant
+turns in the recording lock before a transcription row exists. Recovery uses
+the same conversation UUID when importing that checkpoint.
+
+`v0.51-live-chat-recovery-receipts` adds `chat_recovery_imports` with a BLOB UUID
+`id` (the stable conversation UUID), BLOB UUID `transcriptionId`, and datetime
+`createdAt`. The import and content-free receipt commit atomically. This table
+has no cascading foreign key: a retained lock must not resurrect a chat or
+meeting the user explicitly deleted after import. Existing chat edits, including
+empty messages, remain canonical. Receipts contain no transcript, message or
+calendar content. See the [recovery contract](contracts/meeting-recovery-retention.md).
 
 ```sql
 CREATE TABLE chat_conversations (
@@ -1485,6 +1525,39 @@ extension PromptResult: FetchableRecord, PersistableRecord {
 }
 ```
 
+### MeetingMinutesJob
+
+Migration `v0.52-evidence-first-meeting-minutes` adds private durable
+`meeting_minutes_jobs`. Public `MeetingMinutesJob` is lightweight status metadata;
+the repository's internal work record holds immutable source/skill snapshots
+and the resumable evidence ledger.
+
+| Column | Storage and purpose |
+| --- | --- |
+| `id` | UUID BLOB primary key |
+| `transcriptionID` | UUID BLOB foreign key to `transcriptions`, delete cascades |
+| `identityKey` | Unique hash of source, skill revision and integrity policy |
+| `state` | `pending`, `running`, `failed`, `completed` |
+| `skillRevision`, `sourceHash` | Exact skill/evidence-text SHA-256 provenance |
+| `coveredCharacters`, `totalCharacters` | Ordered unique source coverage |
+| `sourceJSON`, `skillJSON` | Private immutable source and skill snapshots |
+| `progressJSON` | Completed chunk ranges, bounded meeting map and exact evidence ranges |
+| `attemptID` | UUID lease for one running attempt |
+| `providerIdentity`, `providerSnapshot`, `modelSnapshot` | Pinned provider identity and available model receipts |
+| `allowsProviderRebind` | Explicit retry may restart checkpoints for a changed provider |
+| `resultID` | Successful `summaries` UUID, deliberately no FK |
+| `errorMessage` | Bounded user-visible failure, without provider response content |
+| `createdAt`, `updatedAt` | Job lifecycle timestamps |
+
+Source deletion removes private snapshots and pending work. Deleting only the
+minutes result leaves the completed job receipt, preventing automatic
+regeneration of content the user deleted. Interrupted running work requires an
+explicit retry; pending work and complete checkpoints survive restart. Final
+result insertion and completed-state publication share the source-revalidation
+transaction and never replace an existing valid/user-edited result. Exact
+evidence text has a separate hash from the canonical word hash stored in
+`PromptResult.sourceTranscriptHash`.
+
 ### QuickPrompt
 
 ```swift
@@ -1847,6 +1920,9 @@ migrator.registerMigration("v0.7-prompts-and-summaries") { db in
 // v0.47-meeting-ai-output-language — summaries.outputLanguagePolicySnapshot
 // v0.48-prompt-result-source-transcript — summaries.sourceTranscriptHash
 // v0.49-ask-conversations — independent Ask history and cross-process run lease
+// v0.50-project-meeting-preparation — local project/event-preparation associations
+// v0.51-live-chat-recovery-receipts — content-free import/deletion receipts
+// v0.52-evidence-first-meeting-minutes — durable private full-source minutes jobs
 ```
 
 ### Migration Rules
@@ -1885,6 +1961,8 @@ migrator.registerMigration("v0.7-prompts-and-summaries") { db in
 | `dictations.wordCount` | v0.5 | Cached word count for voice stats |
 | `chat_conversations` | v0.5 | Multi-conversation chat per transcription (FK → transcriptions) |
 | `ask_conversations` | v0.49-ask-conversations | Independent Ask conversations; bounded Codable payload, revision and run lease; no source foreign key |
+| `meeting_projects` / `transcription_project_memberships` | v0.50-project-meeting-preparation | Virtual single-project transcript folders; moves preserve source rows and media |
+| `meeting_preparations` / `recording_meeting_associations` | v0.50-project-meeting-preparation | Explicit occurrence preparation and frozen recording intent, bound to a later Library row |
 | `transcriptions.thumbnailURL` | v0.5 | YouTube video thumbnail URL |
 | `transcriptions.channelName` | v0.5 | YouTube channel name |
 | `transcriptions.videoDescription` | v0.5 | YouTube video description |

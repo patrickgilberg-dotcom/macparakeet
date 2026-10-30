@@ -1,0 +1,452 @@
+{
+  "verified_at_utc": "2026-10-28T15:46:46.949535Z",
+  "process_id": 22819,
+  "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+  "meeting_session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+  "transcription_id": "760BA924-C8F2-4708-B92C-30F03497237B",
+  "folder": "/Users/patrickgilberg/Library/Application Support/MacParakeet-Live/meeting-recordings/E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+  "transcript_status": "completed",
+  "duration_ms": 100788,
+  "word_timestamp_count": 159,
+  "capture_report": {
+    "captureFailed": false,
+    "capturedDurationMs": 100811,
+    "elapsedDurationMs": 100739,
+    "interruptedSources": [],
+    "quality": "healthy",
+    "sourceMode": "microphone_and_system",
+    "sources": [
+      {
+        "coverageRatio": 1,
+        "source": "microphone",
+        "status": "complete",
+        "writtenDurationMs": 100800
+      },
+      {
+        "coverageRatio": 0.9990172624306376,
+        "source": "system",
+        "status": "complete",
+        "writtenDurationMs": 100640
+      }
+    ]
+  },
+  "audio_decode": [
+    {
+      "file": "microphone-raw.m4a",
+      "decode_exit_code": 0,
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "decoded_samples": 4838400,
+      "decoded_duration_seconds": 100.8,
+      "container_duration_seconds": 100.86,
+      "mean_volume_db": -41.4,
+      "max_volume_db": -12.9,
+      "nonzero_decoded_signal": true,
+      "analysis_method": "Installed bundled FFmpeg, full decode with volumedetect to null output; prior captured results reused"
+    },
+    {
+      "file": "system-raw.m4a",
+      "decode_exit_code": 0,
+      "sample_rate_hz": 48000,
+      "channels": 1,
+      "decoded_samples": 4831591,
+      "decoded_duration_seconds": 100.65814583333334,
+      "container_duration_seconds": 100.71000000000001,
+      "mean_volume_db": -31.2,
+      "max_volume_db": -2.3,
+      "nonzero_decoded_signal": true,
+      "analysis_method": "Installed bundled FFmpeg, full decode with volumedetect to null output; prior captured results reused"
+    },
+    {
+      "file": "meeting-playback.m4a",
+      "decode_exit_code": 0,
+      "sample_rate_hz": 48000,
+      "channels": 2,
+      "decoded_samples": 9677870,
+      "decoded_duration_seconds": 100.81114583333333,
+      "container_duration_seconds": 100.81,
+      "mean_volume_db": -33.8,
+      "max_volume_db": -2.2,
+      "nonzero_decoded_signal": true,
+      "analysis_method": "Installed bundled FFmpeg, full decode with volumedetect to null output; prior captured results reused"
+    }
+  ],
+  "fixture_verification": {
+    "fixture_id": "question-one",
+    "expected_normalized_token_count": 25,
+    "system_source_normalized_token_count": 25,
+    "matching_expected_fixture_tokens": 25,
+    "exact_normalized_contiguous_fixture_phrase_present_in_system_words": true,
+    "exact_tangerine_word_present": true,
+    "tangerine_timestamps": [
+      {
+        "start_ms": 11113,
+        "end_ms": 12393,
+        "source_id": "system:S1"
+      }
+    ],
+    "retranscription_performed": false,
+    "incidental_microphone_content_in_report": false
+  },
+  "notes_verification": {
+    "synthetic_note_sha256": "595b76f74cc5db7588609f959130edce70891811981b142cc1925aa9f7e00519",
+    "notes_md_exists": true,
+    "notes_md_contains_exact_synthetic_note": true,
+    "transcript_artifact_contains_exact_synthetic_note": true,
+    "database_status": "completed",
+    "database_contains_exact_synthetic_note": true,
+    "root_observation": "Parent observed Saved in native UI, navigated to Library, reopened the meeting and confirmed exact synthetic note restored."
+  },
+  "recording_lock_present": false,
+  "files": [
+    {
+      "name": "microphone-raw.m4a",
+      "exists": true,
+      "bytes": 846860,
+      "sha256": "7a824011b3e50936d9d18f2d236e7b3a143724fa66a222076ffac9638b7e294e"
+    },
+    {
+      "name": "system-raw.m4a",
+      "exists": true,
+      "bytes": 138414,
+      "sha256": "7e65b64b221428ed409e9ba1d4b048435d47d479a797ee77536c73d4646aff4b"
+    },
+    {
+      "name": "meeting-playback.m4a",
+      "exists": true,
+      "bytes": 1634357,
+      "sha256": "3e27824e59adf8c25da8254d68ca0b3445f05d712646f8d84a78405adef2da47"
+    },
+    {
+      "name": "meeting-recording-metadata.json",
+      "exists": true,
+      "bytes": 1516,
+      "sha256": "9f92e7826802d75c3ff6b8f93293258e7baf72b412e225b4940c5fe2fbe77751"
+    },
+    {
+      "name": "manifest.json",
+      "exists": true,
+      "bytes": 3389,
+      "sha256": "54b82cbb9312ffddd068274772e19ef33384e7389b4a9923b0905f6cd5b970e9"
+    },
+    {
+      "name": "transcript.json",
+      "exists": true,
+      "bytes": 41244,
+      "sha256": "5c820aefb9a15bccb587ed095d890bc8f5bff45e668b7f237a902e78f61534f8"
+    },
+    {
+      "name": "meeting.md",
+      "exists": true,
+      "bytes": 4703,
+      "sha256": "5c13ec524f1552a6032c9405d85488dd1eb6aa2dbf26e16da6aed81b8b59e517"
+    },
+    {
+      "name": "notes.md",
+      "exists": true,
+      "bytes": 152,
+      "sha256": "635648a2d2f1a9f8325c4c39f658de53711c9435f36b27e0dfd635df23fe153d"
+    }
+  ],
+  "content_free_log_evidence": [
+    {
+      "timestamp_utc": "2026-10-28T15:39:37.285Z",
+      "event": "meeting_recording_started",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "source_mode": "Optional(MacParakeetCore.MeetingAudioSourceMode.microphoneAndSystem)",
+        "requested_mic_mode": "raw",
+        "effective_mic_mode": "raw",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1894974320478375",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:39:37.277Z",
+      "event": "meeting_mic_first_buffer",
+      "fields": {
+        "sr": "48000.0",
+        "ch": "1",
+        "interleaved": "false",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1894974311930000",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:39:37.366Z",
+      "event": "system_audio_stream_first_buffer",
+      "fields": {
+        "sr": "48000",
+        "ch": "2",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1894974401398791",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.023Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "notes_commit",
+        "duration_ms": "2",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075059809500",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.069Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "capture_stop",
+        "duration_ms": "45",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075106202375",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.081Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "processing_drain",
+        "duration_ms": "11",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075117767416",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.111Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "writer_finalize",
+        "duration_ms": "29",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075147866208",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.114Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "source_urls",
+        "duration_ms": "3",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075150970291",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.116Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "metadata_save",
+        "duration_ms": "1",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075152635375",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.648Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "mix",
+        "duration_ms": "532",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075685231000",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.649Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "notes_write",
+        "duration_ms": "0",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075686308708",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.650Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "lock_write",
+        "duration_ms": "0",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075687097125",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.651Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "cleaned_mic_schedule",
+        "duration_ms": "0",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075687761916",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.651Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "cleanup",
+        "duration_ms": "0",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075687995166",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.651Z",
+      "event": "meeting_recording_stopped",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "duration_s": "100.788",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075688226791",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.652Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "service_total",
+        "duration_ms": "629",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075689537958",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.653Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "service_stop",
+        "duration_ms": "629",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075689880375",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.660Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "prepare_row",
+        "duration_ms": "7",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075697462000",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.662Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "queue_enqueue",
+        "duration_ms": "1",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075699174333",
+        "workflow_id": "BCF956B5-A8E3-431B-91BA-35EEFD4D009D",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp_utc": "2026-10-28T15:41:18.666Z",
+      "event": "meeting_stop_stage",
+      "fields": {
+        "session": "E74DEC98-1D38-42DB-BEF9-3C1A05FA7A9F",
+        "stage": "queued_total",
+        "duration_ms": "648",
+        "outcome": "success",
+        "process_id": "22819",
+        "process_session": "62cf17b5-bd1f-4c71-b4be-87a9b6bf767e",
+        "uptime_ns": "1895075702884833"
+      }
+    }
+  ],
+  "resource_samples_path": "/tmp/macparakeet-live-resource-samples.json",
+  "limitations": [
+    "Generated synthetic fixture playback verifies capture/recognition; not independent natural human-meeting evidence.",
+    "No live-answer requests occurred while credential approval was pending. Final marker coverage does not verify live-answer tail freshness, global shortcut or cancellation.",
+    "Only known synthetic fixture text was compared; incidental microphone text was not exported. Audio and app state were not changed."
+  ]
+}

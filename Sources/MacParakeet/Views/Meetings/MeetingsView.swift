@@ -24,6 +24,8 @@ struct MeetingsView: View {
     @State private var showingAskPromptsSheet = false
     @State private var showingPromptLibrary = false
     @State private var showingMeetingImport = false
+    @State private var preparingEvent: CalendarEvent?
+    @Bindable private var liveMinutes = LiveMeetingMinutesViewModel.shared
     @FocusState private var recentMeetingsSelectionFocused: Bool
 
     private static let rightRailWidth: CGFloat = 300
@@ -31,6 +33,14 @@ struct MeetingsView: View {
 
     var body: some View {
         sheetContent
+            .sheet(item: $preparingEvent) { event in
+                if let planner = viewModel.planner {
+                    MeetingPreparationSheet(event: event, planner: planner) { preparation in
+                        preparingEvent = nil
+                        viewModel.onRecordPreparedMeeting?(event, preparation)
+                    }
+                }
+            }
     }
 
     private var layoutContent: some View {
@@ -39,6 +49,9 @@ struct MeetingsView: View {
                 VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
                     header
                     recordingSurface
+                    if let planner = viewModel.planner {
+                        ProjectFoldersView(planner: planner, onOpen: onSelectMeeting)
+                    }
                     contentColumns(
                         usesTwoColumnLayout: proxy.size.width >= Self.twoColumnMinimumWidth
                     )
@@ -87,6 +100,9 @@ struct MeetingsView: View {
                 viewModel.refreshUpcomingEvents()
             }
             .onChange(of: viewModel.settingsViewModel.calendarExcludedIdentifiers) { _, _ in
+                viewModel.refreshUpcomingEvents()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .googleCalendarConnectionDidChange)) { _ in
                 viewModel.refreshUpcomingEvents()
             }
             .onReceive(NotificationCenter.default.publisher(for: .EKEventStoreChanged)) { _ in
@@ -331,10 +347,13 @@ struct MeetingsView: View {
     private var upcomingSection: some View {
         if AppFeatures.calendarEnabled {
             MeetingsSection(title: "Upcoming", icon: "calendar.badge.clock") {
-                CalendarInlineControlsRow(
-                    settingsViewModel: viewModel.settingsViewModel,
-                    onOpenCalendarSettings: onOpenCalendarSettings
-                )
+                if LiveAppIdentity.isLive {
+                    GoogleCalendarConnectionView(settings: viewModel.settingsViewModel, compact: true)
+                } else {
+                    CalendarInlineControlsRow(
+                        settingsViewModel: viewModel.settingsViewModel,
+                        onOpenCalendarSettings: onOpenCalendarSettings)
+                }
                 if viewModel.calendarStatus != .off {
                     MeetingsHairline()
                 }
@@ -353,7 +372,9 @@ struct MeetingsView: View {
                     MeetingsInlineState(
                         icon: "calendar.badge.exclamationmark",
                         title: "Calendar access needed",
-                        detail: "Connect Calendar above to see your upcoming meetings.",
+                        detail: LiveAppIdentity.isLive
+                            ? "Sign in with Google above to see upcoming meetings."
+                            : "Connect Calendar above to see your upcoming meetings.",
                         actionTitle: nil,
                         actionIcon: nil,
                         action: nil
@@ -362,7 +383,9 @@ struct MeetingsView: View {
                     MeetingsInlineState(
                         icon: "lock.shield",
                         title: "Calendar is blocked",
-                        detail: "Re-enable Calendar access in macOS Settings to see upcoming meetings.",
+                        detail: LiveAppIdentity.isLive
+                            ? "Reconnect your Google account to see upcoming meetings."
+                            : "Re-enable Calendar access in macOS Settings to see upcoming meetings.",
                         actionTitle: nil,
                         actionIcon: nil,
                         action: nil
@@ -398,7 +421,8 @@ struct MeetingsView: View {
                                     onSkipThisMeeting: { viewModel.skipThisMeeting(event) },
                                     onSkipThisRepeatingMeeting: { viewModel.skipThisRepeatingMeeting(event) },
                                     onUnskipThisMeeting: { viewModel.unskipThisMeeting(event) },
-                                    onUnskipThisRepeatingMeeting: { viewModel.unskipThisRepeatingMeeting(event) }
+                                    onUnskipThisRepeatingMeeting: { viewModel.unskipThisRepeatingMeeting(event) },
+                                    onPrepare: viewModel.planner == nil ? nil : { preparingEvent = event }
                                 )
                                 if event.id != viewModel.upcomingEvents.last?.id {
                                     MeetingsHairline()
@@ -436,36 +460,44 @@ struct MeetingsView: View {
 
     private var intelligenceSection: some View {
         MeetingsSection(title: "Intelligence", icon: "sparkles") {
-            switch viewModel.intelligenceStatus {
-            case .setupNeeded:
+            if LiveAppIdentity.isLive {
                 MeetingsInlineState(
-                    icon: "sparkles",
-                    title: "AI not configured",
-                    detail: "Summaries and meeting chat stay off until you choose a provider.",
-                    actionTitle: "Set Up AI",
-                    actionIcon: "gearshape",
-                    action: onOpenAISettings
-                )
-            case .ready(let displayName, let isLocal):
-                IntelligenceReadyRow(
-                    displayName: displayName,
-                    locality: isLocal ? "Local" : "External",
-                    localityIcon: isLocal ? "lock" : "cloud",
-                    detail: isLocal
-                        ? "Meeting summaries and chat use \(displayName) on this Mac."
-                        : nil,
-                    tint: isLocal ? DesignSystem.Colors.successGreen : DesignSystem.Colors.textSecondary,
-                    onOpenSettings: onOpenAISettings
-                )
-            case .cannotConnect(let displayName, let message):
-                MeetingsInlineState(
-                    icon: "exclamationmark.triangle",
-                    title: "\(displayName) unavailable",
-                    detail: message,
-                    actionTitle: "Open AI Settings",
-                    actionIcon: "gearshape",
-                    action: onOpenAISettings
-                )
+                    icon: "sparkles", title: "ChatGPT Live",
+                    detail:
+                        "Live answers and meeting minutes use your ChatGPT connection. Edit your personal answer style in AI settings.",
+                    actionTitle: "AI & Personal Style", actionIcon: "gearshape", action: onOpenAISettings)
+            } else {
+                switch viewModel.intelligenceStatus {
+                case .setupNeeded:
+                    MeetingsInlineState(
+                        icon: "sparkles",
+                        title: "AI not configured",
+                        detail: "Summaries and meeting chat stay off until you choose a provider.",
+                        actionTitle: "Set Up AI",
+                        actionIcon: "gearshape",
+                        action: onOpenAISettings
+                    )
+                case .ready(let displayName, let isLocal):
+                    IntelligenceReadyRow(
+                        displayName: displayName,
+                        locality: isLocal ? "Local" : "External",
+                        localityIcon: isLocal ? "lock" : "cloud",
+                        detail: isLocal
+                            ? "Meeting summaries and chat use \(displayName) on this Mac."
+                            : nil,
+                        tint: isLocal ? DesignSystem.Colors.successGreen : DesignSystem.Colors.textSecondary,
+                        onOpenSettings: onOpenAISettings
+                    )
+                case .cannotConnect(let displayName, let message):
+                    MeetingsInlineState(
+                        icon: "exclamationmark.triangle",
+                        title: "\(displayName) unavailable",
+                        detail: message,
+                        actionTitle: "Open AI Settings",
+                        actionIcon: "gearshape",
+                        action: onOpenAISettings
+                    )
+                }
             }
         }
     }
@@ -473,7 +505,14 @@ struct MeetingsView: View {
     @ViewBuilder
     private var autoNotesSection: some View {
         MeetingsSection(title: "After Each Meeting", icon: "wand.and.stars") {
-            if viewModel.isAutoNotesConfigured {
+            if LiveAppIdentity.isLive {
+                MeetingsInlineState(
+                    icon: "doc.text.magnifyingglass",
+                    title: liveMinutes.automaticMinutesEnabled ? "Automatic meeting minutes" : "Automatic minutes paused",
+                    detail:
+                        "Your saved meeting skill runs after the final transcript is saved. Open a meeting to view minutes, progress, or retry a failed attempt.",
+                    actionTitle: "Edit Meeting Skill", actionIcon: "square.and.pencil", action: onOpenAISettings)
+            } else if viewModel.isAutoNotesConfigured {
                 autoNotesContent
             } else {
                 MeetingsInlineState(
@@ -682,6 +721,15 @@ struct MeetingsView: View {
         let audioState = MeetingAudioFile.state(for: transcription)
         let audioAvailable = audioState == .saved
         let audioRemovable = MeetingAudioFile.isRemovable(for: transcription, state: audioState)
+        if let planner = viewModel.planner {
+            Menu("Move to Project") {
+                Button("Unfiled") { planner.assign(transcriptionIDs: [transcription.id], to: nil) }
+                ForEach(planner.projects) { project in
+                    Button(project.name) { planner.assign(transcriptionIDs: [transcription.id], to: project.id) }
+                }
+            }
+            Divider()
+        }
         let artifactAvailable = MeetingArtifactActions.folderURL(for: transcription) != nil
 
         if meetingSplitViewModel != nil, let provenance = transcription.splitProvenance {
@@ -966,8 +1014,8 @@ struct MeetingsView: View {
     private func calendarEmptyDetail(for mode: CalendarAutoStartMode) -> String {
         switch mode {
         case .off:
-            assertionFailure("calendarEmptyDetail should not be called when calendar reminders are off.")
-            return "Calendar reminders are off."
+            return LiveAppIdentity.isLive
+                ? "No events in the next seven days on your selected calendars." : "Calendar reminders are off."
         case .notify:
             return "Calendar reminders are on."
         case .autoStart:
@@ -1545,6 +1593,7 @@ private struct CalendarEventRow: View {
     var onSkipThisRepeatingMeeting: () -> Void
     var onUnskipThisMeeting: () -> Void
     var onUnskipThisRepeatingMeeting: () -> Void
+    var onPrepare: (() -> Void)? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: DesignSystem.Spacing.md) {
@@ -1575,6 +1624,11 @@ private struct CalendarEventRow: View {
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                         .lineLimit(2)
                 }
+            }
+            Spacer(minLength: 8)
+            if let onPrepare {
+                Button("Prepare / Record", action: onPrepare)
+                    .parakeetAction(.secondary)
             }
         }
         .padding(DesignSystem.Spacing.md)

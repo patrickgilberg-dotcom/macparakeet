@@ -2449,6 +2449,96 @@ public final class DatabaseManager: Sendable {
             )
         }
 
+        migrator.registerMigration("v0.50-project-meeting-preparation") { db in
+            try db.create(table: "meeting_projects") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("sortOrder", .integer).notNull().defaults(to: 0)
+                t.column("isArchived", .boolean).notNull().defaults(to: false)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+            try db.execute(
+                sql: "CREATE UNIQUE INDEX idx_meeting_projects_name ON meeting_projects(name COLLATE NOCASE)")
+            try db.create(table: "transcription_project_memberships") { t in
+                t.column("transcriptionID", .text).primaryKey().references("transcriptions", onDelete: .cascade)
+                t.column("projectID", .text).notNull().references("meeting_projects", onDelete: .cascade)
+                t.column("assignedAt", .datetime).notNull()
+            }
+            try db.create(
+                index: "idx_transcription_project_memberships_project", on: "transcription_project_memberships",
+                columns: ["projectID", "transcriptionID"])
+            try db.create(table: "meeting_preparations") { t in
+                t.column("id", .text).primaryKey()
+                t.column("calendarID", .text).notNull()
+                t.column("eventID", .text).notNull()
+                t.column("context", .text).notNull()
+                t.column("projectID", .text).references("meeting_projects", onDelete: .setNull)
+                t.column("titleSnapshot", .text).notNull()
+                t.column("scheduledStartAt", .datetime)
+                t.column("scheduledEndAt", .datetime)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+            try db.create(
+                index: "idx_meeting_preparations_occurrence", on: "meeting_preparations",
+                columns: ["calendarID", "eventID"], unique: true)
+            try db.create(table: "recording_meeting_associations") { t in
+                t.column("recordingID", .text).primaryKey()
+                t.column("transcriptionID", .text).unique().references("transcriptions", onDelete: .setNull)
+                // Historical preparation ID; deletion of its editable draft
+                // must not erase a recording's immutable preparation snapshot.
+                t.column("preparationID", .text)
+                t.column("projectID", .text).references("meeting_projects", onDelete: .setNull)
+                t.column("titleSnapshot", .text).notNull()
+                t.column("contextSnapshot", .text).notNull()
+                t.column("calendarID", .text)
+                t.column("eventID", .text)
+                t.column("scheduledStartAt", .datetime)
+                t.column("scheduledEndAt", .datetime)
+                t.column("projectNameSnapshot", .text)
+                t.column("createdAt", .datetime).notNull()
+            }
+        }
+
+        migrator.registerMigration("v0.51-live-chat-recovery-receipts") { db in
+            // A content-free receipt survives explicit chat/meeting deletion so
+            // an unsettled recording lock cannot resurrect an imported chat.
+            try db.create(table: "chat_recovery_imports") { t in
+                t.column("id", .blob).primaryKey()
+                t.column("transcriptionId", .blob).notNull()
+                t.column("createdAt", .datetime).notNull()
+            }
+        }
+
+        migrator.registerMigration("v0.52-evidence-first-meeting-minutes") { db in
+            try db.create(table: "meeting_minutes_jobs") { t in
+                t.column("id", .blob).primaryKey()
+                t.column("transcriptionID", .blob).notNull().references("transcriptions", onDelete: .cascade)
+                t.column("identityKey", .text).notNull().unique()
+                t.column("state", .text).notNull()
+                t.column("skillRevision", .text).notNull()
+                t.column("sourceHash", .text).notNull()
+                t.column("coveredCharacters", .integer).notNull()
+                t.column("totalCharacters", .integer).notNull()
+                // No FK: deleting minutes preserves the completed job receipt.
+                t.column("resultID", .blob)
+                t.column("errorMessage", .text)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+                t.column("sourceJSON", .text).notNull()
+                t.column("skillJSON", .text).notNull()
+                t.column("progressJSON", .text).notNull()
+                t.column("attemptID", .blob)
+                t.column("providerIdentity", .text)
+                t.column("providerSnapshot", .text)
+                t.column("modelSnapshot", .text)
+                t.column("allowsProviderRebind", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(index: "meeting_minutes_jobs_state", on: "meeting_minutes_jobs", columns: ["state", "createdAt"])
+            try db.create(index: "meeting_minutes_jobs_source", on: "meeting_minutes_jobs", columns: ["transcriptionID", "createdAt"])
+        }
+
         return migrator
     }
 

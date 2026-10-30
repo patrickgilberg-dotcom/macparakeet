@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build a distributable MacParakeet.app bundle from release executables.
+# Build a distributable MacParakeet Live.app bundle from release executables.
 #
 # This script:
 # - builds the `MacParakeet` app and `macparakeet-cli` products in Release
@@ -9,11 +9,11 @@ set -euo pipefail
 # - bundles FFmpeg and yt-dlp into Resources and optionally bundles `node` for yt-dlp JS runtime support
 #
 # Outputs:
-#   dist/MacParakeet.app
+#   dist/MacParakeet Live.app
 #
 # Environment variables:
-#   APP_NAME            (default: MacParakeet)
-#   BUNDLE_ID           (default: com.macparakeet.MacParakeet)
+#   APP_NAME            (must be MacParakeet Live for this personal fork)
+#   BUNDLE_ID           (must be com.patrickgilberg.macparakeet-live)
 #   VERSION             (default: 0.0.0; release builds must set this explicitly)
 #   BUILD_NUMBER        (default: UTC timestamp, e.g. 20260213220512)
 #   BUILD_GIT_COMMIT    (default: current git short SHA)
@@ -51,8 +51,12 @@ DIST_DIR="$ROOT_DIR/dist"
 
 . "$ROOT_DIR/scripts/dist/meeting_echo_asset_defaults.sh"
 
-APP_NAME="${APP_NAME:-MacParakeet}"
-BUNDLE_ID="${BUNDLE_ID:-com.macparakeet.MacParakeet}"
+APP_NAME="${APP_NAME:-MacParakeet Live}"
+BUNDLE_ID="${BUNDLE_ID:-com.patrickgilberg.macparakeet-live}"
+if [[ "$APP_NAME" != "MacParakeet Live" || "$BUNDLE_ID" != "com.patrickgilberg.macparakeet-live" ]]; then
+  echo "This personal fork must use the MacParakeet Live name and bundle identity. Refusing a build that could share upstream preferences or replace MacParakeet.app." >&2
+  exit 1
+fi
 VERSION="${VERSION:-0.0.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M%S)}"
 BUILD_GIT_COMMIT="${BUILD_GIT_COMMIT:-$(git -C "$ROOT_DIR" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)}"
@@ -78,6 +82,13 @@ LEGAL_DIR="$RESOURCES_DIR/Legal"
 
 DEFAULT_MEETING_ECHO_ASSETS_DIR="$ROOT_DIR/.build/meeting-echo-assets"
 
+# Refuse to replace executing pages, preserving unrelated upstream instances.
+source "$ROOT_DIR/scripts/dev/stop_app_processes.sh"
+stop_app_processes 10 "$ROOT_DIR" \
+  "$APP_DIR/Contents/MacOS/$APP_NAME" \
+  "$XCODE_DERIVED_DATA/Build/Products/Release/MacParakeet" \
+  "$XCODE_DERIVED_DATA-arm64/Build/Products/Release/MacParakeet" \
+  "$XCODE_DERIVED_DATA-x86_64/Build/Products/Release/MacParakeet"
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$FRAMEWORKS_DIR" "$LEGAL_DIR"
 
@@ -627,21 +638,7 @@ echo "Bundled legal notices: $LEGAL_DIR"
 
 echo "[3/4] Writing Info.plist…"
 INFO_PLIST="$CONTENTS_DIR/Info.plist"
-# Sparkle auto-update trust anchor (issue #564, finding S-3). The public EdDSA
-# key MUST ship non-empty in Info.plist or Sparkle 2.x cannot verify update
-# signatures, and the feed MUST be HTTPS so the appcast itself can't be
-# tampered with in transit. SU_PUBLIC_ED_KEY / SU_FEED_URL are the values
-# written into the plist below; the release gate after the write reads them
-# back from the artifact and refuses to ship if they drift or go missing.
-SU_PUBLIC_ED_KEY="2aqRU0Agz+xxZwt0kLybmKz/SAvZUsyn+z9fU0I6ynY="
-SU_FEED_URL="https://macparakeet.com/appcast.xml"
-# Expected key the gate asserts the written plist actually carries. Deliberately
-# a second, independent copy: verifying the artifact against the same variable
-# used to write it would pass even if that variable were edited to a wrong
-# value, so the trust anchor is pinned in two places. A real key rotation must
-# update BOTH — the build fails until they agree, which is the intended
-# confirmation step.
-EXPECTED_SU_PUBLIC_ED_KEY="2aqRU0Agz+xxZwt0kLybmKz/SAvZUsyn+z9fU0I6ynY="
+# This fork deliberately has no upstream update feed or update-signing key.
 CHECKOUT_URL="${MACPARAKEET_CHECKOUT_URL:-}"
 LS_VARIANT_ID="${MACPARAKEET_LS_VARIANT_ID:-}"
 LICENSING_PLIST=""
@@ -675,9 +672,9 @@ cat >"$INFO_PLIST" <<EOF
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
-      <key>CFBundleURLName</key><string>com.macparakeet.meeting</string>
+      <key>CFBundleURLName</key><string>${BUNDLE_ID}.meeting</string>
       <key>CFBundleTypeRole</key><string>Editor</string>
-      <key>CFBundleURLSchemes</key><array><string>macparakeet</string></array>
+      <key>CFBundleURLSchemes</key><array><string>macparakeet-live</string></array>
     </dict>
   </array>
   <key>CFBundlePackageType</key>
@@ -721,44 +718,22 @@ cat >"$INFO_PLIST" <<EOF
   <string>MacParakeet needs system audio recording access for meeting recording.</string>
   <key>NSCalendarsFullAccessUsageDescription</key>
   <string>MacParakeet reads your calendar so it can remind you before a meeting starts and (optionally) begin recording for you. Events stay on your Mac.</string>
-  <key>SUFeedURL</key>
-  <string>${SU_FEED_URL}</string>
   <key>SUEnableAutomaticChecks</key>
-  <true/>
-  <key>SUPublicEDKey</key>
-  <string>${SU_PUBLIC_ED_KEY}</string>
+  <false/>
+  <key>SUAutomaticallyUpdate</key>
+  <false/>
 $(printf "%b" "$LICENSING_PLIST")
 </dict>
 </plist>
 EOF
 
-# Release gate: prove the Sparkle auto-update trust anchor actually shipped
-# (issue #564, finding S-3). A missing or empty SUPublicEDKey would let Sparkle
-# accept an unsigned update, and a non-HTTPS feed would let the appcast itself
-# be MITM'd — both are silent failures the user only discovers when a malicious
-# update lands. Read the values back from the written plist (not the variables)
-# so a malformed plist or a future heredoc refactor that drops the keys fails
-# the build loudly instead of shipping a defenseless updater.
-echo "Verifying Sparkle update-signature trust anchor…"
-WRITTEN_ED_KEY="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$INFO_PLIST" 2>/dev/null || true)"
-WRITTEN_FEED_URL="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$INFO_PLIST" 2>/dev/null || true)"
-if [[ -z "$WRITTEN_ED_KEY" ]]; then
-  echo "FATAL: SUPublicEDKey is missing or empty in $INFO_PLIST — Sparkle could not verify update signatures. Refusing to ship." >&2
-  exit 1
-fi
-if [[ "$WRITTEN_ED_KEY" != "$EXPECTED_SU_PUBLIC_ED_KEY" ]]; then
-  echo "FATAL: SUPublicEDKey in $INFO_PLIST does not match the expected release key. Refusing to ship." >&2
-  exit 1
-fi
-if [[ -z "$WRITTEN_FEED_URL" ]]; then
-  echo "FATAL: SUFeedURL is missing or empty in $INFO_PLIST — Sparkle has no appcast to check. Refusing to ship." >&2
-  exit 1
-fi
-if [[ "$WRITTEN_FEED_URL" != https://* ]]; then
-  echo "FATAL: SUFeedURL is not HTTPS ('$WRITTEN_FEED_URL') — the appcast could be MITM'd. Refusing to ship." >&2
-  exit 1
-fi
-echo "Sparkle trust anchor OK: SUPublicEDKey present and matches, feed is HTTPS."
+# The artifact must never opt into the upstream release channel.
+for forbidden_key in SUFeedURL SUPublicEDKey; do
+  if /usr/libexec/PlistBuddy -c "Print :$forbidden_key" "$INFO_PLIST" >/dev/null 2>&1; then
+    echo "FATAL: $forbidden_key is present in a Live bundle. Refusing upstream auto-updates." >&2
+    exit 1
+  fi
+done
 
 # Archive dSYM for crash symbolication.
 #

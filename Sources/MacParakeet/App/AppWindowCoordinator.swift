@@ -172,10 +172,11 @@ final class AppWindowCoordinator: NSObject, NSWindowDelegate {
     }
 
     func applyActivationPolicyFromSettings() {
-        NSApp.setActivationPolicy(Self.activationPolicy(
-            menuBarOnlyMode: settingsViewModel.menuBarOnlyMode,
-            hasVisiblePrimaryWindow: hasVisiblePrimaryWindow
-        ))
+        NSApp.setActivationPolicy(
+            Self.activationPolicy(
+                menuBarOnlyMode: settingsViewModel.menuBarOnlyMode,
+                hasVisiblePrimaryWindow: hasVisiblePrimaryWindow
+            ))
     }
 
     static func activationPolicy(
@@ -189,7 +190,7 @@ final class AppWindowCoordinator: NSObject, NSWindowDelegate {
         let menu = NSMenu()
 
         let openItem = NSMenuItem(
-            title: "Open MacParakeet",
+            title: "Open \(LiveAppIdentity.displayName)",
             action: #selector(dockOpenMainWindow),
             keyEquivalent: ""
         )
@@ -207,7 +208,7 @@ final class AppWindowCoordinator: NSObject, NSWindowDelegate {
         menu.addItem(NSMenuItem.separator())
 
         let quitItem = NSMenuItem(
-            title: "Quit MacParakeet",
+            title: "Quit \(LiveAppIdentity.displayName)",
             action: #selector(dockQuit),
             keyEquivalent: ""
         )
@@ -272,7 +273,7 @@ final class AppWindowCoordinator: NSObject, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "MacParakeet"
+        window.title = LiveAppIdentity.displayName
         window.center()
         window.setFrameAutosaveName("MainWindow")
         window.minSize = NSSize(

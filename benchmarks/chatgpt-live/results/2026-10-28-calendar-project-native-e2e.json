@@ -1,0 +1,266 @@
+{
+  "measuredSource": "14851bd6a0c6",
+  "fixture": "Two synthetic prior meetings in a QA project; distinct saved event preparation; two spoken current-meeting updates. No private calendar names, account identifiers, audio or transcript contents are published.",
+  "normalCapture": {
+    "status": "completed",
+    "durationMs": 411277,
+    "calendarNameExact": true,
+    "eventContextFrozen": true,
+    "notePreserved": true,
+    "transcriptCharacters": 1495,
+    "chatMessageCounts": [
+      6
+    ],
+    "lockRemaining": false,
+    "strictAudioDecodes": [
+      {
+        "file": "microphone-raw.m4a",
+        "bytes": 3469483,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.227
+      },
+      {
+        "file": "system-raw.m4a",
+        "bytes": 637331,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.186
+      },
+      {
+        "file": "meeting-playback.m4a",
+        "bytes": 6666241,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.307
+      }
+    ],
+    "qaProjectAssigned": true
+  },
+  "beforeFixAbruptRecovery": {
+    "status": "completed",
+    "durationMs": 132073,
+    "calendarNameExact": true,
+    "eventContextFrozen": true,
+    "notePreserved": true,
+    "transcriptCharacters": 1137,
+    "chatMessageCounts": [],
+    "lockRemaining": false,
+    "strictAudioDecodes": [
+      {
+        "file": "microphone-raw.m4a",
+        "bytes": 1085220,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.112
+      },
+      {
+        "file": "system-raw.m4a",
+        "bytes": 259485,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.112
+      },
+      {
+        "file": "meeting-playback.m4a",
+        "bytes": 2141674,
+        "passed": true,
+        "exitCode": 0,
+        "seconds": 0.163
+      }
+    ],
+    "qaProjectAssigned": true
+  },
+  "nativeContextRefreshSeconds": [
+    180,
+    360
+  ],
+  "nativeTranscriptFitFullRawContext": true,
+  "answers": [
+    "No; don\u2019t promise Friday while security approval and the rollback drill remain unconfirmed.\n\n- Current evidence: The pilot budget is $7,000; security review is pending, and Nina has not yet delivered the rollback checklist.\n- The event requires a 48-hour rollback drill before launch. In the prior meeting, Nina was to deliver the checklist by Thursday; confirm that task and due day, and whether the drill is complete.",
+    "The preparation reference is COBALT-27; the prior meeting\u2019s code name was Lighthouse.",
+    "No; Friday isn\u2019t approved, and the required 48-hour rollback drill remains incomplete.\n\n- The final pilot budget is $6,500; security review is approved, and Nina confirmed the checklist was delivered today."
+  ],
+  "checks": {
+    "currentBudget7000Used": true,
+    "savedEvent48HourRequirementUsed": true,
+    "latestPriorOwnerAndDueDayUsed": true,
+    "savedEventMarkerAndLatestProjectCodeUsed": true,
+    "laterBudget6500AndSecurityChecklistCorrectionsUsed": true,
+    "olderOnlyCanariesAbsent": true
+  },
+  "normalNativeUITimingsMs": [
+    {
+      "firstText": 2440,
+      "firstSentence": 2710
+    },
+    {
+      "firstText": 2120,
+      "firstSentence": 2280
+    },
+    {
+      "firstText": 2110,
+      "firstSentence": 2330
+    }
+  ],
+  "postFixNativeRecovery": {
+    "source": "9447f78bcb2e",
+    "durationMs": 173076,
+    "transcriptCharacters": 334,
+    "checkpointMessageCount": 4,
+    "checkpointRevision": 5,
+    "checks": {
+      "statusCompleted": true,
+      "calendarNameExact": true,
+      "frozenEventContextRetained": true,
+      "noteExact": true,
+      "allFourMessagesExact": true,
+      "markedRecovered": true,
+      "qaProjectAssigned": true,
+      "singleImportReceipt": true,
+      "lockSettled": true,
+      "recoveredChatVisibleInNativeUI": true,
+      "olderProjectCodenameNotInvented": true
+    },
+    "strictAudioDecodes": [
+      {
+        "file": "microphone-raw.m4a",
+        "passed": true,
+        "bytes": 1419110,
+        "exitCode": 0
+      },
+      {
+        "file": "system-raw.m4a",
+        "passed": true,
+        "bytes": 251449,
+        "exitCode": 0
+      },
+      {
+        "file": "meeting-playback.m4a",
+        "passed": true,
+        "bytes": 2804566,
+        "exitCode": 0
+      }
+    ],
+    "answers": [
+      "Don\u2019t promise Friday; the rollback drill is still incomplete.\n\n- Today, security review is approved, the budget is $6,500, and Nina confirmed the checklist was delivered.\n- The prior project meeting recorded security review pending, a $7,000 budget, and the checklist not yet delivered; that is historical.\n- This event\u2019s reference is COBALT-27. The customer requires a 48-hour rollback drill before any production launch, and no launch date is approved.",
+      "No codename was agreed in the latest prior project transcript.\n\n- This event\u2019s saved preparation reference is COBALT-27."
+    ],
+    "nativeUITimingsMs": [
+      {
+        "firstText": 4730,
+        "firstSentence": 4760
+      },
+      {
+        "firstText": 3040,
+        "firstSentence": 3280
+      }
+    ],
+    "artifactChecks": {
+      "manifest.json": true,
+      "meeting.md": true,
+      "transcript.json": true,
+      "notes.md": true,
+      "meeting-recording-metadata.json": true,
+      "prompt-results.json": true,
+      "notesSidecarHasExactNote": true,
+      "manifestJSONValid": true,
+      "transcriptJSONValid": true
+    }
+  },
+  "limits": [
+    "Native capture lasted411.277s with short spoken fixtures and quiet intervals. Its full transcript fit raw context; this did not exercise long semantic compaction.",
+    "These are three native UI observations, not a speed distribution or acoustic speech-end measurements.",
+    "Before-fix recovery lost completed chat while preserving title, project, notes, transcript and audio; that failed case is retained.",
+    "Post-fix native timing readings are two additional rounded UI observations, not a controlled before/after speed comparison.",
+    "The first post-fix answer used three supporting bullets, exceeding the two-bullet target; factual grounding passed.",
+    "The final normal-save spoken fixture was recognized with conflicting $7,000/$2,000 amounts. The actual live transcript contained both, and AI disclosed the conflict. This is not evidence of perfect recognition accuracy.",
+    "The final normal-save trial overlapped a focused compiler run; its timing is not a performance comparison."
+  ],
+  "postFixNativeNormalStop": {
+    "source": "9447f78bcb2e",
+    "durationMs": 198734,
+    "transcriptCharacters": 370,
+    "checkpointMessageCount": 2,
+    "checks": {
+      "statusCompleted": true,
+      "calendarNameExact": true,
+      "frozenEventContextRetained": true,
+      "noteExact": true,
+      "bothMessagesExact": true,
+      "qaProjectAssigned": true,
+      "singleImportReceipt": true,
+      "lockSettled": true,
+      "savedChatVisibleInNativeUI": true
+    },
+    "strictAudioDecodes": [
+      {
+        "file": "microphone-raw.m4a",
+        "passed": true,
+        "bytes": 1673220,
+        "exitCode": 0
+      },
+      {
+        "file": "system-raw.m4a",
+        "passed": true,
+        "bytes": 321781,
+        "exitCode": 0
+      },
+      {
+        "file": "meeting-playback.m4a",
+        "passed": true,
+        "bytes": 3219730,
+        "exitCode": 0
+      }
+    ],
+    "answers": [
+      "We can\u2019t promise Friday until security approval and the required rollback drill are confirmed.\n- The current budget update is unclear: it mentions both $7,000 and $2,000.\n- The prior meeting reported the checklist delivered, but the current update says Nina has not; confirm its status and the 48-hour drill before setting a launch date."
+    ],
+    "nativeUITimingsMs": [
+      {
+        "firstText": 3550,
+        "firstSentence": 3860
+      }
+    ],
+    "liveRecognitionBudgetConflictObserved": true,
+    "aiDisclosedThatConflict": true,
+    "artifactChecks": {
+      "manifest.json": true,
+      "meeting.md": true,
+      "transcript.json": true,
+      "notes.md": true,
+      "meeting-recording-metadata.json": true,
+      "prompt-results.json": true,
+      "notesSidecarHasExactNote": true,
+      "manifestJSONValid": true,
+      "transcriptJSONValid": true
+    }
+  },
+  "preparationCleanup": {
+    "blankContextPersisted": true,
+    "noProjectPersisted": true,
+    "frozenRecordingContextAndProjectPreserved": true,
+    "verifiedByNativeReopenAndDatabase": true
+  },
+  "finalInstalledSource": "a0f4b3c6ce15",
+  "calendarStartupReplay": {
+    "source": "a0f4b3c6ce15",
+    "focusedTests": 63,
+    "focusedFailures": 0,
+    "upcomingEventControlsLoaded": 77,
+    "manualRefreshUsed": false,
+    "selectionErrorPresent": false,
+    "allMacOSGrantsRetained": true,
+    "leftIdleInMeetings": true
+  },
+  "fullRegressionGate": {
+    "source": "9447f78bcb2e",
+    "xctestTests": 8434,
+    "skipped": 36,
+    "failures": 0,
+    "swiftTestingTests": 30,
+    "note": "The subsequent narrow calendar-only repair received its focused gate; the full suite was not repeated."
+  },
+  "databaseIntegrity": "ok",
+  "activeRecordingLocksAfterTests": 0
+}

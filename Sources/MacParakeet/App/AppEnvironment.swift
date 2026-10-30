@@ -14,6 +14,8 @@ final class AppEnvironment {
     let shareCoordinator: ShareCoordinator?
     let dictationRepo: DictationRepository
     let transcriptionRepo: TranscriptionRepository
+    let meetingProjectRepo: MeetingProjectRepository
+    let meetingPreparationRepo: MeetingPreparationRepository
     let meetingTypeRepo: MeetingTypeRepository
     let meetingLabelRepo: MeetingLabelRepository
     let transcriptionMeetingLabelRepo: TranscriptionMeetingLabelRepository
@@ -38,6 +40,10 @@ final class AppEnvironment {
     let promptCollectionRepo: PromptCollectionRepository
     let promptEditingService: PromptEditingService
     let promptResultRepo: PromptResultRepository
+    let liveMinutesRepository: MeetingMinutesJobRepository
+    let liveMinutesEngine: MeetingMinutesEngine
+    let liveMinutesClient: ChatGPTLiveClient
+    let liveMinutes: LiveMeetingMinutesViewModel
     let meetingArtifactStore: MeetingArtifactStore
     let meetingSplitRepo: MeetingSplitRepository
     let meetingSplitService: MeetingSplitService
@@ -92,6 +98,8 @@ final class AppEnvironment {
         // Repositories
         dictationRepo = DictationRepository(dbQueue: databaseManager.dbQueue)
         transcriptionRepo = TranscriptionRepository(dbQueue: databaseManager.dbQueue)
+        meetingProjectRepo = MeetingProjectRepository(dbQueue: databaseManager.dbQueue)
+        meetingPreparationRepo = MeetingPreparationRepository(dbQueue: databaseManager.dbQueue)
         meetingTypeRepo = MeetingTypeRepository(dbQueue: databaseManager.dbQueue)
         meetingLabelRepo = MeetingLabelRepository(dbQueue: databaseManager.dbQueue)
         transcriptionMeetingLabelRepo = TranscriptionMeetingLabelRepository(dbQueue: databaseManager.dbQueue)
@@ -125,6 +133,11 @@ final class AppEnvironment {
         promptCollectionRepo = PromptCollectionRepository(dbQueue: databaseManager.dbQueue)
         promptEditingService = PromptEditingService(dbQueue: databaseManager.dbQueue)
         promptResultRepo = PromptResultRepository(dbQueue: databaseManager.dbQueue)
+        liveMinutesRepository = MeetingMinutesJobRepository(dbQueue: databaseManager.dbQueue)
+        liveMinutesEngine = MeetingMinutesEngine(repository: liveMinutesRepository)
+        // A separate physical socket prevents background minutes from holding Live Ask's request lease.
+        liveMinutesClient = ChatGPTLiveClient()
+        liveMinutes = .shared
         meetingSplitRepo = MeetingSplitRepository(dbQueue: databaseManager.dbQueue)
         meetingArtifactStore = MeetingArtifactStore(
             speakerAttributionReader: speakerAttributionReader,
@@ -277,7 +290,7 @@ final class AppEnvironment {
         }()
 
         let licensingConfig = LicensingConfig(checkoutURL: checkoutURL, expectedVariantID: expectedVariantID)
-        let serviceName = Bundle.main.bundleIdentifier ?? "com.macparakeet"
+        let serviceName = LiveAppIdentity.keychainService("licensing")
         let keychain = KeychainKeyValueStore(service: serviceName)
         entitlementsService = EntitlementsService(
             config: licensingConfig,
@@ -490,10 +503,16 @@ final class AppEnvironment {
             transcriptionService: transcriptionService,
             transcriptionRepo: transcriptionRepo,
             meetingArtifactStore: meetingArtifactStore,
-            promptResultRepo: promptResultRepo
+            promptResultRepo: promptResultRepo,
+            chatConversationRepo: chatConversationRepo,
+            onRecovered: { [meetingPreparationRepo] recordingID, transcriptionID in
+                if try meetingPreparationRepo.fetchRecordingAssociation(recordingID: recordingID) != nil {
+                    try meetingPreparationRepo.bindRecording(recordingID: recordingID, to: transcriptionID)
+                }
+            }
         )
 
-        let savedAudioCompletionService = SavedAudioAutoPromptCompletionService(
+        let legacySavedAudioCompletionService = SavedAudioAutoPromptCompletionService(
             promptRepo: promptRepo,
             promptResultRepo: promptResultRepo,
             llmService: llmService,
@@ -506,6 +525,11 @@ final class AppEnvironment {
                 runtimePreferences.meetingAIOutputLanguagePolicy
             }
         )
+        let savedAudioCompletionService = ConfiguredSavedAudioAutoPromptCompletionService(
+            delegate: legacySavedAudioCompletionService,
+            isConfigured: { [llmConfigStore] in
+                !LiveAppIdentity.isLive || (try? llmConfigStore.loadRouteMetadata(for: .analysis)) != nil
+            })
         meetingSplitService = MeetingSplitService(
             transcriptionRepo: transcriptionRepo,
             splitRepo: meetingSplitRepo,

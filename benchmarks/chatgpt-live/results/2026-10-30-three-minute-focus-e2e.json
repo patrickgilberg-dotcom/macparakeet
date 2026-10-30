@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "qualificationDate": "2026-10-30",
+  "timeZone": "America/Edmonton",
+  "installedSource": "d7e71ad968b4",
+  "builtAtUTC": "2026-10-30T17:26:16Z",
+  "buildSource": "live-xcodebuild-release",
+  "policy": {
+    "focus": "latest completed three-minute recording-time window plus fresh recognized speech",
+    "generalBackground": "cumulative summary with complete-source coverage safeguards",
+    "refreshSeconds": 180,
+    "recentSummaryCharacterLimit": 3000,
+    "generalSummaryCharacterLimit": 8000,
+    "newFocusSummaryRequiredAtAsk": false,
+    "beforeFirstUpdate": "available raw transcript with summary-not-ready labels",
+    "windowSelection": "numeric word timings independent of rich/plain display",
+    "sourceWarningsRemainExplicit": true
+  },
+  "automated": {
+    "initialFocused": {
+      "tests": 163,
+      "failures": 0
+    },
+    "fullSuiteOnce": {
+      "compiledSource": "d450b27b",
+      "xctestCases": 8519,
+      "skipped": 36,
+      "failures": 0,
+      "durationSeconds": 581.106,
+      "swiftTestingPassed": 30
+    },
+    "finalFocusedIncludingSnapshotRace": {
+      "source": "d7e71ad9",
+      "tests": 164,
+      "failures": 0,
+      "durationSeconds": 11.268
+    },
+    "fullSuiteRepeatedAfterNarrowFix": false,
+    "selectionsOverlap": true,
+    "strictFormattingPassed": true,
+    "independentReviewConverged": true
+  },
+  "syntheticRealCloud": {
+    "signedHelperConfiguration": "Debug",
+    "existingAuthorizedHelperIdentityReused": true,
+    "coreAndPromptMatchInstalledSource": true,
+    "simulatedMeetingMinutes": 15,
+    "periodicUpdates": 5,
+    "completedSummaryRequests": 10,
+    "allSummaryRequestsCompleted": true,
+    "completedAnswers": 3,
+    "manualSemanticReviewPassed": true,
+    "asks": [
+      {
+        "index": 1,
+        "focusStartMs": 720000,
+        "focusEndMs": 900000,
+        "currentFocusStartMs": 730000,
+        "currentFocusEndMs": 910000,
+        "summaryCallsAtAsk": 0,
+        "sourceCoverage": {
+          "allSourceProcessed": true,
+          "coveredCharacters": 21296,
+          "mode": "allEarlierSummarized",
+          "overlapCharacters": 11905,
+          "rawCharacters": 12000,
+          "summarizedCharacters": 21201,
+          "totalCharacters": 21296
+        },
+        "answerCompleted": true,
+        "syntheticOutput": "The corrected proposed cap is $38,000, but we cannot promise a Friday production launch.\n- The cap is not final, and no production launch has been approved.",
+        "lexicalChecks": {
+          "all_source_ranges_covered": true,
+          "answer_mentions_corrected_cap": true,
+          "answer_mentions_route_owner_when_asked": true,
+          "answer_preserves_launch_uncertainty_when_asked": true,
+          "cached_prepare_made_no_summary_call": true,
+          "combined_context_retains_corrected_cap": true,
+          "combined_context_retains_early_unrelated_route": true,
+          "current_answer_does_not_drift_to_old_route": true,
+          "current_focus_uses_fresh_15m10s_window": true,
+          "focus_summary_does_not_import_old_budget": true,
+          "focus_summary_does_not_import_old_route": true,
+          "focus_summary_ready_from_completed_12_to_15_window": true,
+          "fresh_focus_contains_latest_customer_question": true,
+          "general_and_focus_are_separate_in_request": true,
+          "raw_tail_contains_latest_customer_question": true,
+          "summary_retains_corrected_cap": true,
+          "summary_retains_early_unrelated_route": true
+        }
+      },
+      {
+        "index": 2,
+        "focusStartMs": 720000,
+        "focusEndMs": 900000,
+        "currentFocusStartMs": 730000,
+        "currentFocusEndMs": 910000,
+        "summaryCallsAtAsk": 0,
+        "sourceCoverage": {
+          "allSourceProcessed": true,
+          "coveredCharacters": 21296,
+          "mode": "allEarlierSummarized",
+          "overlapCharacters": 11905,
+          "rawCharacters": 12000,
+          "summarizedCharacters": 21201,
+          "totalCharacters": 21296
+        },
+        "answerCompleted": true,
+        "syntheticOutput": "The corrected proposed cap is $38,000, but we can’t promise a Friday production launch.\n- The cap is not final, and no production launch has been approved.",
+        "lexicalChecks": {
+          "all_source_ranges_covered": true,
+          "answer_mentions_corrected_cap": true,
+          "answer_mentions_route_owner_when_asked": true,
+          "answer_preserves_launch_uncertainty_when_asked": false,
+          "cached_prepare_made_no_summary_call": true,
+          "combined_context_retains_corrected_cap": true,
+          "combined_context_retains_early_unrelated_route": true,
+          "current_answer_does_not_drift_to_old_route": true,
+          "current_focus_uses_fresh_15m10s_window": true,
+          "focus_summary_does_not_import_old_budget": true,
+          "focus_summary_does_not_import_old_route": true,
+          "focus_summary_ready_from_completed_12_to_15_window": true,
+          "fresh_focus_contains_latest_customer_question": true,
+          "general_and_focus_are_separate_in_request": true,
+          "raw_tail_contains_latest_customer_question": true,
+          "summary_retains_corrected_cap": true,
+          "summary_retains_early_unrelated_route": true
+        }
+      },
+      {
+        "index": 3,
+        "focusStartMs": 720000,
+        "focusEndMs": 900000,
+        "currentFocusStartMs": 730000,
+        "currentFocusEndMs": 910000,
+        "summaryCallsAtAsk": 0,
+        "sourceCoverage": {
+          "allSourceProcessed": true,
+          "coveredCharacters": 21296,
+          "mode": "allEarlierSummarized",
+          "overlapCharacters": 11905,
+          "rawCharacters": 12000,
+          "summarizedCharacters": 21201,
+          "totalCharacters": 21296
+        },
+        "answerCompleted": true,
+        "syntheticOutput": "Hana Lin owns AMBER-17, and the corrected proposed pilot ceiling is $38,000.\n- The ceiling is not final.",
+        "lexicalChecks": {
+          "all_source_ranges_covered": true,
+          "answer_mentions_corrected_cap": true,
+          "answer_mentions_route_owner_when_asked": true,
+          "answer_preserves_launch_uncertainty_when_asked": true,
+          "cached_prepare_made_no_summary_call": true,
+          "combined_context_retains_corrected_cap": true,
+          "combined_context_retains_early_unrelated_route": true,
+          "current_answer_does_not_drift_to_old_route": true,
+          "current_focus_uses_fresh_15m10s_window": true,
+          "focus_summary_does_not_import_old_budget": true,
+          "focus_summary_does_not_import_old_route": true,
+          "focus_summary_ready_from_completed_12_to_15_window": true,
+          "fresh_focus_contains_latest_customer_question": true,
+          "general_and_focus_are_separate_in_request": true,
+          "raw_tail_contains_latest_customer_question": true,
+          "summary_retains_corrected_cap": true,
+          "summary_retains_early_unrelated_route": true
+        }
+      }
+    ],
+    "lexicalHeuristicMiss": [
+      {
+        "ask": 2,
+        "check": "answer_preserves_launch_uncertainty_when_asked",
+        "manualResult": "The answer explicitly denied promising the launch and said no launch had been approved. The marker missed a curly apostrophe and alternate phrasing."
+      }
+    ],
+    "timingQualification": "Functional evidence only. Debug helper overlapped full tests; no Release/native capture latency comparison."
+  },
+  "nativeInstallation": {
+    "supportedSignedReleaseInstalled": true,
+    "persistentSigningIdentityRetained": true,
+    "strictDeepSignaturePassed": true,
+    "ordinaryQuitProcessCount": 0,
+    "allSavedMeetingsRetained": true,
+    "meetingCount": 17,
+    "settingsUnchanged": true,
+    "completedMinutesJobsRetained": true,
+    "captureLocks": 0,
+    "originalAppUnchanged": true,
+    "savedChatGPTConnectionTerminalCompleted": true,
+    "ordinaryRelaunchSucceeded": true,
+    "meetingsViewVisibleAfterRelaunch": true,
+    "automaticMinutesAndStyleStillEnabled": true,
+    "privateDatabaseBackupQuickCheck": "ok"
+  },
+  "limits": [
+    "The full regression binary predates the final two-line snapshot consistency fix. The final 164-test focused gate covers that fix and its new gated regression.",
+    "Recent focus is the latest completed window, with its actual interval shown; it is not regenerated for every Ask.",
+    "Both summaries are lossy. Recognized source text, corrections and gap warnings remain authoritative.",
+    "Native startup and the saved ChatGPT connection were checked. No new microphone capture, native 180-second cadence test or multi-hour hardware soak.",
+    "The focus renderer was compiled. Detailed flow used production Core, synthetic cloud calls and VM/flow tests.",
+    "Local no-mistakes and Greptile CLI unavailable; no hosted CI result claimed."
+  ],
+  "privacy": "Synthetic cloud outputs and content-free native checks only. No real calendar names, meeting text, skill, style examples, email content, credentials or backups."
+}
