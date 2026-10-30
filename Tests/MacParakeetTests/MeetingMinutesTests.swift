@@ -125,6 +125,25 @@ final class MeetingMinutesTests: XCTestCase {
         }
     }
 
+    func testIndependentFullAuditCanConfirmAnInitiallyProposedCommitment() async throws {
+        let fixture = try Fixture(text: "Unknown: I will send the report.")
+        let corrected = "An unidentified speaker committed to sending the report. No deadline was stated."
+        let model = Model(
+            quote: "I will send the report.", extractionClassification: "proposed",
+            correctedMeetingMap: corrected)
+        let result = try await MeetingMinutesEngine(repository: fixture.repo).run(
+            jobID: fixture.job.id, session: model.session())
+        let candidate = try XCTUnwrap(fixture.progress().candidates.first)
+        XCTAssertEqual(candidate.kind, .confirmed)
+        XCTAssertTrue(candidate.reviewed)
+        XCTAssertEqual(try fixture.progress().meetingMap, corrected)
+        let output = try XCTUnwrap(result?.content)
+        let verified = output.components(separatedBy: "## Conditional or Proposed Follow-Ups")[0]
+        XCTAssertTrue(verified.contains("### 1. Send the report"))
+        XCTAssertTrue(verified.contains("> I will send the report."))
+        XCTAssertFalse(verified.contains("No confirmed action items"))
+    }
+
     func testLegacyReviewedCheckpointIsReconciledAfterYieldWithoutRereadingSource() async throws {
         let fixture = try Fixture(text: "Unknown: Nina, please send it. Others1: Yes, I will.")
         let work = try fixture.repo.claim(
@@ -367,6 +386,7 @@ private actor Model {
     private let noteCount: Int
     private let blockNotes: Bool
     private let extraQuote: String?
+    private let extractionClassification: String
     private let extractionMap: String
     private let correctedMeetingMap: String?
     private let echoNotesMap: Bool
@@ -381,7 +401,7 @@ private actor Model {
     var extractionCount: Int { extractions.count }
     init(
         quote: String? = nil, reviewApproves: Bool = true, noteCount: Int = 4, blockNotes: Bool = false,
-        extraQuote: String? = nil,
+        extraQuote: String? = nil, extractionClassification: String = "confirmed",
         extractionMap: String =
             "The team discussed delivery and unresolved requirements. No additional facts were inferred.",
         correctedMeetingMap: String? = nil, echoNotesMap: Bool = false
@@ -389,6 +409,7 @@ private actor Model {
         self.quote = quote; self.reviewApproves = reviewApproves; self.noteCount = noteCount;
         self.blockNotes = blockNotes
         self.extraQuote = extraQuote; self.extractionMap = extractionMap
+        self.extractionClassification = extractionClassification
         self.correctedMeetingMap = correctedMeetingMap; self.echoNotesMap = echoNotesMap
     }
     nonisolated func session(key: String = "synthetic-session") -> LiveAnswerStreamSession {
@@ -421,7 +442,7 @@ private actor Model {
             var candidates: [[String: Any]] = []
             for quote in [quote, extraQuote].compactMap({ $0 }) {
                 candidates.append([
-                    "classification": "confirmed", "headline": "Send the report",
+                    "classification": extractionClassification, "headline": "Send the report",
                     "description": "Send the report as explicitly committed.", "quote": quote,
                     "owner": NSNull(), "recipient": NSNull(), "dueDate": NSNull(), "trigger": NSNull(),
                     "ownerCertainty": "Unknown — no speaker identity", "why": "The source contains a commitment.",

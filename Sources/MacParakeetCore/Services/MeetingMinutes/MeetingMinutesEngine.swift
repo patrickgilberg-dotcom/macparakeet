@@ -99,9 +99,12 @@ public actor MeetingMinutesEngine {
                     !review.correctedMeetingMap.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                     review.correctedMeetingMap.count <= 8_000
                 else { throw MeetingMinutesError.invalidResponse }
-                if !(review.approved && review.futureWork && review.concreteDeliverable && review.commitment
-                    && review.attributionSupported && review.scopeMatches && review.classification == .confirmed)
-                {
+                let confirmed =
+                    review.approved && review.futureWork && review.concreteDeliverable && review.commitment
+                    && review.attributionSupported && review.scopeMatches && review.classification == .confirmed
+                if confirmed {
+                    candidate.kind = .confirmed
+                } else {
                     candidate.kind = review.classification == .confirmed ? .excluded : review.classification
                 }
                 candidate.why = review.reason
