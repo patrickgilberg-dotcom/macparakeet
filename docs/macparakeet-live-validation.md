@@ -1,11 +1,14 @@
 # MacParakeet Live qualification
 
-Qualification dates: October 28–29, 2026 (America/Edmonton).
+Qualification dates: October 28–30, 2026 (America/Edmonton).
 
-Installed source: `a0f4b3c6ce15`, branch `feat/macparakeet-live`,
+Installed source: `a3c1d2ff7ff5`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
 The installed Release includes direct Google Calendar sign-in, private event
 preparation, project folders, latest-project grounding and live-chat recovery.
+It also adds automatic skill-based minutes, a native skill editor and editable
+personal answer style. Their separate qualification and test limits are in
+[the minutes/style report](macparakeet-live-minutes-style-validation.md).
 The initial integrated native recording/answer checks used `14851bd6a0c6`;
 `9447f78bcb2e` passed the full regression gate, native interruption recovery and
 normal Stop with completed chat. The final narrow calendar-startup repair in

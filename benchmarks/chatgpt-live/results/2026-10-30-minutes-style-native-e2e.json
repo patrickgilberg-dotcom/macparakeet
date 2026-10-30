@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "qualificationDate": "2026-10-30",
+  "timeZone": "America/Edmonton",
+  "installedSource": "a3c1d2ff7ff5",
+  "buildSource": "live-xcodebuild-release",
+  "builtAtUTC": "2026-10-30T15:59:59Z",
+  "installation": {
+    "supportedSignedReleaseWorkflow": true,
+    "strictDeepSignatureVerified": true,
+    "persistentSigningIdentityRetained": true,
+    "originalAppExecutableUnchanged": true
+  },
+  "nativeSettings": {
+    "editorSaveDefaultRestorePreviewAndHistoryVerified": true,
+    "originalSkillPreserved": true,
+    "exactImportedDefaultSaved": true,
+    "savedHistoryVersions": 2,
+    "automaticMinutesEnabled": true,
+    "personalAnswerStyleEnabled": true,
+    "savedStyleCharacters": 541,
+    "privateExampleOrEmailPublished": false
+  },
+  "nativeAutomaticMinutes": {
+    "fixture": "post-activation synthetic 33-second recording imported quietly",
+    "explicitGenerateClicked": false,
+    "captureOrPlaybackRequired": false,
+    "provider": "existing ChatGPT-plan connection",
+    "completedThroughTerminalProviderSuccess": true,
+    "auditPolicy": "reconciled-meeting-map-v2",
+    "coveredCharacters": 730,
+    "totalCharacters": 730,
+    "sourceChunks": 1,
+    "quickNotes": 4,
+    "sentenceCounts": [
+      2,
+      2,
+      2,
+      2
+    ],
+    "verifiedActions": 1,
+    "attribution": "commitment retained with unknown owner; unidentified acceptance not assigned to named addressee",
+    "manualSemanticReview": {
+      "notesAgreeWithAuditedMap": true,
+      "unsupportedNamedAcceptanceAbsent": true,
+      "releaseApprovalNotInvented": true,
+      "securityAndRollbackConditionsPreserved": true,
+      "tentativeReviewNotPromoted": true,
+      "capabilityNotAssignedAsTask": true
+    },
+    "structuralChecks": {
+      "meetingCompleted": true,
+      "jobCompleted": true,
+      "auditPolicyV2": true,
+      "resultPresent": true,
+      "singleMinutesResult": true,
+      "singleMinutesJob": true,
+      "sourceHashMatches": true,
+      "asciiSourceIndexing": true,
+      "fullCoverage": true,
+      "contiguousChunkCoverage": true,
+      "allCandidatesReviewedWithExactRenderedQuotes": true,
+      "exactlyFourQuickNotes": true,
+      "twoToFourSentencesHeuristic": true,
+      "artifactFolderInLiveRecordings": true,
+      "manifestMeetingMatches": true,
+      "allManifestFilesPresentNonempty": true,
+      "singleManifestLinkToResult": true,
+      "portableMarkdownOutputMatches": true,
+      "portableJSONOutputMatches": true,
+      "meetingMarkdownLinksResult": true
+    }
+  },
+  "portableArtifacts": {
+    "markdownAndJSONMatchSavedResult": true,
+    "manifestLinksValidated": true,
+    "nonemptyContentAndAudioFiles": 8,
+    "strictDecodedAudioFiles": 2
+  },
+  "ordinaryQuitAndRelaunch": {
+    "quitProcessCount": 0,
+    "sameJobAndResult": true,
+    "minutesJobs": 1,
+    "minutesResults": 1,
+    "savedContentAndSettingsUnchanged": true,
+    "contentArtifactsUnchangedExceptManifest": true,
+    "manifestReconciledAndRevalidated": true,
+    "activeCaptureLocks": 0
+  },
+  "automatedChecks": {
+    "initialAffectedArea": {
+      "passed": 186,
+      "failed": 0
+    },
+    "additionalPersistence": {
+      "passed": 237,
+      "failed": 0
+    },
+    "fullSuiteOnceAtInitialFeatureSource": {
+      "source": "00e11427",
+      "xctestExecuted": 8491,
+      "skipped": 36,
+      "failedAssertions": 2,
+      "affectedTestCases": 1,
+      "swiftTestingPassed": 30,
+      "clean": false
+    },
+    "postAuditAndFixtureRepair": {
+      "passed": 63,
+      "failed": 0,
+      "entireMicrophoneRecoveryClassPassed": 30
+    },
+    "finalMinutesAtInstalledSource": {
+      "passed": 18,
+      "failed": 0
+    },
+    "focusedSelectionsOverlap": true,
+    "fullSuiteRepeated": false
+  },
+  "qualificationLimits": [
+    "The initial native minutes result exposed a real audit-to-summary inconsistency; that failed synthetic result is preserved privately and is not qualified as success.",
+    "The full suite failed one existing microphone fixture test. Synthetic buffers were initialized fully without changing capture/timeouts; its complete 30-test class then passed. The earlier timeout cause is not proven.",
+    "No new multi-hour native microphone/system-audio soak or arbitrary-duration guarantee.",
+    "Semantic judgment and speech recognition remain fallible.",
+    "Personal style uses the editable local profile; saved ChatGPT history or memory is not imported.",
+    "No hosted CI, no-mistakes or Greptile success claimed."
+  ],
+  "privacy": "Content-free public evidence. Actual skill, worked example, email body, calendar identifiers, credentials, recordings, transcripts and result bodies remain excluded."
+}
