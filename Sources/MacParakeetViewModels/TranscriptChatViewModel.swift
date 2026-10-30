@@ -654,6 +654,7 @@ public final class TranscriptChatViewModel {
                 }
                 // Read after the audio barrier, so the pending end of the question is included.
                 let transcript = directLiveSessionProvider == nil ? capturedTranscript : meetingTranscriptSnapshot()
+                let focusSource = directLiveSessionProvider == nil ? nil : focusSourceProvider?()
                 let userNotes = directLiveSessionProvider == nil ? capturedNotes : userNotesProvider?()
                 let stream: AsyncThrowingStream<String, Error>
                 if let session = liveSession {
@@ -662,7 +663,7 @@ public final class TranscriptChatViewModel {
                     let memory = liveMeetingMemory
                     let memorySnapshot = try await memory.prepare(
                         transcript: transcript, question: question, cacheKey: session.cacheKey,
-                        focusSource: focusSourceProvider?(),
+                        focusSource: focusSource,
                         summarize: { messages in
                             var result = ""
                             for try await text in session.stream(messages: messages) {
