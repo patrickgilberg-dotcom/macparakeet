@@ -105,7 +105,7 @@ final class LiveMeetingMemoryViewModelTests: XCTestCase {
         XCTAssertTrue(summaryPayloads.contains("approval was conditional"))
         XCTAssertTrue(summaryPayloads.contains("QZ-71"))
         XCTAssertTrue(requests.last!.last!.content.contains("Latest: Can Maya review this today?"))
-        XCTAssertTrue(requests.last!.last!.content.contains("<earlier_meeting_summary>"))
+        XCTAssertTrue(requests.last!.last!.content.contains("<general_meeting_summary>"))
         XCTAssertEqual(vm.lastLiveMeetingMemory?.coverage.totalCharacters, transcript.count)
         XCTAssertTrue(vm.lastLiveMeetingMemory?.coverage.allSourceProcessed == true)
     }

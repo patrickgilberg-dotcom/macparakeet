@@ -760,6 +760,7 @@ final class MeetingRecordingFlowCoordinator {
             panelVM.canToggleMicrophoneMute = false
             panelVM.updateLiveTranscriptStatus(.startingAudio)
             panelVM.updatePreviewLines([], isTranscriptionLagging: false)
+            panelVM.updateLiveMeetingTimeline(MeetingTranscriptUpdate(words: [], speakers: []))
             panelVM.onStop = { [weak self] in self?.toggleRecording() }
             panelVM.onPauseToggle = { [weak self] in self?.togglePause() }
             panelVM.onMicrophoneMuteToggle = { [weak self] in self?.toggleMicrophoneMute() }
@@ -799,11 +800,13 @@ final class MeetingRecordingFlowCoordinator {
                             guard self.stateMachine.state == .recording else {
                                 throw MeetingRecordingService.LiveAnswerTranscriptError.sessionChanged
                             }
+                            panelVM.updateLiveMeetingTimeline(update)
                             panelVM.updatePreviewLines(lines, isTranscriptionLagging: update.isTranscriptionLagging)
                             panelVM.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
                         }
                     },
-                    sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() }
+                    sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() },
+                    focusSourceProvider: { [weak panelVM] in panelVM?.liveMeetingFocusSource }
                 )
                 configureProjectContext(for: panelVM.chatViewModel)
                 chatGPTPreparationTask?.cancel()
@@ -1800,6 +1803,7 @@ final class MeetingRecordingFlowCoordinator {
                 }.value
                 guard !Task.isCancelled else { break }
                 panelViewModel?.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
+                panelViewModel?.updateLiveMeetingTimeline(update)
                 panelViewModel?.updatePreviewLines(
                     previewLines,
                     isTranscriptionLagging: update.isTranscriptionLagging

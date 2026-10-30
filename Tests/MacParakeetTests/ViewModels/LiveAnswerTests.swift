@@ -18,15 +18,17 @@ final class LiveAnswerTests: XCTestCase {
             answerStyleExamples: "Synthetic sample: We approved the $90,000 design last month.")
         vm.configureLiveAnswerPreferences { profile }
         vm.configure(llmService: nil, transcriptText: "Current budget is $7,000 and approval is pending.")
-        vm.configureDirectLiveAnswers(prepareTranscript: {}, stream: { messages in
-            AsyncThrowingStream { continuation in
-                Task {
-                    await capture.record(messages)
-                    continuation.yield("Approval is pending; I’ll confirm the next step.")
-                    continuation.finish()
+        vm.configureDirectLiveAnswers(
+            prepareTranscript: {},
+            stream: { messages in
+                AsyncThrowingStream { continuation in
+                    Task {
+                        await capture.record(messages)
+                        continuation.yield("Approval is pending; I’ll confirm the next step.")
+                        continuation.finish()
+                    }
                 }
-            }
-        })
+            })
         vm.helpMeAnswer()
         try await waitUntilSettled(vm)
         let requests = await capture.requests
@@ -54,7 +56,7 @@ final class LiveAnswerTests: XCTestCase {
             preparation: "Do not promise approval.", history: [])
         XCTAssertEqual(messages.first?.content, LiveAnswerContext.instructions)
         let payload = messages.last!.content
-        XCTAssertTrue(payload.contains("<earlier_meeting_summary>"))
+        XCTAssertTrue(payload.contains("<general_meeting_summary>"))
         XCTAssertTrue(payload.contains(snapshot.earlierSummary))
         XCTAssertTrue(payload.contains("<exact_earlier_excerpts>"))
         XCTAssertTrue(payload.contains(snapshot.questionExcerpts))

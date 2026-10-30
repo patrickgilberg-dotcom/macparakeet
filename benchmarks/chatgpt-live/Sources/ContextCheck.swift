@@ -49,6 +49,11 @@ enum ContextCheck {
         let requestCharacters: Int
         let answer: StreamTrial
         let checks: [String: Bool]
+        let focusSummary: String?
+        let focusStartMs: Int?
+        let focusEndMs: Int?
+        let currentFocusStartMs: Int?
+        let currentFocusEndMs: Int?
         var endToEndFirstTextMs: Double? { answer.firstTextMs.map { preparationMs + $0 } }
     }
     struct Report: Encodable {
@@ -61,7 +66,7 @@ enum ContextCheck {
         var asks: [AskStage] = []
         var summaryCalls: [StreamTrial] = []
         var error: String?
-        let notes = [
+        var notes = [
             "All source, summaries and answers are synthetic; no meeting database, audio or transcript is read.",
             "Periodic snapshots at 3/6/9/12 minutes are simulated sequentially with no wall-clock sleep; Ask uses the final 15-minute snapshot.",
             "Coverage means every source range is represented by processed summary or raw text, not that a lossy summary retains every fact.",
@@ -76,7 +81,9 @@ enum ContextCheck {
         var count: Int { trials.count }
     }
 
-    static func run(client: ChatGPTLiveClient, requestedModel: String?, outputPath: String) async throws {
+    static func run(
+        client: ChatGPTLiveClient, requestedModel: String?, outputPath: String, includeFocus: Bool = false
+    ) async throws {
         try fixtureChecks()
         let selection = try await client.selection()
         if let requestedModel, requestedModel != selection.model {
@@ -99,8 +106,12 @@ enum ContextCheck {
         var report = Report(
             timestamp: Date(), transport: client.transport, model: selection.model,
             reasoningEffort: selection.reasoningEffort, fixtureMinutes: 15)
+        if includeFocus {
+            report.notes[1] =
+                "Focus snapshots at 3/6/9/12/15 minutes are simulated sequentially. The final Ask adds fresh speech at 15:10 and reuses the completed 12:00–15:00 focus summary."
+        }
         do {
-            for minute in [3, 6, 9, 12] {
+            for minute in includeFocus ? [3, 6, 9, 12, 15] : [3, 6, 9, 12] {
                 try Task.checkCancellation()
                 try await session.validate()
                 let transcript = fixture(throughMinute: minute)
@@ -108,7 +119,9 @@ enum ContextCheck {
                 let start = ProcessInfo.processInfo.systemUptime
                 do {
                     let coverage = try await memory.update(
-                        transcript: transcript, cacheKey: session.cacheKey, summarize: summarize)
+                        transcript: transcript, cacheKey: session.cacheKey,
+                        focusSource: includeFocus ? focusSource(transcript, atMs: minute * 60_000) : nil,
+                        summarize: summarize)
                     try await session.validate()
                     let calls = await trace.count - before
                     report.periodicUpdates.append(
@@ -129,13 +142,17 @@ enum ContextCheck {
                 report.summaryCalls = await trace.trials
                 try save(report, to: outputPath)
             }
-            let transcript = fixture(throughMinute: 15)
+            let transcript = fixture(throughMinute: 15) + (includeFocus ? "[15:10] \(latestQuestion)\n" : "")
+            let currentFocus = includeFocus ? focusSource(transcript, atMs: 910_000) : nil
+            let askQuestions =
+                includeFocus ? ["Help me answer the latest question the other person asked."] + questions : questions
             var history: [ChatMessage] = []
-            for (index, question) in questions.enumerated() {
+            for (index, question) in askQuestions.enumerated() {
                 let before = await trace.count
                 let start = ProcessInfo.processInfo.systemUptime
                 let snapshot = try await memory.prepare(
-                    transcript: transcript, question: question, cacheKey: session.cacheKey, summarize: summarize)
+                    transcript: transcript, question: question, cacheKey: session.cacheKey,
+                    focusSource: currentFocus, summarize: summarize)
                 try await session.validate()
                 let preparationMs = elapsed(start)
                 let calls = await trace.count - before
@@ -147,7 +164,8 @@ enum ContextCheck {
                 let answer = await collect(session: session, messages: messages)
                 let evidence =
                     snapshot.earlierSummary + "\n" + snapshot.questionExcerpts + "\n" + snapshot.recentTranscript
-                let checks = [
+                let asksAboutRoute = includeFocus ? question.contains("AMBER-17") : index != 0
+                var checks = [
                     "all_source_ranges_covered": snapshot.coverage.allSourceProcessed,
                     "cached_prepare_made_no_summary_call": calls == 0,
                     "summary_retains_early_unrelated_route": containsRoute(snapshot.earlierSummary),
@@ -156,16 +174,40 @@ enum ContextCheck {
                     "combined_context_retains_corrected_cap": containsCorrectedCap(evidence),
                     "raw_tail_contains_latest_customer_question": snapshot.recentTranscript.contains(latestQuestion),
                     "answer_mentions_corrected_cap": containsCorrectedCap(answer.output),
-                    "answer_mentions_route_owner_when_asked": index == 0 || containsRoute(answer.output),
-                    "answer_preserves_launch_uncertainty_when_asked": index != 0 || preservesApproval(answer.output),
+                    "answer_mentions_route_owner_when_asked": !asksAboutRoute || containsRoute(answer.output),
+                    "answer_preserves_launch_uncertainty_when_asked": asksAboutRoute
+                        || preservesApproval(answer.output),
                 ]
+                if includeFocus {
+                    let focus = snapshot.focusSummary
+                    let payload = messages.last?.content ?? ""
+                    checks.merge(
+                        [
+                            "focus_summary_ready_from_completed_12_to_15_window": focus?.startMs == 720_000
+                                && focus?.endMs == 900_000,
+                            "current_focus_uses_fresh_15m10s_window": snapshot.focusSource?.startMs == 730_000
+                                && snapshot.focusSource?.endMs == 910_000,
+                            "focus_summary_does_not_import_old_route":
+                                !(focus?.text.lowercased().contains("amber-17") ?? true),
+                            "focus_summary_does_not_import_old_budget": !containsCorrectedCap(focus?.text ?? ""),
+                            "general_and_focus_are_separate_in_request": payload.contains("<general_meeting_summary>")
+                                && payload.contains("<latest_three_minute_summary start_ms="),
+                            "fresh_focus_contains_latest_customer_question": snapshot.focusSource?.transcript.contains(
+                                latestQuestion) == true,
+                            "current_answer_does_not_drift_to_old_route": asksAboutRoute
+                                || !answer.output.lowercased().contains("amber-17"),
+                        ], uniquingKeysWith: { _, new in new })
+                }
                 report.asks.append(
                     .init(
                         question: question, preparationMs: preparationMs, summaryCallsDuringPreparation: calls,
                         coverage: Coverage(snapshot.coverage), summary: snapshot.earlierSummary,
                         exactExcerpts: snapshot.questionExcerpts, recentCharacters: snapshot.recentTranscript.count,
                         requestCharacters: messages.reduce(0) { $0 + $1.modelContent.count }, answer: answer,
-                        checks: checks))
+                        checks: checks, focusSummary: includeFocus ? snapshot.focusSummary?.text : nil,
+                        focusStartMs: includeFocus ? snapshot.focusSummary?.startMs : nil,
+                        focusEndMs: includeFocus ? snapshot.focusSummary?.endMs : nil,
+                        currentFocusStartMs: currentFocus?.startMs, currentFocusEndMs: currentFocus?.endMs))
                 report.summaryCalls = await trace.trials
                 try save(report, to: outputPath)
                 print(
@@ -178,6 +220,9 @@ enum ContextCheck {
                 }
                 guard calls == 0 else {
                     throw Failure(message: "Unchanged synthetic Ask unexpectedly rebuilt its cached summary.")
+                }
+                if includeFocus, snapshot.focusSummary?.startMs != 720_000 || snapshot.focusSummary?.endMs != 900_000 {
+                    throw Failure(message: "The synthetic Ask did not reuse the completed three-minute focus window.")
                 }
                 history += [
                     ChatMessage(role: .user, content: question), ChatMessage(role: .assistant, content: answer.output),
@@ -280,6 +325,26 @@ enum ContextCheck {
         }
         return text
     }
+    /// These fixed timestamps belong only to this generated fixture, never user transcript text.
+    private static func focusSource(_ transcript: String, atMs: Int) -> LiveMeetingFocusSource {
+        var speakers: [String: SpeakerInfo] = [:]
+        let words: [WordTimestamp] = transcript.split(separator: "\n").compactMap { line in
+            let fields = line.split(separator: "]", maxSplits: 1)
+            guard fields.count == 2 else { return nil }
+            let time = fields[0].dropFirst().split(separator: ":").compactMap { Int($0) }
+            let turn = fields[1].trimmingCharacters(in: .whitespaces).split(separator: ":", maxSplits: 1)
+            guard time.count == 2, turn.count == 2 else { return nil }
+            let milliseconds = (time[0] * 60 + time[1]) * 1_000
+            let speaker = String(turn[0])
+            speakers[speaker] = SpeakerInfo(id: speaker, label: speaker)
+            return WordTimestamp(
+                word: String(turn[1]).trimmingCharacters(in: .whitespaces), startMs: milliseconds, endMs: milliseconds,
+                confidence: 1, speakerId: speaker)
+        }.sorted { $0.startMs < $1.startMs }
+        return LiveMeetingFocusTranscript.project(
+            words: words, speakers: Array(speakers.values), elapsedMs: atMs, includeTimestamps: true)
+    }
+
     private static func fixtureChecks() throws {
         let earlier = fixture(throughMinute: 12)
         let full = fixture(throughMinute: 15)

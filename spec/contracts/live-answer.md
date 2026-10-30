@@ -15,7 +15,10 @@ account conversations or personal memory. The editable starter reflects only
 the user's requested concise, direct wording; no biography or example messages
 are invented. See [meeting preferences](live-meeting-preferences-v1.md).
 
-- Help me answer this and custom questions prepare whole-meeting context and then
+- Help me answer this and custom questions prioritize the latest completed
+  three-minute focus summary and fresh speech, while retaining general meeting
+  memory as background. An explicit question about earlier discussion can use
+  that background and exact excerpts. They prepare current context and then
   perform one final streamed answer call. Periodic and catch-up summaries can
   make additional model calls through the same approved ChatGPT client.
   The global shortcut is Option-Command-Space while a meeting is active, using
@@ -46,15 +49,32 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   Processing coverage refers to available recognized text, not missing audio or
   a guarantee that a summary preserves every fact. Durable audio and the complete
   saved transcript remain unchanged.
-- During active, unpaused recording, a local timer attempts a rolling summary
-  update every 180 seconds. This background cloud processing was explicitly
-  authorized for this fork. Empty or unchanged snapshots are skipped, and a tick
+- During active, unpaused recording, a local timer attempts two complementary
+  summary updates every 180 seconds: cumulative general memory and a separate
+  recent focus summary. This background cloud processing was explicitly
+  authorized for this fork. Unchanged source/window snapshots are skipped, and a tick
   does not compete with an active answer or summary. Pause, stop and teardown
   cancel periodic work. An explicit Ask cancels and awaits background work before
   preparing its fresh transcript and context; it does not wait for the next tick.
+- Recent focus uses the recognized words overlapping the latest 180 seconds on
+  the recording timeline, including a word that straddles the start boundary.
+  Numeric word timestamps select this source independently of plain/rich text
+  preferences; formatted paragraph timestamps are not used to guess a window.
+  A focus update processes the selected source in chunks of at most 16,000
+  characters with up to 800 characters of overlap, returning at most 3,000
+  characters of window-only memory. It never absorbs general memory, event
+  preparation, project history, personal style or writing samples.
+- Ask reuses the latest completed focus summary with its actual start/end times;
+  it does not make a fresh focus-summary call on every question. This is a
+  completed three-minute snapshot, not a promise of a newly summarized sliding
+  window ending at invocation. Fresh recognized speech is included immediately
+  and takes priority for corrections and the latest question. A focus summary
+  outside the current recent window is omitted, and silence ages old focus out
+  even when the full transcript text has not changed. Before a focus summary is
+  ready, Ask uses available current speech and labels the summary unavailable.
 - Semantic memory processes the available source in ordered chunks of at most
   16,000 characters, including up to 800 characters of overlap, and retains a
-  rolling summary of at most 8,000 characters. Prompts preserve material facts,
+  general summary of at most 8,000 characters. Prompts preserve material facts,
   attribution, corrections, decisions, proposals, uncertainty and approval gates.
   This is a lossy summary, not a verbatim copy or an exhaustive fact index.
 - For a transcript of at most 16,000 characters, Ask includes all raw text. For
@@ -66,6 +86,9 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   supplements semantic coverage; it never substitutes for a failed summary.
   Notes and local preparation each retain their 6,000-character limit, and prior
   chat retains its 4,000-character limit. These are text limits, not time windows.
+  Those complete-source safeguards remain in addition to recent focus. Before
+  the first general update, a short meeting can have no general summary; its
+  available full transcript supplies background instead of a fabricated summary.
 - Each memory build and answer pins the recording's ChatGPT account/model/effort/
   transport/policy identity. A changed identity, reset or non-append transcript
   edit invalidates cached coverage. Only terminal-completed, useful summaries
@@ -87,9 +110,10 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   the isolated Live database; they are user-authored records, not a polling cache
   of Google Calendar. A recording freezes its event context/project association
   at start and preserves the exact calendar title against automatic renaming.
-  Automatic three-minute updates send only recognized current-meeting text and
-  that meeting's prior rolling memory; they do not absorb project history or send
-  raw audio. Rolling memory remains scoped to this live session's process.
+  Automatic three-minute updates send only recognized current-meeting text and,
+  for general memory, that meeting's prior general summary. The focus summary
+  uses only its own selected recent source. Neither absorbs project history or
+  sends raw audio. Both remain scoped to this live session's process.
 - A selected project can add one separately labeled historical reference: the
   actual latest eligible prior project meeting before this recording began.
   Selection happens before readiness checks. A processing, failed, cancelled or
@@ -104,9 +128,11 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   [Google Calendar and project context](google-calendar-live.md).
 - Ask shows review progress and the last successful background update or its
   error. The optional context disclosure belongs to the last completed answer:
-  it identifies full raw context or shows that answer's earlier summary, plus
-  recent speech captured when Ask was pressed. It is not the continuously
-  updating background summary. Summary omissions are disclosed, and the source
+  it shows that answer's recent focus and actual completed window, plus general
+  meeting background, including when the full raw transcript was available.
+  Missing summaries are labeled explicitly. It also identifies raw/summary
+  coverage and includes recent speech captured when Ask was pressed. It is not
+  the continuously updating background summary. Summary omissions are disclosed, and the source
   transcript remains necessary for exact earlier wording.
 - Text deltas render during streaming. An interrupted direct response remains
   visible as `[Incomplete response]` and does not enter successful model history.
@@ -146,3 +172,8 @@ context refreshes, normal saving and interrupted chat recovery. Their short
 transcripts fit raw context; they do not measure long native semantic compaction
 or establish acoustic speech-end timing. The validation report identifies each
 measured revision and the additional focused calendar-startup repair separately.
+
+The separate recent-focus/general-background policy is tracked in
+[its implementation plan](../../plans/active/2026-10-30-live-three-minute-focus.md).
+Its focused checks, signed build and installed qualification are pending; the
+earlier revision evidence above does not qualify this new request shape.

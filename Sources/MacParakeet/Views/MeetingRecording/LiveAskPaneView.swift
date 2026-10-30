@@ -187,12 +187,14 @@ struct LiveAskPaneView: View {
             )
             .font(.caption)
             .foregroundStyle(DesignSystem.Colors.textSecondary)
-            Text("Summary refreshes every 3 minutes while recording; answers also include latest speech.")
+            Text(
+                "Summaries refresh every 3 minutes. Answers focus on the latest completed window and fresh speech, with general meeting background."
+            )
                 .font(.caption)
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
             if let updatedAt = viewModel.liveMeetingMemoryLastUpdated {
                 HStack(spacing: 3) {
-                    Text("Summary updated")
+                    Text("Summaries updated")
                     Text(updatedAt, style: .relative)
                     Text("ago")
                 }
@@ -231,22 +233,30 @@ struct LiveAskPaneView: View {
             if let context = viewModel.lastLiveMeetingMemory {
                 DisclosureGroup("Context for last completed answer", isExpanded: $showingAnswerContext) {
                     VStack(alignment: .leading, spacing: 6) {
+                        Text("Recent focus").fontWeight(.semibold)
+                        if let focus = context.focusSummary {
+                            Text("Latest completed window: \(focusWindowLabel(startMs: focus.startMs, endMs: focus.endMs))")
+                            contextSummaryText(focus.text)
+                        } else if context.focusSource?.transcript.isEmpty == true {
+                            Text("No recognized speech in the recent three-minute window.")
+                        } else {
+                            Text("Waiting for a recent summary. This answer includes the available live transcript.")
+                        }
+                        Text("General meeting background").fontWeight(.semibold)
+                        if context.earlierSummary.isEmpty {
+                            Text("No general summary is ready yet. The available transcript supplies background.")
+                        } else {
+                            contextSummaryText(context.earlierSummary)
+                        }
                         switch context.coverage.mode {
                         case .fullRaw:
                             Text("The full available live transcript was included.")
                         case .allEarlierSummarized:
-                            ScrollView {
-                                Text(context.earlierSummary)
-                                    .font(.system(size: 12))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .frame(maxHeight: 150)
                             Text(
                                 "Earlier discussion was summarized, so some details may be missing. Check the transcript for exact wording."
                             )
                         }
-                        Text("Includes recent speech captured when you asked. This snapshot belongs to that answer.")
+                        Text("Includes speech available when you asked. These summaries belong to this completed answer.")
                     }
                     .font(.caption)
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
@@ -279,6 +289,24 @@ struct LiveAskPaneView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.md)
         .padding(.top, 8)
+    }
+
+    private func contextSummaryText(_ text: String) -> some View {
+        ScrollView {
+            Text(text)
+                .font(.system(size: 12))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 150)
+    }
+
+    private func focusWindowLabel(startMs: Int, endMs: Int) -> String {
+        func timestamp(_ milliseconds: Int) -> String {
+            let seconds = max(0, milliseconds / 1_000)
+            return String(format: "%d:%02d", seconds / 60, seconds % 60)
+        }
+        return "\(timestamp(startMs))–\(timestamp(endMs))"
     }
 
     private func liveTimingLabel(_ timing: LiveAnswerTiming) -> String {

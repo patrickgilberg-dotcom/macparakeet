@@ -106,6 +106,7 @@ public final class TranscriptChatViewModel {
     /// state (e.g. `MeetingNotesViewModel.notesText`).
     private var userNotesProvider: (@MainActor () -> String?)?
     private var prepareLiveTranscript: (@MainActor () async throws -> Void)?
+    private var focusSourceProvider: (@MainActor () -> LiveMeetingFocusSource?)?
     private var directLiveSessionProvider: (@Sendable () async throws -> LiveAnswerStreamSession)?
     private var liveAnswerPreferencesProvider: (@Sendable () async throws -> LiveMeetingPreferences)?
     private var liveMeetingMemory = LiveMeetingMemory()
@@ -116,6 +117,7 @@ public final class TranscriptChatViewModel {
     private var summaryUpdatesEnabled = false
     private var summaryRefreshInterval: Duration = .seconds(180)
     private var lastBackgroundSource: String?
+    private var lastBackgroundFocusSource: LiveMeetingFocusSource?
     private var lastBackgroundCacheKey: String?
     private var chatHistory: [ChatMessage] = []
     private var streamingTask: Task<Void, Never>?
@@ -139,11 +141,13 @@ public final class TranscriptChatViewModel {
     public func configureDirectLiveAnswers(
         prepareTranscript: @escaping @MainActor () async throws -> Void,
         stream: @escaping @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>,
+        focusSourceProvider: (@MainActor () -> LiveMeetingFocusSource?)? = nil,
         summaryRefreshInterval: Duration = .seconds(180)
     ) {
         configureDirectLiveAnswers(
             prepareTranscript: prepareTranscript,
             sessionProvider: { LiveAnswerStreamSession(cacheKey: "injected-live-provider", stream: stream) },
+            focusSourceProvider: focusSourceProvider,
             summaryRefreshInterval: summaryRefreshInterval)
     }
 
@@ -151,18 +155,21 @@ public final class TranscriptChatViewModel {
     public func configureDirectLiveAnswers(
         prepareTranscript: @escaping @MainActor () async throws -> Void,
         sessionProvider: @escaping @Sendable () async throws -> LiveAnswerStreamSession,
+        focusSourceProvider: (@MainActor () -> LiveMeetingFocusSource?)? = nil,
         summaryRefreshInterval: Duration = .seconds(180)
     ) {
         cancelStreaming()
         stopLiveMeetingMemory()
         usesDirectLiveAnswers = true
         self.prepareLiveTranscript = prepareTranscript
+        self.focusSourceProvider = focusSourceProvider
         directLiveSessionProvider = sessionProvider
         liveMeetingMemory = LiveMeetingMemory()
         lastLiveMeetingMemory = nil
         liveMeetingMemoryLastUpdated = nil
         liveMeetingMemoryBackgroundError = nil
         lastBackgroundSource = nil
+        lastBackgroundFocusSource = nil
         lastBackgroundCacheKey = nil
         self.summaryRefreshInterval = summaryRefreshInterval
         resumeLiveMeetingMemory()
@@ -239,10 +246,12 @@ public final class TranscriptChatViewModel {
         liveMeetingMemoryProgress = nil
     }
 
+    private static let previewGapWarning =
+        "[Earlier live-preview audio was missed; missing words were not reconstructed. The full recording is preserved for final transcription.]"
+
     private func meetingTranscriptSnapshot() -> String {
         guard liveTranscriptHasEarlierGap else { return transcriptText }
-        let warning =
-            "[Earlier live-preview audio was missed; missing words were not reconstructed. The full recording is preserved for final transcription.]"
+        let warning = Self.previewGapWarning
         return transcriptText.hasPrefix(warning) ? transcriptText : warning + "\n" + transcriptText
     }
 
@@ -252,6 +261,7 @@ public final class TranscriptChatViewModel {
         else { return }
         guard !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let source = meetingTranscriptSnapshot()
+        let focusSource = focusSourceProvider?()
         summaryGeneration &+= 1
         let generation = summaryGeneration
         let snapshotAt = Date()
@@ -268,10 +278,14 @@ public final class TranscriptChatViewModel {
                 let session = try await provider()
                 try Task.checkCancellation()
                 guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming else { return }
-                if source == lastBackgroundSource, session.cacheKey == lastBackgroundCacheKey { return }
+                if source == lastBackgroundSource, focusSource == lastBackgroundFocusSource,
+                    session.cacheKey == lastBackgroundCacheKey
+                {
+                    return
+                }
                 if lastBackgroundCacheKey != session.cacheKey { liveMeetingMemoryLastUpdated = nil }
                 _ = try await memory.update(
-                    transcript: source, cacheKey: session.cacheKey,
+                    transcript: source, cacheKey: session.cacheKey, focusSource: focusSource,
                     summarize: { messages in
                         var result = ""
                         for try await text in session.stream(messages: messages) {
@@ -294,6 +308,7 @@ public final class TranscriptChatViewModel {
                     return
                 }
                 lastBackgroundSource = source
+                lastBackgroundFocusSource = focusSource
                 lastBackgroundCacheKey = session.cacheKey
                 liveMeetingMemoryLastUpdated = snapshotAt
                 liveMeetingMemoryBackgroundError = nil
@@ -305,7 +320,7 @@ public final class TranscriptChatViewModel {
             } catch {
                 guard summaryUpdatesEnabled, summaryGeneration == generation else { return }
                 liveMeetingMemoryBackgroundError =
-                    "Summary update failed. Your next question will retry earlier context."
+                    "Your question retries required earlier context. The next summary update retries recent focus."
                 AudioCaptureDiagnostics.appendAsync("live_meeting_memory outcome=failed")
             }
         }
@@ -625,6 +640,7 @@ public final class TranscriptChatViewModel {
                     if let previousKey = lastBackgroundCacheKey, previousKey != liveSession?.cacheKey {
                         liveMeetingMemoryLastUpdated = nil
                         lastBackgroundSource = nil
+                        lastBackgroundFocusSource = nil
                         lastBackgroundCacheKey = nil
                     }
                     try Task.checkCancellation()
@@ -646,6 +662,7 @@ public final class TranscriptChatViewModel {
                     let memory = liveMeetingMemory
                     let memorySnapshot = try await memory.prepare(
                         transcript: transcript, question: question, cacheKey: session.cacheKey,
+                        focusSource: focusSourceProvider?(),
                         summarize: { messages in
                             var result = ""
                             for try await text in session.stream(messages: messages) {
@@ -690,7 +707,8 @@ public final class TranscriptChatViewModel {
                         question: question, context: memorySnapshot, notes: userNotes,
                         preparation: livePreparationContext, history: scopedHistory,
                         eventPreparation: capturedEventPreparation,
-                        previousMeeting: preparedProjectContext?.quotedContext ?? "")
+                        previousMeeting: preparedProjectContext?.quotedContext ?? "",
+                        sourceLimitations: liveTranscriptHasEarlierGap ? Self.previewGapWarning : "")
                     if let answerPreferences {
                         contextMessages = LiveAnswerStyleContext.applying(
                             to: contextMessages, enabled: answerPreferences.answerStyleEnabled,

@@ -78,6 +78,9 @@ public final class MeetingRecordingPanelViewModel {
 
     private var copiedResetTask: Task<Void, Never>?
     private var previewLineWordCounts: [Int] = []
+    private var liveTimelineWords: [WordTimestamp] = []
+    private var liveTimelineSpeakers: [SpeakerInfo] = []
+    private var hasLiveTimeline = false
     private let transcriptAIContextModeProvider: @MainActor () -> TranscriptAIContextMode
 
     public init(
@@ -163,6 +166,23 @@ public final class MeetingRecordingPanelViewModel {
         chatViewModel.updateTranscriptText(chatTranscript)
     }
 
+    /// Numeric timing remains available even when plain Ask context hides the
+    /// transcript's display timestamps. Refresh after every preview/barrier update.
+    public func updateLiveMeetingTimeline(_ update: MeetingTranscriptUpdate) {
+        liveTimelineWords = update.words
+        liveTimelineSpeakers = update.speakers
+        hasLiveTimeline = true
+    }
+
+    public var liveMeetingFocusSource: LiveMeetingFocusSource? {
+        guard hasLiveTimeline else { return nil }
+        let seconds = max(0, elapsedSeconds)
+        let elapsedMs = seconds > Int.max / 1_000 ? Int.max : seconds * 1_000
+        return LiveMeetingFocusTranscript.project(
+            words: liveTimelineWords, speakers: liveTimelineSpeakers, elapsedMs: elapsedMs,
+            includeTimestamps: transcriptAIContextModeProvider() == .richTranscript)
+    }
+
     public var transcriptText: String {
         previewLines.map { "[\($0.timestamp)] \($0.speakerLabel): \($0.text)" }.joined(separator: "\n")
     }
@@ -197,6 +217,9 @@ public final class MeetingRecordingPanelViewModel {
         canToggleMicrophoneMute = false
         previewLines = []
         previewLineWordCounts = []
+        liveTimelineWords = []
+        liveTimelineSpeakers = []
+        hasLiveTimeline = false
         wordCount = 0
         isTranscriptionLagging = false
         liveTranscriptStatus = .listening
