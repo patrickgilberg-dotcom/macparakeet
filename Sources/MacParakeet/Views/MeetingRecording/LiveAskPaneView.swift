@@ -190,8 +190,8 @@ struct LiveAskPaneView: View {
             Text(
                 "Summaries refresh every 3 minutes. Answers focus on the latest completed window and fresh speech, with general meeting background."
             )
-                .font(.caption)
-                .foregroundStyle(DesignSystem.Colors.textSecondary)
+            .font(.caption)
+            .foregroundStyle(DesignSystem.Colors.textSecondary)
             if let updatedAt = viewModel.liveMeetingMemoryLastUpdated {
                 HStack(spacing: 3) {
                     Text("Summaries updated")
@@ -235,7 +235,9 @@ struct LiveAskPaneView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Recent focus").fontWeight(.semibold)
                         if let focus = context.focusSummary {
-                            Text("Latest completed window: \(focusWindowLabel(startMs: focus.startMs, endMs: focus.endMs))")
+                            Text(
+                                "Latest completed window: \(focusWindowLabel(startMs: focus.startMs, endMs: focus.endMs))"
+                            )
                             contextSummaryText(focus.text)
                         } else if context.focusSource?.transcript.isEmpty == true {
                             Text("No recognized speech in the recent three-minute window.")
@@ -256,7 +258,9 @@ struct LiveAskPaneView: View {
                                 "Earlier discussion was summarized, so some details may be missing. Check the transcript for exact wording."
                             )
                         }
-                        Text("Includes speech available when you asked. These summaries belong to this completed answer.")
+                        Text(
+                            "Includes speech available when you asked. These summaries belong to this completed answer."
+                        )
                     }
                     .font(.caption)
                     .foregroundStyle(DesignSystem.Colors.textSecondary)
