@@ -128,15 +128,6 @@
     "source": "fb7342b6e821",
     "qualificationDate": "2026-10-31"
   },
-  "nativeUI": {
-    "status": "blocked_by_locked_mac",
-    "userUnlockRequested": true,
-    "qaPreferencesChanged": false,
-    "audioPlayed": false,
-    "testRecordingStarted": false,
-    "syntheticClipsReady": true,
-    "preparedPlan": "system-only capture, temporarily exclude calendars, All Meetings, real 180-second tick, long question, silence, new question, manual Update, normal Stop, key-only preference restore"
-  },
   "privacy": "Only synthetic output and structural checks. No real calendar identifiers, meeting content, skill, writing examples, credentials or backups.",
   "initialInstallation": {
     "supportedSignedReleaseInstalled": true,
@@ -208,5 +199,16 @@
     "originalQASettingsRestored": true,
     "urlRecordingControlRemainedDisabled": true,
     "remaining": "Unlocked native long-question/Update-button recording and normal save on corrected build."
+  },
+  "initialBlockedNativePreparation": {
+    "status": "blocked_by_locked_mac",
+    "userUnlockRequested": true,
+    "qaPreferencesChanged": false,
+    "audioPlayed": false,
+    "testRecordingStarted": false,
+    "syntheticClipsReady": true,
+    "preparedPlan": "system-only capture, temporarily exclude calendars, All Meetings, real 180-second tick, long question, silence, new question, manual Update, normal Stop, key-only preference restore",
+    "source": "1136349991ae",
+    "stage": "Historical initial locked-Mac preparation, before the later native diagnostic. These values do not describe the completed diagnostic or current corrected-build attempt."
   }
 }
