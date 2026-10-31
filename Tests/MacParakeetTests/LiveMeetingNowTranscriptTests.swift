@@ -131,6 +131,19 @@ final class LiveMeetingNowTranscriptTests: XCTestCase {
         XCTAssertFalse(result.source.transcript.contains("Earlier whole-meeting"))
     }
 
+    func testNegatedAuxiliaryContinuationPreservesTheQuestionOpening() {
+        let result = project(
+            [
+                word("Could you help explain the pilot while the rollback drill has been.", 191_000, 205_000),
+                word("has not finished, while making clear what we can promise.", 209_000, 219_000),
+                word("without implying any approval that has never been established.", 224_000, 233_000),
+            ], at: 249_000)
+        XCTAssertEqual(result.anchor?.startMs, 191_000)
+        XCTAssertEqual(result.source.startMs, 191_000)
+        XCTAssertTrue(result.anchor?.text.hasPrefix("Could you help explain the pilot") == true)
+        XCTAssertTrue(result.anchor?.text.contains("has not finished") == true)
+    }
+
     func testLaterLexicalQuestionWinsWhenASRUsesOnlyPeriods() {
         let result = project(
             [

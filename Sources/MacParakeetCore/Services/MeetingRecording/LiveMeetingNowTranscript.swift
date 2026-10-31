@@ -378,7 +378,9 @@ public enum LiveMeetingNowTranscript {
         if ["can", "could", "would", "should", "will", "do", "does", "did", "is", "are", "was", "were", "has", "have"]
             .contains(first)
         {
-            return true
+            // A negated continuation such as "has not finished" must not
+            // replace the opening of the question that contains it.
+            return tokens[1] != "not"
         }
         if ["who", "whom", "whose"].contains(first) { return true }
         if ["what", "how", "when", "where", "why", "which"].contains(first) {
