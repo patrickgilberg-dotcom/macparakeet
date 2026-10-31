@@ -1,8 +1,8 @@
 # MacParakeet Live qualification
 
-Qualification dates: October 28–30, 2026 (America/Edmonton).
+Qualification dates: October 28–31, 2026 (America/Edmonton).
 
-Installed source: `d7e71ad968b4`, branch `feat/macparakeet-live`,
+Installed source: `fb7342b6e821`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
 The installed Release includes direct Google Calendar sign-in, private event
 preparation, project folders, latest-project grounding and live-chat recovery.
@@ -12,6 +12,16 @@ personal answer style. Their separate qualification and test limits are in
 The newest context update prioritizes the latest completed three-minute focus
 and fresh speech while retaining cumulative background; its source-specific
 checks and limits are in [the focus report](macparakeet-live-focus-validation.md).
+The newest installed addition supplies a local thirty-second question focus and
+explicit Update answer action. A native diagnostic verified its summary timer
+and refresh interaction, but exposed recognition punctuation truncating a long
+question. Correction `fb7342b6e821` passed 193 focused tests and is installed
+with a verified strict signature. Its native attempt failed to start system
+audio while the Mac locked; final interaction qualification remains pending
+unlock and rerun. Original QA preferences are restored. The full regression
+run failed. See
+[the Now/refresh report](macparakeet-live-now-validation.md) for revision-specific
+results and limits.
 The initial integrated native recording/answer checks used `14851bd6a0c6`;
 `9447f78bcb2e` passed the full regression gate, native interruption recovery and
 normal Stop with completed chat. The final narrow calendar-startup repair in
