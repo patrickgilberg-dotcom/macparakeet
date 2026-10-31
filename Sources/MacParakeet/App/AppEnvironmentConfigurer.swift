@@ -635,10 +635,13 @@ final class AppEnvironmentConfigurer {
         // feature flag because calendar integration only makes sense when
         // the user can actually record meetings.
         if AppFeatures.meetingRecordingEnabled {
+            let excludedCalendarIDs: @MainActor @Sendable () -> Set<String> = { [weak settingsViewModel] in
+                settingsViewModel?.calendarExcludedIdentifiers ?? []
+            }
             meetingsWorkspaceViewModel.planner?.automaticPrep?.start(
-                eventsProvider: { [weak settingsViewModel] in
+                eventsProvider: {
                     let events = try await GoogleCalendarService.shared.fetchUpcomingEvents(days: 1)
-                    let excluded = await MainActor.run { settingsViewModel?.calendarExcludedIdentifiers ?? [] }
+                    let excluded = await excludedCalendarIDs()
                     return events.filter { event in
                         event.calendarIdentifier.map { !excluded.contains($0) } ?? true
                     }
