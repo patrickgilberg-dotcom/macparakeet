@@ -143,9 +143,9 @@ simulated timeline into a hardware recording or latency guarantee.
 - The same diagnostic exposed internal recognition periods truncating a long
   question's early clause: Now/anchor began at 3:33 rather than 3:13. The saved
   **QA Now Focus Boundary Check** row is diagnostic, not final qualification.
-  `fb7342b6e821` extends raw source to the acoustic utterance boundary and
-  coalesces the anchor lead-in, with bounded lexical/pause rules rather than
-  guaranteed semantic parsing.
+  `fb7342b6e821` extends raw source to a speaker-or-pause boundary inferred
+  from word timings and coalesces the anchor lead-in, with bounded lexical
+  rules rather than guaranteed semantic parsing.
 - The installed `fb7342b6e821` native attempt started at
   `2026-10-31T03:54:49Z`, and the Mac locked during startup. At `03:55:03Z`,
   metadata reported `system_audio_stream_start_failed`
