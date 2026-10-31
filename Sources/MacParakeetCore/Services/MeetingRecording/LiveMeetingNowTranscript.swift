@@ -99,6 +99,7 @@ public enum LiveMeetingNowTranscript {
         let lookback = max(0, end - anchorLookbackMilliseconds)
         let sentences = spans(valid, splitAtPause: false)
         let turns = spans(valid, splitAtPause: true)
+        let utterances = spans(valid, splitAtPause: true, splitAtSentence: false)
         let meaningfulTurns = turns.filter { range in
             valid[range.upperBound - 1].endMs >= lookback && !semantic(valid[range]).isEmpty
         }
@@ -112,22 +113,46 @@ public enum LiveMeetingNowTranscript {
         let lastQuestion = sentences.last { range in
             valid[range.upperBound - 1].endMs >= lookback && question(valid[range])
         }
-        let anchorRange: Range<Int>?
+        let selectedAnchor: Range<Int>?
         if let lastQuestion,
             latestTurn == nil || lastQuestion.upperBound >= latestTurn!.upperBound
         {
-            anchorRange = lastQuestion
+            selectedAnchor = lastQuestion
         } else {
-            anchorRange = latestTurn
+            selectedAnchor = latestTurn
+        }
+        // ASR can insert a question mark or period inside one uninterrupted
+        // question. Keep the complete acoustic utterance as exact source even
+        // when its sentence punctuation suggests a shorter question.
+        let anchorRange = selectedAnchor.map { range -> Range<Int> in
+            guard question(valid[range]) || !endsSentence(valid[range.upperBound - 1].word),
+                let utterance = utterances.first(where: { $0.contains(range.upperBound - 1) })
+            else { return range }
+            var start = min(range.lowerBound, utterance.lowerBound)
+            // This lexical cue is deliberately modest, not semantic turn
+            // detection. A genuine Q1? Who/What/Can...Q2? keeps Q2 priority.
+            // If capitalization was itself an ASR error, the full raw acoustic
+            // utterance below still contains the recoverable opening.
+            for (previous, next) in zip(sentences, sentences.dropFirst())
+            where next.lowerBound > start && next.lowerBound <= range.lowerBound {
+                if question(valid[previous]), startsNewQuestion(valid[next.lowerBound].word) {
+                    start = next.lowerBound
+                }
+            }
+            return start..<range.upperBound
         }
         var first = valid.firstIndex { $0.endMs >= cutoff && $0.startMs <= end }
         if let firstIndex = first,
-            let intersecting = turns.first(where: { $0.contains(firstIndex) })
+            let intersecting = utterances.first(where: { $0.contains(firstIndex) })
         {
             first = intersecting.lowerBound
         }
         if let anchorRange {
-            first = min(first ?? anchorRange.lowerBound, anchorRange.lowerBound)
+            let acousticStart =
+                utterances.first(where: { $0.contains(anchorRange.upperBound - 1) })?.lowerBound
+                ?? anchorRange.lowerBound
+            let retainedStart = min(anchorRange.lowerBound, acousticStart)
+            first = min(first ?? retainedStart, retainedStart)
         }
         let selected = first.map { Array(valid[$0...]) } ?? []
         let labels = Dictionary(speakers.map { ($0.id, $0.label) }, uniquingKeysWith: { _, latest in latest })
@@ -245,7 +270,9 @@ public enum LiveMeetingNowTranscript {
         return "\(id.utf8.count):\(id):\(startMs)"
     }
 
-    private static func spans(_ words: [WordTimestamp], splitAtPause: Bool) -> [Range<Int>] {
+    private static func spans(
+        _ words: [WordTimestamp], splitAtPause: Bool, splitAtSentence: Bool = true
+    ) -> [Range<Int>] {
         guard !words.isEmpty else { return [] }
         var output: [Range<Int>] = []
         var start = 0
@@ -256,12 +283,24 @@ public enum LiveMeetingNowTranscript {
             {
                 output.append(start..<index); start = index
             }
-            if endsSentence(words[index].word) {
+            if splitAtSentence, endsSentence(words[index].word) {
                 output.append(start..<(index + 1)); start = index + 1
             }
         }
         if start < words.count { output.append(start..<words.count) }
         return output
+    }
+
+    private static func startsNewQuestion(_ value: String) -> Bool {
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"'“‘([{"))
+        guard text.first?.isUppercase == true, let first = normalize(text).split(separator: " ").first else {
+            return false
+        }
+        return [
+            "who", "what", "when", "where", "why", "how", "can", "could", "would", "should", "will", "do", "does",
+            "did", "is", "are", "was", "were", "has", "have",
+        ].contains(String(first))
     }
 
     private static func question(_ words: ArraySlice<WordTimestamp>) -> Bool {

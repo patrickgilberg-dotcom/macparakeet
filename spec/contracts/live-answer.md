@@ -57,14 +57,25 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   cancel periodic work. An explicit Ask cancels and awaits background work before
   preparing its fresh transcript and context; it does not wait for the next tick.
 - Immediate focus selects approximately the latest 30 seconds of recognized
-  speech locally from numeric word timing. Selection extends to preserve the
-  complete relevant question or speaker turn rather than cutting it at a fixed
-  time boundary. A complete question can remain the answer anchor during
-  silence. This raw source requires no additional model summary call. Existing
-  complete-source context remains available when a question needs more history.
-  Immediate source, three-minute source, transcript and user notes are captured
-  as one answer snapshot before asynchronous preference or context preparation.
-  Their data remains quoted context and cannot override the answer rules.
+  speech locally from numeric word timing. Its raw-source start extends back to
+  the overlapping unbroken utterance's beginning: a speaker change or a pause
+  of at least 2,500 ms supplies an utterance boundary. Recognized punctuation
+  alone does not cut that raw span, because speech recognition can insert
+  periods inside one spoken question. The question anchor can coalesce the
+  selected question with its same-utterance lead-in and conditions. A later
+  capitalized interrogative following an earlier question can establish a new
+  question anchor within that utterance.
+  These local pause/speaker/lexical rules are not semantic question parsing;
+  they can coalesce several closely spoken turns and cannot establish a named
+  speaker's identity. Immediate raw source and anchor text remain bounded at
+  12,000 characters. Shortened beginnings are explicitly marked; a shortened
+  anchor is not represented as complete. The ordinary transcript/general
+  context retains the complete available-source safeguards. A complete question can
+  remain the answer anchor during silence. This raw projection adds no model
+  summary call. Immediate source, three-minute source, transcript and user notes
+  are captured as one answer snapshot before asynchronous preference or context
+  preparation. Their data remains quoted context and cannot override the
+  answer rules.
 - Each explicit live answer keeps its captured question/turn and capture time
   visible while preparing, streaming and completed. This is a stable answer
   anchor, not a claim that an in-flight request continuously receives new

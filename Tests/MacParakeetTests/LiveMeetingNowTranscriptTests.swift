@@ -50,6 +50,67 @@ final class LiveMeetingNowTranscriptTests: XCTestCase {
         XCTAssertEqual(result.source.startMs, 0)
     }
 
+    func testNativeLongQuestionKeepsVendorOpeningAcrossInsertedASRPunctuation() {
+        let words = [
+            word("Earlier approval conditions.", 0, 1_000),
+            word("Could you help me explain to the vendor how wonder to do it?", 193_000, 202_000),
+            word("how we should respond", 202_300, 212_000),
+            word("security approval is still pending.", 212_300, 217_000),
+            word("And the rollback drill has not finished while also making clear", 217_300, 224_000),
+            word("whether anyone has actually.", 224_300, 228_000),
+            word("Accepted responsibility that the meeting has never established?", 228_300, 231_000),
+        ]
+        let result = project(words, at: 265_000)
+        XCTAssertEqual(result.source.startMs, 193_000)
+        XCTAssertEqual(result.anchor?.startMs, 193_000)
+        XCTAssertEqual(result.anchor?.endMs, 231_000)
+        XCTAssertTrue(result.source.transcript.contains("Could you help me explain to the vendor"))
+        XCTAssertTrue(result.anchor?.text.hasPrefix("Could you help me explain to the vendor") == true)
+        XCTAssertTrue(result.anchor?.text.contains("security approval is still pending") == true)
+        XCTAssertFalse(result.source.transcript.contains("Earlier approval conditions."))
+    }
+
+    func testNativeQuestionPreambleAndBeforeClauseStayInTheSameAnchor() {
+        let result = project(
+            [
+                word("Here is a different question.", 300_000, 301_000),
+                word("What are the two checks we must confirm.", 301_300, 310_000),
+                word("before the test account can connect?", 310_300, 317_000),
+            ], at: 320_000)
+        XCTAssertEqual(result.anchor?.startMs, 300_000)
+        XCTAssertEqual(
+            result.anchor?.text,
+            "Here is a different question. What are the two checks we must confirm. before the test account can connect?"
+        )
+        XCTAssertTrue(result.anchor?.isComplete == true)
+    }
+
+    func testConsecutiveQuestionsKeepLatestPriorityWhileRawRetainsTheAcousticUtterance() {
+        let result = project(
+            [
+                word("What is the budget?", 10_000, 12_000),
+                word("Who owns the review?", 13_000, 15_000),
+            ], at: 50_000)
+        XCTAssertEqual(result.anchor?.text, "Who owns the review?")
+        XCTAssertEqual(result.anchor?.startMs, 13_000)
+        XCTAssertEqual(result.source.startMs, 10_000)
+        XCTAssertTrue(result.source.transcript.contains("What is the budget?"))
+        XCTAssertTrue(result.source.transcript.contains("Who owns the review?"))
+    }
+
+    func testSpeakerAndRealPauseStillBoundTheAcousticExtension() {
+        let result = project(
+            [
+                word("An older speaker question?", 1_000, 2_000, "A"),
+                word("A separate old topic.", 3_000, 4_000, "B"),
+                word("Can we proceed?", 50_000, 51_000, "B"),
+            ], at: 60_000)
+        XCTAssertEqual(result.anchor?.text, "Can we proceed?")
+        XCTAssertEqual(result.source.startMs, 50_000)
+        XCTAssertFalse(result.source.transcript.contains("older speaker"))
+        XCTAssertFalse(result.source.transcript.contains("separate old topic"))
+    }
+
     func testQuestionAnchorSurvivesSilenceAndExpiresAfterLookback() {
         let words = [word("Can we proceed?", 10_000, 20_000)]
         let atAsk = project(words, at: 25_000)
