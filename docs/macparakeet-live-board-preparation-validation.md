@@ -63,7 +63,7 @@ The full run precedes the final literal owner/deadline prompt refinement and cal
 
 The supported `run_live_app.sh` and `install_live_app.sh` workflows built and installed the app with the existing persistent signing identity. Deep/strict signature verification passed after installation, and the installed Info.plist identifies `1e7588be8105`. The app launched successfully; no permission reset or new account setup was requested.
 
-The database passed `PRAGMA quick_check`. All **21 pre-install meeting IDs remain**, including every baseline row. A consistent SQLite backup and structural before/after evidence remain privately outside the repository. The original `/Applications/MacParakeet.app` executable hash is unchanged. No new audio recording was started by this task.
+The database passed `PRAGMA quick_check`. All **21 pre-install meeting IDs remain**, including every baseline row. Original/current transcript text, saved notes, title fields, segments and status also compare unchanged with the private pre-install backup. A consistent SQLite backup and structural before/after evidence remain privately outside the repository. The original `/Applications/MacParakeet.app` executable hash is unchanged. No new audio recording was started by this task.
 
 The final app's on-screen Prepare/card/quotation acceptance is **pending manual Mac unlock**. The unlock request remains pending; a temporary display-awake assertion prevents another idle lock during that check. Native audio/capture tests from the prior focus task remain source-qualified in [the previous report](macparakeet-live-now-validation.md); this change does not repeat them or claim a new multi-hour recording soak.
 
