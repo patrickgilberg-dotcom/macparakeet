@@ -69,7 +69,9 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   or request opener at a recognized sentence start within the latest three minutes.
   It can retain that opener and same-speaker continuations across inserted
   periods and numeric timing gaps, including when recognition omits a question
-  mark. A newer direct opener, explicit short question, conditional question,
+  mark. A negated auxiliary continuation such as "has not finished" does not
+  establish a new lexical opener. A newer direct opener, explicit short question,
+  conditional question,
   speaker change, explicit topic/status assertion or completed substantial
   declarative can reset the anchor; the declarative rule requires at least
   eight words and a recognized declarative start. New anchor boundaries take
@@ -232,6 +234,7 @@ The separate recent-focus/general-background policy is tracked in
 [its implementation plan](../../plans/active/2026-10-30-live-three-minute-focus.md)
 and [source-specific qualification](../../docs/macparakeet-live-focus-validation.md).
 The immediate-focus and explicit-refresh extension is tracked in
-[its implementation plan](../../plans/active/2026-10-30-live-now-focus-and-refresh.md).
-Its qualification is pending; prior revision evidence does not qualify the new
-immediate-focus projection or refresh interaction.
+[its implementation plan](../../plans/completed/2026-10-30-live-now-focus-and-refresh.md).
+The [qualification report](../../docs/macparakeet-live-now-validation.md)
+distinguishes the physical recording revision from the final local
+question-opening predicate guard and records the remaining test limits.

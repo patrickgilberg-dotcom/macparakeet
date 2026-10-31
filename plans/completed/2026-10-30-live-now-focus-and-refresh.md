@@ -1,6 +1,6 @@
 # Immediate meeting focus and explicit answer refresh
 
-Status: in progress.
+Status: complete with recorded qualification limits.
 
 ## Scope
 
@@ -69,12 +69,18 @@ correction supersedes that snapshot.
   receipt and strict/deep signature verified.
 - [x] Stop the interrupted mixed-audio native attempt normally, verify its
   structural artifacts and restore original QA preferences and their presence.
-- [ ] Finish a controlled native complete-question/Update scenario after the
-  user chooses to pause other audio or finish later; restore any new settings.
+- [x] Complete the clean native raw-question/Ask/Update/timer/save flow at
+  `e602f5a2ebc7` after other audio was paused, then restore original QA settings.
+- [x] Commit the narrow question-opening predicate guard as `372b64e580a5` and pass its
+  200-test focused gate, including 30 Core tests.
+- [x] Complete the signed `372b64e580a5` helper cloud check with all markers
+  true, five terminal requests and zero foreground summary calls on either Ask.
+- [x] Finish the final signed Release build, installation and post-relaunch
+  verification at `372b64e580a5`; no further audio is required.
 
 ## Verification
 
-Partial qualification is recorded below and in
+Source-specific qualification is recorded below and in
 [the new validation report](../../docs/macparakeet-live-now-validation.md).
 Earlier focus, calendar/project, recovery and minutes/style evidence retains
 its original source labels and does not qualify this new native refresh
@@ -85,10 +91,11 @@ simulated timeline into a hardware recording or latency guarantee.
 ## Verification progress
 
 - Qualification spans October 30–31, 2026 in Edmonton. Installed source
-  `e602f5a2ebc7` was built at `2026-10-31T17:21:35Z`; the supported install,
-  source receipt and strict/deep signature passed. Earlier source
-  `fb7342b6e821` was built at `2026-10-31T03:54:23Z` and `1136349991ae` at
-  `2026-10-31T00:56:46Z`; those two timestamps were October 30 locally.
+  `372b64e580a5` was built at `2026-10-31T17:59:14Z`; the supported install,
+  exact source receipt, strict/deep signature and native relaunch checks passed.
+  Physical recording/Ask/Update evidence remains source `e602f5a2ebc7`, built
+  at `2026-10-31T17:21:35Z`. Earlier source timestamps and diagnostic limits
+  remain in the report rather than qualifying the final source implicitly.
 - The first build exhausted temporary disk space during debug-symbol generation,
   before tests, with no Swift source error. The focused gate was rebuilt using
   Debug `-debug-info-format none` with assertions retained: **189 passed**,
@@ -103,6 +110,11 @@ simulated timeline into a hardware recording or latency guarantee.
   and assertions retained**, running the fresh binary after an earlier build
   was stopped before tests. These gates overlap and do not replace the failed
   full-suite result.
+- Final question-opening guard source `372b64e580a5` passed **200 focused tests**, zero
+  failures, in **9.688 seconds**, including **30 Core tests**. Debug used
+  `-debug-info-format none` with assertions retained. The change is one local
+  negated-auxiliary guard plus the actual negative-clause regression; audio,
+  data and persistence paths are unchanged.
 - At `1136349991ae`, production-ViewModel `freshnesscheck` exited successfully:
   **three terminal summary calls**, **two terminal answers**, and **zero
   foreground summary calls** for either Ask. A 32.25-second complete question retained its beginning
@@ -137,6 +149,18 @@ simulated timeline into a hardware recording or latency guarantee.
   **1,340 / 1,685 / 3,536 ms**; Update **1,477 / 1,809 / 2,071 ms**, to first
   text / first sentence / completion. These are Debug-helper numeric-fixture
   timings, not native ASR/rendering qualification.
+- The signed `372b64e580a5` helper's quiet genuine cloud rerun exited 0 with
+  **all functional markers true**, including the literal denial marker.
+  **Three summaries and two answers** completed terminally, with **zero
+  foreground summary calls** on either Ask. The moved-on flag set while answer
+  counts stayed **1 → 1**; explicit Update refreshed the question and retained
+  the old answer and both summary layers. The corrected $38,000 ceiling,
+  unapproved status, security requirement and route owner were correct.
+  This run's “we can’t promise a Friday production launch” matched the literal
+  marker; earlier false markers remain preserved. Rounded Ask timings were
+  **1,267 / 1,578 / 2,693 ms**; Update **1,233 / 1,476 / 1,795 ms**, to first
+  text / first sentence / completion. These are warm-model numeric-fixture
+  helper timings; physical native measurements remain source `e602f5a2ebc7`.
 - At `1136349991ae`, the ONE full-suite command finished with **exit 1**. Existing
   `TransformsCommandTests.testRunRecordsTransformHistory` timed out with a
   300-second configured limit and **450.661-second** observed wall time. The
@@ -209,7 +233,7 @@ simulated timeline into a hardware recording or latency guarantee.
   recognized sentence starts and same-speaker continuations across periods and
   timing gaps. Reviewed resets preserve newer question/topic/status priority;
   short declaratives can still coalesce. The 12k bound and punctuation-only
-  completeness limits remain. Final native qualification is pending.
+  completeness limits remain. The later clean native result is recorded below.
 - Automatic minutes initially rejected an unverified action quote; no invalid
   minutes were published. A later explicit retry completed with validated
   output. The initial rejection remains recorded as history.
@@ -221,13 +245,45 @@ simulated timeline into a hardware recording or latency guarantee.
 - Normal Stop saved one new row with two chat turns, user/assistant, and saved
   audio passed strict decoding. This proves structural saving, not controlled
   native A/B completion.
-- The library has **20 rows**: all **17 baseline meetings**, two diagnostics
-  and one interrupted mixed-audio recording. Database `quick_check` passed,
-  zero active recording locks remain, and the app was ordinarily quit.
-- Original values and presence for the two modified QA preference keys were
-  restored exactly; all five checked keys and their presence match the original
-  snapshot. URL recording control remained disabled.
-- Final controlled native interaction remains pending the user's choice to
-  pause other calls/videos or finish later. No rerun starts before that reply.
-  The installed source, 199-test gate and synthetic cloud proof remain valid;
-  the full-suite failure remains unresolved. The plan stays in progress.
+- After the interrupted attempt the library held **20 rows**. The original
+  QA keys/presence were restored, and a relaunch independently verified
+  microphone plus system audio, URL control off, the original calendar selection
+  and connected Refresh without an error. Meetings was ready with no capture.
+- After the user paused other audio, clean native **QA Now Focus and Update**
+  passed the main flow at `e602f5a2ebc7`. Now raw **3:09–3:59** retained the
+  question opening and all available recognized clauses beyond 30 seconds.
+  Three-minute **0:00–2:59** and general summaries were separately visible;
+  real 180-second and 360-second ticks were observed.
+- Clean native Ask timings were **1.6825 / 2.0046 / 3.1576 s** to first text /
+  first sentence / completion; Update was **1.1064 / 1.4621 / 1.7031 s**.
+  These are invocation measurements, not acoustic-end latency.
+- **116 seconds of silence** did not mark stale. B's notice left the completed
+  answer count at one. Actual Update used the whole new anchor, preserved the
+  unsent draft and kept the old completed answer.
+- Normal Stop saved **404.58 seconds**, manual system-only, zero microphone
+  bytes, no calendar/project and empty notes. Four user/assistant/user/assistant
+  turns and one recovery receipt persisted. Raw system audio and playback
+  strictly decoded; manifest files existed, JSON parsed and Markdown was
+  nonempty. Automatic minutes completed validated in the UI without Retry.
+- A narrow label false positive selected a negated auxiliary continuation as
+  a question anchor even though the full raw question reached the AI. The
+  one-line guard and actual regression shipped as `372b64e580a5`, with 200
+  focused tests/30 Core and the genuine five-request cloud helper passed.
+  Audio/data/persistence paths are unchanged. Physical flow evidence remains
+  `e602f5a2ebc7`; the pure local guard was not physically recorded again.
+- Signed Release `372b64e580a5` was built at `2026-10-31T17:59:14Z` and
+  installed with exact source receipt and strict/deep signature verification.
+  Native relaunch confirmed microphone plus system audio, URL control off,
+  the original two calendars selected and actual Upcoming events loading.
+  The clean QA recording opened in Library; old/new answers and Update were
+  visible in Chat, and automatic minutes showed Open/Saved after relaunch.
+- All **17 baseline meetings** remain among **21 rows**. The clean chat retains
+  four user/assistant/user/assistant turns. Database `quick_check` passed,
+  recording locks are zero, and all five QA keys/presence exactly match the
+  original snapshot. The original MacParakeet executable SHA-256 is unchanged.
+- The feature plan is complete with source-specific limits: physical main flow
+  at `e602f5a2ebc7`, final local question-opening guard covered by Core/VM/cloud checks and
+  native relaunch at `372b64e580a5`. No more audio is required. The full suite's
+  failure at `1136349991ae` remains disclosed alongside the 90-test passing
+  diagnostic rerun. This is not an all-green regression or multi-hour hardware
+  capture guarantee.

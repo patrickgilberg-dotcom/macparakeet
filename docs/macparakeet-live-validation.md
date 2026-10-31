@@ -2,7 +2,7 @@
 
 Qualification dates: October 28–31, 2026 (America/Edmonton).
 
-Installed source: `e602f5a2ebc7`, branch `feat/macparakeet-live`,
+Installed source: `372b64e580a5`, branch `feat/macparakeet-live`,
 [personal fork review](https://github.com/patrickgilberg-dotcom/macparakeet/pull/1).
 The installed Release includes direct Google Calendar sign-in, private event
 preparation, project folders, latest-project grounding and live-chat recovery.
@@ -14,17 +14,19 @@ and fresh speech while retaining cumulative background; its source-specific
 checks and limits are in [the focus report](macparakeet-live-focus-validation.md).
 The newest installed addition supplies a local thirty-second question focus,
 complete-question fallback and explicit Update answer action. Source
-`e602f5a2ebc7`, built at `2026-10-31T17:21:35Z`, passed 199 focused tests,
-its signed helper's cloud flow and strict/deep installation checks. Earlier
-native recordings remain diagnostic: observed punctuation/timing boundaries
-dropped question openings, without isolating recognition from other system
-audio. The latest native attempt saved normally but was interrupted by other
-system audio before Update B; controlled interaction qualification awaits the
-user's choice to pause other audio or finish later. Original QA preferences
-are restored, all 17 baseline meetings remain, and no recording lock is active.
-The full regression run failed. See
-[the Now/refresh report](macparakeet-live-now-validation.md) for source-specific
-results and limits.
+`372b64e580a5`, built at `2026-10-31T17:59:14Z`, passed 200 focused tests
+including 30 Core tests, its genuine five-request cloud helper, strict/deep
+installation checks and native relaunch. The full physical raw-context,
+summary-timer, Ask/Update, normal-save and validated automatic-minutes flow
+passed at `e602f5a2ebc7`. The final one-line question-opening predicate guard was qualified
+through Core/VM/cloud checks and relaunch without another physical recording.
+Saved old/new answers, Update and minutes reopened on the installed source.
+Original QA preferences are restored, all 17 baseline meetings remain, and no
+recording lock is active. This feature is complete with these source-specific
+limits; the full regression run failed and the short recording does not prove
+multi-hour hardware capture. See
+[the Now/refresh report](macparakeet-live-now-validation.md) for evidence and
+historical diagnostic limits.
 The initial integrated native recording/answer checks used `14851bd6a0c6`;
 `9447f78bcb2e` passed the full regression gate, native interruption recovery and
 normal Stop with completed chat. The final narrow calendar-startup repair in

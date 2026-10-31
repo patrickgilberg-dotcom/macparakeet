@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "qualificationDate": "2026-10-31",
   "timeZone": "America/Edmonton",
-  "installedSource": "e602f5a2ebc7",
-  "builtAtUTC": "2026-10-31T17:21:35Z",
-  "status": "controlled_native_check_pending_competing_system_audio",
+  "installedSource": "372b64e580a5",
+  "builtAtUTC": "2026-10-31T17:59:14Z",
+  "status": "qualified_with_documented_source_and_full_suite_limits",
   "implementation": {
     "nowFocusMilliseconds": 30000,
     "extendsForCompleteQuestionOrTurn": true,
@@ -28,12 +28,13 @@
   },
   "tests": {
     "focusedFeature": {
-      "source": "e602f5a2ebc7",
-      "cases": 199,
+      "source": "372b64e580a5",
+      "cases": 200,
       "failures": 0,
-      "durationSeconds": 9.875,
-      "configuration": "Debug with symbols and assertions; same fresh test binary used for Core-only and skip-build final feature gate. Completed rebuildable Debug scratch removed after verification for disk capacity.",
-      "coreProjectionCases": 29
+      "durationSeconds": 9.688,
+      "coreProjectionCases": 30,
+      "configuration": "Debug -debug-info-format none; assertions retained",
+      "newCase": "Observed negated auxiliary continuation retains its original question anchor."
     },
     "initialBuildFailure": "Temporary disk exhaustion during debug-symbol generation; no Swift source error and no tests executed in that attempt.",
     "fullRunOnce": {
@@ -77,10 +78,11 @@
       "coreProjectionCases": 23
     },
     "coreProjectionFinal": {
-      "source": "e602f5a2ebc7",
-      "cases": 29,
+      "source": "372b64e580a5",
+      "cases": 30,
       "failures": 0,
-      "durationSeconds": 0.016
+      "coveredByFinalFocusedFeatureGate": 200,
+      "dedicatedCoreOnlyRun": false
     },
     "resolvedFallbackIteration": {
       "source": "working-tree precursor to e602f5a2ebc7",
@@ -88,6 +90,20 @@
       "assertionFailures": 10,
       "affectedCoreCases": 5,
       "resolvedBy": "Lexical fallback uses semantic sentence starts, not pause fragments; final 29 Core and 199 feature cases passed."
+    },
+    "priorFocusedFeature": {
+      "source": "e602f5a2ebc7",
+      "cases": 199,
+      "failures": 0,
+      "durationSeconds": 9.875,
+      "configuration": "Debug with symbols and assertions; same fresh test binary used for Core-only and skip-build final feature gate. Completed rebuildable Debug scratch removed after verification for disk capacity.",
+      "coreProjectionCases": 29
+    },
+    "priorE602CoreProjection": {
+      "source": "e602f5a2ebc7",
+      "cases": 29,
+      "failures": 0,
+      "durationSeconds": 0.016
     }
   },
   "realChatGPTVMFlow": {
@@ -105,11 +121,11 @@
         "nowStartMs": 860000,
         "nowEndMs": 900000,
         "summaryCallsAtAsk": 0,
-        "syntheticAnswer": "The corrected ceiling is $38,000, but Friday’s production launch cannot be promised.\n\n- The ceiling hasn’t been approved, and security approval is still required before the test account connects.",
+        "syntheticAnswer": "The corrected ceiling is $38,000, but we can’t promise a Friday production launch.\n\n- That budget ceiling was corrected but not approved; security approval is required before the test account connects.",
         "checks": {
           "all_source_processed": true,
           "answer_completed": true,
-          "answer_denies_unapproved_launch": false,
+          "answer_denies_unapproved_launch": true,
           "answer_preserves_corrected_budget": true,
           "general_summary_present": true,
           "long_question_retained_from_before_thirty_second_boundary": true,
@@ -117,9 +133,9 @@
           "now_source_present": true,
           "three_minute_summary_present": true
         },
-        "firstTextMs": 1339.825791,
-        "firstSentenceMs": 1685.2161660000002,
-        "completionMs": 3536.102875
+        "firstTextMs": 1267.31225,
+        "firstSentenceMs": 1578.1643749999998,
+        "completionMs": 2692.997375
       },
       {
         "label": "updated",
@@ -143,16 +159,17 @@
           "updated_answer_mentions_route_and_owner": true,
           "updated_answer_preserves_corrected_budget": true
         },
-        "firstTextMs": 1476.746584,
-        "firstSentenceMs": 1809.100875,
-        "completionMs": 2070.772667
+        "firstTextMs": 1232.619708,
+        "firstSentenceMs": 1475.841833,
+        "completionMs": 1794.502708
       }
     ],
     "manualSemanticReviewPassed": true,
-    "lexicalQualification": "The initial literal denial check remains false: output says production launch cannot be promised, outside its marker list. Manual review confirms denial and preserves the false flag.",
-    "timingQualification": "Generated-source Debug helper, not native capture or pixel latency; not a provider comparison.",
-    "source": "e602f5a2ebc7",
-    "qualificationDate": "2026-10-31"
+    "lexicalQualification": "All markers passed in this final run, including denial using can’t promise. Earlier false literal markers remain in source-specific historical reports.",
+    "timingQualification": "Generated-source Debug helper, not acoustic/pixel latency or a provider comparison.",
+    "source": "372b64e580a5",
+    "qualificationDate": "2026-10-31",
+    "allMarkersPassed": true
   },
   "privacy": "Public data contains only synthetic helper output and structural observations. Interrupted real-audio recording and conversation/AI content remain private and excluded, along with account/calendar identifiers, credentials, skills/examples, recordings and backups.",
   "initialInstallation": {
@@ -172,16 +189,25 @@
   "installation": {
     "supportedSignedReleaseInstalled": true,
     "strictDeepSignatureVerified": true,
-    "installedSource": "e602f5a2ebc7",
-    "builtAtUTC": "2026-10-31T17:21:35Z",
+    "installedSource": "372b64e580a5",
+    "builtAtUTC": "2026-10-31T17:59:14Z",
     "baselineMeetingsRetained": true,
     "baselineMeetingCount": 17,
-    "currentMeetingCount": 20,
+    "currentMeetingCount": 21,
     "diagnosticMeetingsAdded": 2,
     "interruptedPrivateRecordingAdded": 1,
+    "cleanValidationMeetingAdded": 1,
     "activeRecordingLockCount": 0,
     "exactOriginalQAPreferencesAndAbsenceRestored": true,
-    "normalCaptureAndCalendarSelectionsVerifiedInUI": true,
+    "nativeNormalCaptureAndOriginalCalendarsVerified": true,
+    "restoredUpcomingVisible": true,
+    "savedChatRolesAfterRelaunch": [
+      "user",
+      "assistant",
+      "user",
+      "assistant"
+    ],
+    "oldAndNewRepliesAndMinutesReadable": true,
     "databaseQuickCheck": "ok",
     "originalAppUnchanged": true
   },
@@ -341,9 +367,137 @@
   },
   "native": {
     "source": "e602f5a2ebc7",
+    "completed": true,
+    "controlledMainFlowPassed": true,
+    "userConfirmedOtherAudioPaused": true,
+    "durationSeconds": 404.58,
+    "real180And360SecondSummaryTicksObserved": true,
+    "rawNowWindow": "3:09–3:59",
+    "recognizedQuestionOpeningAndAvailableClausesRetainedBeyondThirtySeconds": true,
+    "threeMinuteWindowForFirstAsk": "0:00–2:59",
+    "threeMinuteAndGeneralSummariesVisibleTogether": true,
+    "silenceDidNotMarkStaleSeconds": 116,
+    "answerGenerationCountBeforeExplicitUpdate": 1,
+    "noticeDidNotStartAnotherAnswer": true,
+    "actualUpdateButtonUsed": true,
+    "updatedAnswerFollowedLatestQuestion": true,
+    "oldAnswerAndUnsentDraftRetained": true,
+    "initialTimingMs": {
+      "firstText": 1682.5,
+      "firstSentence": 2004.6,
+      "completion": 3157.6
+    },
+    "updateTimingMs": {
+      "firstText": 1106.4,
+      "firstSentence": 1462.1,
+      "completion": 1703.1
+    },
+    "timingQualification": "Invocation to meaningful model text received in VM, not acoustic end or screenshot paint. Completion includes local checkpoint.",
+    "normalStopCompleted": true,
+    "savedChatRoles": [
+      "user",
+      "assistant",
+      "user",
+      "assistant"
+    ],
+    "recoveryImportReceiptCount": 1,
+    "sourceMode": "system_only",
+    "microphoneRawBytes": 0,
+    "nilCalendarAndNoProject": true,
+    "notesEmpty": true,
+    "strictPlaybackAndRawSystemDecodePassed": true,
+    "allManifestFilesExist": true,
+    "exportJSONParsesAndMarkdownNonempty": true,
+    "automaticMinutesCompletedWithoutRetry": true,
+    "postFinalInstallRelaunchOldAndUpdatedAnswersAndMinutesReadable": true,
+    "qaPreferencesRestoredExactly": true,
+    "activeRecording": false,
+    "visibleAnchorNegatedContinuationIssueObserved": true,
+    "questionOpeningGuardFixedInSource": "372b64e580a5",
+    "finalGuardPhysicalRecordingRepeated": false,
+    "finalGuardQualification": "One local question-opening predicate affecting anchor and raw-Now selection and its observed regression; final 200 focused tests including30Core, genuine five-call production-VM flow and signed installation/relaunch. The complete physical recording belongs to e602. Capture, storage, summaries and network code unchanged by this guard."
+  },
+  "previousInstallation": {
+    "supportedSignedReleaseInstalled": true,
+    "strictDeepSignatureVerified": true,
+    "installedSource": "fb7342b6e821",
+    "builtAtUTC": "2026-10-31T03:54:23Z",
+    "baselineMeetingsRetained": true,
+    "baselineMeetingCount": 17,
+    "currentMeetingCount": 18,
+    "syntheticDiagnosticMeetingsAdded": 1,
+    "activeRecordingLockCount": 0,
+    "exactOriginalQAPreferencesAndAbsenceRestored": true,
+    "originalAppUnchanged": true
+  },
+  "priorE602CloudFlow": {
+    "syntheticOnly": true,
+    "terminalRequests": 5,
+    "summaryRequests": 3,
+    "explicitAnswers": 2,
+    "movedOnBeforeUpdate": true,
+    "inferenceCallsBeforeNotification": 1,
+    "inferenceCallsAfterNotification": 1,
+    "stages": [
+      {
+        "label": "initial",
+        "anchor": "Given that the pilot still needs security approval and we have discussed several launch conditions across this meeting, what is the corrected budget ceiling, and can we promise a production launch on Friday?",
+        "nowStartMs": 860000,
+        "nowEndMs": 900000,
+        "summaryCallsAtAsk": 0,
+        "syntheticAnswer": "The corrected ceiling is $38,000, but Friday’s production launch cannot be promised.\n\n- The ceiling hasn’t been approved, and security approval is still required before the test account connects.",
+        "checks": {
+          "all_source_processed": true,
+          "answer_completed": true,
+          "answer_denies_unapproved_launch": false,
+          "answer_preserves_corrected_budget": true,
+          "general_summary_present": true,
+          "long_question_retained_from_before_thirty_second_boundary": true,
+          "no_foreground_summary_call": true,
+          "now_source_present": true,
+          "three_minute_summary_present": true
+        },
+        "firstTextMs": 1339.825791,
+        "firstSentenceMs": 1685.2161660000002,
+        "completionMs": 3536.102875
+      },
+      {
+        "label": "updated",
+        "anchor": "Who owns emergency route AMBER-17, and what is our corrected pilot ceiling?",
+        "nowStartMs": 860000,
+        "nowEndMs": 914050,
+        "summaryCallsAtAsk": 0,
+        "syntheticAnswer": "Hana Lin owns AMBER-17, and the corrected pilot ceiling is $38,000.",
+        "checks": {
+          "all_source_processed": true,
+          "answer_completed": true,
+          "conversation_moved_on_flag_cleared_for_current_snapshot": true,
+          "explicit_update_has_own_visible_user_turn": true,
+          "general_summary_present": true,
+          "new_now_anchor_contains_latest_complete_question": true,
+          "new_question_notification_did_not_infer": true,
+          "no_foreground_summary_call": true,
+          "now_source_present": true,
+          "prior_completed_answer_retained": true,
+          "three_minute_summary_present": true,
+          "updated_answer_mentions_route_and_owner": true,
+          "updated_answer_preserves_corrected_budget": true
+        },
+        "firstTextMs": 1476.746584,
+        "firstSentenceMs": 1809.100875,
+        "completionMs": 2070.772667
+      }
+    ],
+    "manualSemanticReviewPassed": true,
+    "lexicalQualification": "The initial literal denial check remains false: output says production launch cannot be promised, outside its marker list. Manual review confirms denial and preserves the false flag.",
+    "timingQualification": "Generated-source Debug helper, not native capture or pixel latency; not a provider comparison.",
+    "source": "e602f5a2ebc7",
+    "qualificationDate": "2026-10-31"
+  },
+  "interruptedNativeAttempt": {
+    "source": "e602f5a2ebc7",
     "completed": false,
     "blockedByMacLock": false,
-    "pendingControlledAudioWindow": true,
     "competingSystemAudioDetected": true,
     "privateContentExcluded": true,
     "interruptedCaptureSeconds": 307.9,
@@ -361,19 +515,32 @@
     "restorationVerifiedInNativeUI": true,
     "calendarConnectionAndOriginalSelectionsRetained": true,
     "urlRecordingControlRemainedDisabled": true,
-    "remaining": "Controlled long-question/Update-answer capture after other system audio is paused. No rerun before user reply."
+    "stage": "Historical interrupted attempt before the clean native run",
+    "pendingControlledAudioWindowAtThatStage": true,
+    "remainingAtThatStage": "Controlled long-question/Update-answer capture after other system audio is paused. No rerun before user reply.",
+    "resolvedBy": "native"
   },
-  "previousInstallation": {
+  "priorE602Installation": {
     "supportedSignedReleaseInstalled": true,
     "strictDeepSignatureVerified": true,
-    "installedSource": "fb7342b6e821",
-    "builtAtUTC": "2026-10-31T03:54:23Z",
+    "installedSource": "e602f5a2ebc7",
+    "builtAtUTC": "2026-10-31T17:21:35Z",
     "baselineMeetingsRetained": true,
     "baselineMeetingCount": 17,
-    "currentMeetingCount": 18,
-    "syntheticDiagnosticMeetingsAdded": 1,
+    "currentMeetingCount": 20,
+    "diagnosticMeetingsAdded": 2,
+    "interruptedPrivateRecordingAdded": 1,
     "activeRecordingLockCount": 0,
     "exactOriginalQAPreferencesAndAbsenceRestored": true,
+    "normalCaptureAndCalendarSelectionsVerifiedInUI": true,
+    "databaseQuickCheck": "ok",
     "originalAppUnchanged": true
-  }
+  },
+  "qualificationLimits": [
+    "Full-suite run at11363499 failed/crashed in unchanged optional CLI runner; fresh90-test rerun does not erase it.",
+    "Complete physical main flow tested at e602. Final372 local question-opening predicate guard verified by focused tests and real VM/cloud checks; no further recording was requested.",
+    "No multi-hour hardware recording soak or original-provider comparison was performed.",
+    "Recognition, summaries and English lexical boundary detection remain fallible; full available recognized source is not a promise of perfect acoustic transcription.",
+    "Interrupted unrelated-audio recording and conversation/AI content remain private and excluded."
+  ]
 }
