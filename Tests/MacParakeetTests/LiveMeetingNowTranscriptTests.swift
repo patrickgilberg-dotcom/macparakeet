@@ -111,6 +111,97 @@ final class LiveMeetingNowTranscriptTests: XCTestCase {
         XCTAssertFalse(result.source.transcript.contains("separate old topic"))
     }
 
+    func testNativeMissingQuestionMarkRetainsOpeningAcrossPeriodsAndLargeTimingGaps() {
+        let result = project(
+            [
+                word("Earlier whole-meeting conditions.", 0, 1_000),
+                word("Could you help me explain to the vendor how we should respond", 191_000, 199_000),
+                word("security approval is still pending and the rollback drill has not finished.", 203_000, 210_000),
+                word("while making clear which work can proceed.", 214_000, 219_000),
+                word("Seed now without presenting Friday as a commitment.", 223_000, 228_000),
+                word("So that our response stays useful without claiming we have no idea.", 232_000, 243_000),
+                word("never established", 247_000, 249_000),
+            ], at: 253_000)
+        XCTAssertEqual(result.anchor?.startMs, 191_000)
+        XCTAssertEqual(result.source.startMs, 191_000)
+        XCTAssertTrue(result.anchor?.text.hasPrefix("Could you help me explain to the vendor") == true)
+        XCTAssertTrue(result.anchor?.text.contains("security approval is still pending") == true)
+        XCTAssertTrue(result.anchor?.isQuestion == true)
+        XCTAssertFalse(result.anchor?.isComplete ?? true, "No closing punctuation was recognized")
+        XCTAssertFalse(result.source.transcript.contains("Earlier whole-meeting"))
+    }
+
+    func testLaterLexicalQuestionWinsWhenASRUsesOnlyPeriods() {
+        let result = project(
+            [
+                word("Could you help explain the pilot.", 1_000, 2_000),
+                word("What is the budget.", 40_000, 42_000),
+            ], at: 50_000)
+        XCTAssertEqual(result.anchor?.text, "What is the budget.")
+        XCTAssertEqual(result.anchor?.startMs, 40_000)
+        XCTAssertTrue(result.anchor?.isQuestion == true)
+        XCTAssertTrue(
+            result.anchor?.isComplete == true, "Completeness remains source punctuation, not semantic certainty")
+    }
+
+    func testExplicitNewTopicAndStatusDoNotReuseAnOlderRequestAnchor() {
+        let first = word("Could you help explain the pilot.", 1_000, 2_000)
+        let status = project([first, word("Security approval is now approved.", 40_000, 42_000)], at: 50_000)
+        XCTAssertEqual(status.anchor?.text, "Security approval is now approved.")
+        XCTAssertTrue(
+            status.source.transcript.contains("Could you help"),
+            "Ambiguous status can retain exact source without keeping its old anchor")
+        let topic = project(
+            [first, word("Different delivery dates require security review customer approval.", 40_000, 42_000)],
+            at: 50_000)
+        XCTAssertFalse(topic.anchor?.text.contains("Could you help") ?? true)
+        XCTAssertFalse(topic.source.transcript.contains("Could you help"))
+        let statement = project(
+            [first, word("The team has decided delivery must wait until Monday.", 40_000, 42_000)], at: 50_000)
+        XCTAssertFalse(statement.anchor?.text.contains("Could you help") ?? true)
+    }
+
+    func testShortOrConditionalExplicitQuestionReplacesOldLexicalRequestEvenInSameAcousticTurn() {
+        for question in [
+            "Why?", "Budget?", "Given the changed constraints what should happen next?",
+            "Under these conditions what is the budget?",
+        ] {
+            let result = project(
+                [
+                    word("Could you help explain the pilot.", 1_000, 2_000),
+                    word(question, 3_000, 4_000),
+                ], at: 50_000)
+            XCTAssertEqual(result.anchor?.text, question)
+            XCTAssertEqual(result.anchor?.startMs, 3_000)
+            XCTAssertTrue(
+                result.source.transcript.contains("Could you help"), "Exact earlier source remains recoverable")
+        }
+    }
+
+    func testShortStatusAssertionWithoutNowReplacesOldRequestAnchor() {
+        for status in [
+            "Security approval is approved.", "Security approval was denied.", "The review has been completed.",
+        ] {
+            let result = project(
+                [
+                    word("Could you help explain the pilot.", 1_000, 2_000),
+                    word(status, 40_000, 42_000),
+                ], at: 50_000)
+            XCTAssertEqual(result.anchor?.text, status)
+            XCTAssertTrue(result.source.transcript.contains("Could you help"))
+        }
+    }
+
+    func testRequestOpenerExpiresOutsideTheBoundedLookback() {
+        let result = project(
+            [
+                word("Could you help explain the pilot.", 1_000, 2_000),
+                word("Current discussion remains available.", 220_000, 222_000),
+            ], at: 230_000)
+        XCTAssertFalse(result.source.transcript.contains("Could you help"))
+        XCTAssertFalse(result.anchor?.text.contains("Could you help") ?? true)
+    }
+
     func testQuestionAnchorSurvivesSilenceAndExpiresAfterLookback() {
         let words = [word("Can we proceed?", 10_000, 20_000)]
         let atAsk = project(words, at: 25_000)

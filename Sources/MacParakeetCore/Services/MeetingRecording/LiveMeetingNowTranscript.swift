@@ -113,14 +113,17 @@ public enum LiveMeetingNowTranscript {
         let lastQuestion = sentences.last { range in
             valid[range.upperBound - 1].endMs >= lookback && question(valid[range])
         }
-        let selectedAnchor: Range<Int>?
+        let legacyAnchor: Range<Int>?
         if let lastQuestion,
             latestTurn == nil || lastQuestion.upperBound >= latestTurn!.upperBound
         {
-            selectedAnchor = lastQuestion
+            legacyAnchor = lastQuestion
         } else {
-            selectedAnchor = latestTurn
+            legacyAnchor = latestTurn
         }
+        let lexical = questionOpeningFallback(
+            words: valid, turns: sentences.filter { valid[$0.upperBound - 1].endMs >= lookback }, lookback: lookback)
+        let selectedAnchor = lexical.anchor ?? legacyAnchor
         // ASR can insert a question mark or period inside one uninterrupted
         // question. Keep the complete acoustic utterance as exact source even
         // when its sentence punctuation suggests a shorter question.
@@ -129,6 +132,7 @@ public enum LiveMeetingNowTranscript {
                 let utterance = utterances.first(where: { $0.contains(range.upperBound - 1) })
             else { return range }
             var start = min(range.lowerBound, utterance.lowerBound)
+            if let boundary = lexical.boundary { start = max(start, min(boundary, range.lowerBound)) }
             // This lexical cue is deliberately modest, not semantic turn
             // detection. A genuine Q1? Who/What/Can...Q2? keeps Q2 priority.
             // If capitalization was itself an ASR error, the full raw acoustic
@@ -154,6 +158,9 @@ public enum LiveMeetingNowTranscript {
             let retainedStart = min(anchorRange.lowerBound, acousticStart)
             first = min(first ?? retainedStart, retainedStart)
         }
+        if let retainedStart = lexical.retainedStart {
+            first = min(first ?? retainedStart, retainedStart)
+        }
         let selected = first.map { Array(valid[$0...]) } ?? []
         let labels = Dictionary(speakers.map { ($0.id, $0.label) }, uniquingKeysWith: { _, latest in latest })
         let rendered = render(selected, labels: labels, includeTimestamps: includeTimestamps)
@@ -168,7 +175,10 @@ public enum LiveMeetingNowTranscript {
             return .init(
                 id: identity(speakerID: firstWord.speakerId, startMs: firstWord.startMs),
                 text: bound(raw), startMs: firstWord.startMs, endMs: lastWord.endMs,
-                speakerID: firstWord.speakerId, isQuestion: question(rangeWords),
+                speakerID: firstWord.speakerId,
+                isQuestion: question(rangeWords)
+                    || (lexical.anchor.map { range.lowerBound <= $0.lowerBound && range.upperBound >= $0.upperBound }
+                        ?? false),
                 isComplete: !clipped && endsSentence(lastWord.word), semanticText: normalize(bound(raw)))
         }
         var occurrences: [String: Int] = [:]
@@ -289,6 +299,97 @@ public enum LiveMeetingNowTranscript {
         }
         if start < words.count { output.append(start..<words.count) }
         return output
+    }
+
+    /// Local recovery for ASR that inserts periods/pauses and omits the final
+    /// question mark. It is an English lexical cue, not semantic turn detection.
+    /// A later explicit question/topic/status still takes priority. Raw source
+    /// can retain the earlier opening when a status boundary is ambiguous.
+    private static func questionOpeningFallback(
+        words: [WordTimestamp], turns: [Range<Int>], lookback: Int
+    ) -> (anchor: Range<Int>?, retainedStart: Int?, boundary: Int?) {
+        var active: Range<Int>?
+        var retainedStart: Int?
+        var boundary: Int?
+        var speaker: String?
+        for range in turns {
+            let first = words[range.lowerBound]
+            let text = semantic(words[range])
+            let tokens = text.split(separator: " ").map(String.init)
+            guard !tokens.isEmpty, !acknowledgements.contains(text) else { continue }
+            if let start = retainedStart, words[start].speakerId != first.speakerId {
+                active = nil; retainedStart = nil; boundary = range.lowerBound
+            }
+            if first.startMs >= lookback, directQuestionOpening(tokens) {
+                if retainedStart != nil { boundary = range.lowerBound }
+                active = range; retainedStart = range.lowerBound; speaker = first.speakerId
+                continue
+            }
+            let continuation: Set<String> = [
+                "and", "but", "while", "whether", "so", "before", "after", "as", "also", "which", "that", "to",
+                "without", "if", "when", "where", "how", "who", "what", "because", "since",
+            ]
+            let explicitQuestion =
+                active != nil && question(words[range])
+                && ((tokens.count <= 4
+                    && (tokens.count == 1 || !continuation.contains(tokens[0]) || startsNewQuestion(first.word)))
+                    || ["given", "under"].contains(tokens[0]))
+            if explicitQuestion {
+                active = range; boundary = range.lowerBound
+                retainedStart = retainedStart ?? range.lowerBound; speaker = first.speakerId
+                continue
+            }
+            let explicitTopic = [
+                "here is a different question", "here is another question", "new question", "different question",
+                "another question", "separate question", "moving on", "switching topics", "next topic", "different ",
+            ].contains(where: text.hasPrefix)
+            let status =
+                statusWords.contains(tokens[0])
+                || (tokens.contains(where: statusWords.contains)
+                    && tokens.contains(where: {
+                        ["is", "are", "was", "were", "has", "have", "been", "now"].contains($0)
+                    })
+                    && endsSentence(words[range.upperBound - 1].word))
+            if explicitTopic {
+                active = nil; retainedStart = nil; boundary = range.lowerBound
+                continue
+            }
+            if status {
+                active = nil; boundary = range.lowerBound
+                continue
+            }
+            let declarativeStarts: Set<String> = ["i", "we", "they", "you", "he", "she", "the", "our", "this", "it"]
+            let standaloneStatement =
+                tokens.count >= 8 && !continuation.contains(tokens[0])
+                && declarativeStarts.contains(tokens[0]) && endsSentence(words[range.upperBound - 1].word)
+            if standaloneStatement {
+                active = nil; retainedStart = nil; boundary = range.lowerBound
+                continue
+            }
+            if let prior = active, first.speakerId == speaker {
+                active = prior.lowerBound..<range.upperBound
+            }
+        }
+        return (active, retainedStart, boundary)
+    }
+
+    private static func directQuestionOpening(_ tokens: [String]) -> Bool {
+        guard let first = tokens.first, tokens.count >= 2 else { return false }
+        if ["can", "could", "would", "should", "will", "do", "does", "did", "is", "are", "was", "were", "has", "have"]
+            .contains(first)
+        {
+            return true
+        }
+        if ["who", "whom", "whose"].contains(first) { return true }
+        if ["what", "how", "when", "where", "why", "which"].contains(first) {
+            return [
+                "is", "are", "was", "were", "can", "could", "would", "should", "will", "do", "does", "did", "has",
+                "have",
+            ].contains(tokens[1])
+        }
+        if first == "please" { return true }
+        if ["help", "tell", "show", "walk"].contains(first), ["me", "us"].contains(tokens[1]) { return true }
+        return first == "explain"
     }
 
     private static func startsNewQuestion(_ value: String) -> Bool {

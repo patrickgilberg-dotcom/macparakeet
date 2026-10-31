@@ -58,19 +58,36 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   preparing its fresh transcript and context; it does not wait for the next tick.
 - Immediate focus selects approximately the latest 30 seconds of recognized
   speech locally from numeric word timing. Its raw-source start extends back to
-  the overlapping unbroken utterance's beginning: a speaker change or a pause
-  of at least 2,500 ms supplies an utterance boundary. Recognized punctuation
-  alone does not cut that raw span, because speech recognition can insert
-  periods inside one spoken question. The question anchor can coalesce the
-  selected question with its same-utterance lead-in and conditions. A later
-  capitalized interrogative following an earlier question can establish a new
-  question anchor within that utterance.
-  These local pause/speaker/lexical rules are not semantic question parsing;
-  they can coalesce several closely spoken turns and cannot establish a named
-  speaker's identity. Immediate raw source and anchor text remain bounded at
-  12,000 characters. Shortened beginnings are explicitly marked; a shortened
-  anchor is not represented as complete. The ordinary transcript/general
-  context retains the complete available-source safeguards. A complete question can
+  the overlapping unbroken utterance's beginning: a speaker change or a gap
+  of at least 2,500 ms in recognized word timings supplies an utterance boundary.
+  Recognized punctuation alone does not cut that raw span, because speech
+  recognition can insert periods inside one spoken question. The question
+  anchor can coalesce the selected question with its same-utterance lead-in
+  and conditions. A later capitalized interrogative following an earlier
+  question can establish a new question anchor within that utterance.
+  A bounded English lexical fallback additionally looks for a direct question
+  or request opener at a recognized sentence start within the latest three minutes.
+  It can retain that opener and same-speaker continuations across inserted
+  periods and numeric timing gaps, including when recognition omits a question
+  mark. A newer direct opener, explicit short question, conditional question,
+  speaker change, explicit topic/status assertion or completed substantial
+  declarative can reset the anchor; the declarative rule requires at least
+  eight words and a recognized declarative start. New anchor boundaries take
+  priority over utterance coalescing. Explicit topic and substantial declarative
+  boundaries clear the fallback's retained opener; an ambiguous status boundary
+  may keep the earlier exact raw source while the status turn takes anchor
+  priority.
+  These local timing/speaker/English lexical rules are not semantic question
+  parsing or a universal turn detector. Short declaratives and closely spoken
+  turns may coalesce, and speaker IDs cannot establish a named person's
+  identity. An anchor may be classified as a question without a recognized
+  question mark. Its complete flag requires recognized ending punctuation and
+  unclipped source; a period can satisfy that flag. This is not a guarantee
+  that recognition captured every word or that the question is semantically
+  complete. Immediate raw source and anchor text remain bounded at 12,000
+  characters. Shortened beginnings are explicitly marked; a shortened anchor
+  is not represented as complete. The ordinary transcript/general context
+  retains the complete available-source safeguards. A complete question can
   remain the answer anchor during silence. This raw projection adds no model
   summary call. Immediate source, three-minute source, transcript and user notes
   are captured as one answer snapshot before asynchronous preference or context
