@@ -1,22 +1,23 @@
 # Immediate meeting focus and explicit answer refresh
 
 Qualification dates: October 30–31, 2026 (America/Edmonton).
-Installed correction source: `fb7342b6e821`, built at
-`2026-10-31T03:54:23Z` (October 30 in Edmonton). Installation and strict
-signature verification passed. The preceding feature build `1136349991ae`
-was built at `2026-10-31T00:56:46Z`, also October 30 locally.
+Installed source: `e602f5a2ebc7`, built at `2026-10-31T17:21:35Z`
+(October 31 in Edmonton). The supported installation, source receipt and
+strict/deep signature verification passed. Earlier source-specific results
+below remain labeled `1136349991ae` and `fb7342b6e821`.
 
-Status: **in progress**. The correction passed 193 focused tests. The original
-feature passed real-ViewModel synthetic cloud checks, installation, signature
-and saved-data checks. A real native recording verified the summary timer and
-explicit refresh flow, but exposed a long-question boundary defect corrected
-in `fb7342b6e821`. That recording is diagnostic, not final qualification. The
-corrected build is installed, and original QA preferences are restored. Its
-native attempt failed to start system capture while the Mac locked; final
-native interaction qualification remains pending unlock and rerun. The fresh
-signed helper at the correction source completed its cloud functional check.
-The **one full-suite command failed** and did not produce an All Tests
-completion summary.
+Status: **in progress — controlled native audio pending**. The installed
+question-opener fallback passed 29 Core tests, the final 199-test focused gate
+and its signed helper's cloud functional check. Two preceding native recordings
+remain diagnostic because recognized punctuation/timing boundaries dropped
+question openings; exclusive generated-audio input was not established.
+The installed source's controlled A/B attempt was stopped normally after other
+system audio entered capture. It saved its artifacts but did not test Update B,
+so final controlled native qualification remains pending the user's choice to
+pause other audio or finish later. No rerun will begin before that reply.
+Original QA preferences and their presence are restored exactly, all 17
+baseline meetings remain, and no recording lock is active. The **one full-suite
+command failed** and did not produce an All Tests completion summary.
 
 ## Resulting behavior
 
@@ -40,16 +41,25 @@ answers remain readable, an unsent composer draft is preserved, and cancelled
 partial text does not enter successful assistant history. Existing ownership,
 checkpoint, source-gap and account/model guards remain in place.
 
-The corrected raw window backs up to the beginning of the overlapping
-utterance, using a speaker change or a pause of at least 2.5 seconds as its
-boundary. Recognition-inserted periods do not truncate that span. The anchor
-can retain the question's same-utterance lead-in and conditions; a later
-capitalized interrogative after a prior question can establish a new anchor.
-These are local timing and lexical rules, not semantic parsing, and may
-coalesce closely spoken turns. The raw source remains available separately.
-Pathological source beyond the 12,000-character immediate-context bound is
-marked shortened and incomplete. A complete flag does not guarantee perfect
-speech recognition.
+The source-`fb7342b6e821` raw window backs up to a speaker change or a gap
+of at least 2.5 seconds in recognized word timing, ignoring recognized
+sentence punctuation. Native diagnostics showed a selected question opening
+could be lost across numeric gaps; the origin of extra recognized speech was
+not isolated. Installed source `e602f5a2ebc7` adds an English lexical fallback:
+within a three-minute lookback, a recognized sentence's direct question or
+request opener can retain same-speaker continuations across periods and timing
+gaps. A newer explicit question, topic/status assertion or substantial
+completed declarative can reset the anchor; hard boundaries preserve the
+newer question's priority. Ambiguous status boundaries can retain earlier exact
+raw source while the status turn takes anchor priority.
+
+These local timing and lexical rules are not semantic parsing or a universal
+turn detector. Short declaratives and closely spoken turns can coalesce. Raw
+source remains available separately, with the unchanged 12,000-character bound
+and explicit omission marker. An anchor can be classified as a question without
+a question mark; its complete flag requires recognized ending punctuation and
+unclipped source. A period can satisfy that flag. This does not guarantee
+perfect recognition or semantic completeness.
 
 ## Focused evidence
 
@@ -57,12 +67,22 @@ The initial default-symbol build ran out of temporary disk space while
 producing debug symbols, before tests ran. It reported no Swift source error.
 The focused gate was rebuilt in **Debug with `-debug-info-format none`**;
 assertions remained enabled. Source `1136349991ae` passed **189 tests**, zero
-failures, in **9.749 seconds**. After the native diagnostic exposed recognition
-punctuation splitting a spoken question, source `fb7342b6e821` passed the
+failures, in **9.749 seconds**. After a native diagnostic showed a
+punctuation boundary dropping a question opening, source `fb7342b6e821` passed the
 expanded gate: **193 tests**, zero failures, in **10.007 seconds**. The four
 additional cases cover that boundary correction. These successive gates cover
 overlapping tests. Reducing debug symbols is not an optimized Release
 qualification or a change to production capture behavior.
+
+Fallback development initially produced **10 assertion failures across five
+Core tests** in an earlier 199-test run. Sentence-based opener selection and
+reviewed boundary guards resolved those failures. The final committed source
+`e602f5a2ebc7` passed **29 Core tests** in **0.016 seconds**, then **199 focused
+tests**, zero failures, in **9.875 seconds** using the freshly built binary.
+This final gate used **Debug with debug symbols and assertions retained**.
+The earlier default-symbol build attempt was stopped before tests; the resumed
+Core and focused invocations ran against the fresh final binary. These focused
+gates cover overlapping tests and do not replace the failed full-suite run.
 
 Coverage includes immediate-window boundaries, complete questions longer than
 30 seconds and rendering paragraph limits, silence and acknowledgements,
@@ -75,8 +95,8 @@ preservation, cancellation, late output and terminal-save ordering.
 At source `1136349991ae`, the already authorized, persistently signed helper
 ran `freshnesscheck` using the production ViewModel and Update action with
 generated numeric word fixtures. No user meeting database, audio, transcript,
-skill, preparation or writing example was read for the synthetic source. The full synthetic report
-is retained privately as `QA/2026-10-30-now-focus/cloud-freshnesscheck.json`.
+skill, preparation or writing example was read for the synthetic source. The
+full synthetic report is retained privately as `QA/2026-10-30-now-focus/cloud-freshnesscheck.json`.
 
 The helper exited successfully after **five terminal-completed requests**:
 **three summary requests** to prepare the caches and **two explicit answers**.
@@ -129,6 +149,31 @@ These rounded invocation timings describe the Debug signed helper with
 numeric transcript fixtures. They do not measure native rendering, speech
 recognition, system-audio capture or acoustic-end latency.
 
+The signed helper rebuilt from fresh Debug `e602f5a2ebc7` completed a new
+check with **exit 0**. Its separate private report is
+`QA/2026-10-30-now-focus/e602f5a2-cloud-freshnesscheck.json`. All **five requests**
+completed terminally: **three summaries and two explicit answers**, with **zero
+foreground summary calls** on either answer. The numeric-fixture checks passed
+for the 32.25-second question, separate three-minute/general inputs, unchanged
+answer-call counts (**one before and one after** the notice), fresh explicit
+Update anchor and retained old answer.
+
+The lexical approval marker remains **false**. In this run the actual answer
+said Friday's production launch **“cannot be promised”**, retained the corrected
+**$38,000** ceiling, and said that the ceiling had not been approved and
+security approval was required. The literal matcher did not cover this denial wording; manual
+semantic review passed. This is a distinct phrase from the earlier runs'
+curly-apostrophe “isn’t approved,” and those earlier flags remain unchanged.
+
+| Helper action at `e602f5a2ebc7` | First text | First sentence | Completion |
+| --- | ---: | ---: | ---: |
+| Ask | 1,340 ms | 1,685 ms | 3,536 ms |
+| Update answer | 1,477 ms | 1,809 ms | 2,071 ms |
+
+These rounded Debug-helper invocation timings and generated word fixtures
+prove current-source cloud data flow and completion. They do not qualify
+native rendering, real speech recognition or system-audio capture.
+
 ## Full-suite failure and focused diagnostic rerun
 
 At source `1136349991ae`, the **one full-suite command finished with exit
@@ -174,9 +219,10 @@ new diagnostic recording and temporary QA preferences.
 After unlock, the installed source `1136349991ae` completed a **5:34 native
 system-audio-only recording**. A real 180-second tick produced both the
 three-minute and general summaries. The recording had zero microphone bytes,
-no calendar-event association and no project. The test used synthetic speech,
-local calendar exclusions and All Meetings, with recording URL control left
-disabled. It did not modify real events, per-event preparation or real project
+no calendar-event association and no project. Generated test speech was played
+into all-system-audio capture, using local calendar exclusions and All Meetings
+with recording URL control disabled. Other system speech was not excluded,
+and exclusive generated-audio input was not established. It did not modify real events, per-event preparation or real project
 membership.
 
 The native Ask and Update button completed actual answers. Times below run
@@ -193,15 +239,15 @@ Update answer used the new question correctly and retained the previous
 completed answer. Normal Stop saved audio, transcript and chat, with one
 recovery receipt; saved audio decoded successfully.
 
-However, the roughly 37-second spoken question acquired internal periods from
-recognition. Its raw Now span and anchor began at 3:33 instead of preserving
+However, the recognized output around the roughly 37-second test question
+contained internal periods. Its raw Now span and anchor began at 3:33 instead of preserving
 the opening at 3:13, dropping an early question clause. The retained recording
 is named **QA Now Focus Boundary Check**. This defect makes the run diagnostic,
 not a pass for the requested complete-question behavior.
 
-Source `fb7342b6e821` corrects the raw and anchor boundaries as described above
-and passed the 193-test focused gate. Its signed Release was built at
-`2026-10-31T03:54:23Z`, installed, and passed strict signature verification.
+Source `fb7342b6e821` added the punctuation-aware raw and anchor boundaries
+described above and passed the 193-test focused gate. Its signed Release was
+built at `2026-10-31T03:54:23Z`, installed, and passed strict signature verification.
 The native attempt started at `03:54:49Z`; the Mac locked during startup. At
 `03:55:03Z`, capture metadata reported `system_audio_stream_start_failed`
 (`MeetingAudioError.systemAudioCaptureFailed`, code 2). No recording was
@@ -210,22 +256,76 @@ attempt, not a qualified corrected-build recording; the observed lock does not
 establish the sole cause of the capture error.
 
 The host then paused overnight, and tools resumed at `2026-10-31T16:36Z`
-(October 31 locally). User unlock is pending. The original audio-source and
-calendar-exclusion preference values and their presence have now been restored
+(October 31 locally). Before the later unlocked attempt, the original
+audio-source and calendar-exclusion values and their presence were restored
 exactly from the private snapshot; the other three checked QA keys were
-unchanged. Recording URL control remains disabled. The library retains all
-17 baseline meetings plus the one diagnostic recording, for **18 rows**. The
-app was ordinarily quit with no active recording.
+unchanged. At that stage, all 17 baseline meetings plus the first diagnostic
+remained (**18 rows**), and the app was ordinarily quit with no active recording.
 
-A fresh native long-question/Update-button recording and its normal artifact
-checks remain pending after unlock. The private procedure and generated TTS
-files are ready; any future temporary settings must again be restored to their
-original values and presence. The plan remains in progress.
+After user unlock, `fb7342b6e821` completed a second native recording lasting
+**383.5 seconds**, saved as **QA Now Focus Gap Boundary Check**. The real
+180-second tick produced both completed summaries covering **0:00–2:59**.
+Capture used system audio only, with zero microphone bytes, no calendar event
+and no project.
+
+| Native action at `fb7342b6e821` | First text | First sentence | Completion |
+| --- | ---: | ---: | ---: |
+| Ask | 2.4576 s | 2.7136 s | 3.7961 s |
+| Update answer | 1.8035 s | 2.0606 s | 2.2525 s |
+
+These are invocation timings for this diagnostic. At least **81 seconds of
+silence** did not mark the answer stale. A later question offered Update while
+the answer count remained one. The actual Update answered that question with
+its full preamble, retained the old answer and preserved an unsent composer
+draft. Normal Stop saved transcript and chat in user/assistant/user/assistant
+order, with one recovery receipt; saved audio passed strict decoding.
+
+The long-question check still failed. Recognized output contained periods,
+and numeric word timings contained gaps exceeding 2.5 seconds. The resulting
+Now span was only **3:37–4:13**, beginning on a middle clause rather than the
+opening at **3:11**. These are observed selection boundaries; speech-recognition
+behavior and mixed system audio were not isolated as possible origins of the
+extra recognized speech. The run does not prove a sole ASR cause or exclusive
+generated-audio capture. Punctuation-aware extension alone therefore did not
+qualify the requested complete-question behavior. The bounded opener fallback
+is committed and installed at `e602f5a2ebc7`, with its final controlled native
+result still pending.
+
+Automatic minutes for this second diagnostic initially rejected an unverified
+action quote. No invalid minutes were published. A later explicit retry
+completed with validated output; the initial rejection remains part of the
+history rather than being rewritten as a first-attempt success.
+
+The signed `e602f5a2ebc7` Release was built at `2026-10-31T17:21:35Z` and
+installed through the supported workflow, with its source receipt and
+strict/deep signature verified. Its manual system-audio-only native attempt
+started at `17:22:20Z`. Other live system audio entered the recording after
+the generated clip, so the controlled A/B scenario was stopped normally after
+**307.9 seconds**. The recording had no calendar association or project.
+No Update-B action was tested. The retained capture is private and includes
+non-synthetic audio; no conversation or AI output from it is reproduced here.
+
+Normal Stop completed one new database row, with two chat turns in
+user/assistant order. Saved audio passed strict decoding. These structural
+artifact checks establish normal saving, not a completed controlled native
+question/Update scenario.
+
+The library now contains **20 rows**: all **17 baseline meetings**, the two
+diagnostics and the interrupted recording. Database `quick_check` passed and
+there are **zero active recording locks**. The two modified QA preference keys
+were restored to their original values and presence; all five checked keys
+and their presence match the original snapshot. Recording URL control remained
+disabled. The app was ordinarily quit with no active capture.
+
+Final controlled native qualification awaits the user's choice to pause other
+calls/videos or finish later. No rerun will begin before that reply. The plan
+remains in progress.
 
 The public source-specific evidence is recorded in
 [the qualification file](../benchmarks/chatgpt-live/results/2026-10-30-now-focus-refresh-e2e.json).
-The corrected build's native qualification must remain pending until its own
-UI/audio rerun finishes; the earlier diagnostic does not qualify it.
+Native qualification remains pending a controlled UI/audio rerun of the
+installed opener fallback. Neither diagnostic nor the interrupted mixed-audio
+recording qualifies that final result.
 
 ## Privacy and limits
 
@@ -234,12 +334,14 @@ fixtures and no private skill, email body, account identifier or credential in
 the added source. Actual recordings, backup files and authentication material
 remain outside this report and the repository.
 
-The full XCTest run is not green. The pre-correction native recording proved
-several interactions but exposed a question-boundary defect; the corrected
-build is installed but its native startup failed while the Mac locked.
-Original QA preferences have been restored; corrected-build native interaction
-qualification remains pending. Focused reruns, synthetic cloud calls and
-signature/data checks do not substitute for that final qualification.
+The full XCTest run is not green. The preceding native diagnostics exposed
+question-selection boundaries without isolating recognition from other system
+speech. The installed opener fallback passed focused tests and synthetic cloud
+checks; its latest native attempt saved normally but was interrupted by other
+system audio before Update B. Final controlled native qualification remains
+pending. Original preferences are restored and capture is stopped. Source tests,
+helper calls and structural artifact checks do not substitute for that missing
+controlled interaction result.
 
 Both summaries are lossy, local recognition can miss words, and the local
 conversation-moved-on heuristic is not a guarantee of semantic topic detection.

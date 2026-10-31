@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "qualificationDate": "2026-10-31",
   "timeZone": "America/Edmonton",
-  "installedSource": "fb7342b6e821",
-  "builtAtUTC": "2026-10-31T03:54:23Z",
-  "status": "native_corrected_build_check_pending_mac_unlock",
+  "installedSource": "e602f5a2ebc7",
+  "builtAtUTC": "2026-10-31T17:21:35Z",
+  "status": "controlled_native_check_pending_competing_system_audio",
   "implementation": {
     "nowFocusMilliseconds": 30000,
     "extendsForCompleteQuestionOrTurn": true,
@@ -19,16 +19,21 @@
     "completedAnswersRetained": true,
     "rawFocusRetainsUnbrokenUtteranceAcrossASRPunctuation": true,
     "acousticPauseBoundaryMilliseconds": 2500,
-    "questionBoundaryHeuristicQualification": "Pause/speaker/capitalized-interrogative rules can coalesce nearby turns or misclassify ASR punctuation; exact raw source remains available and bounded."
+    "questionBoundaryHeuristicQualification": "Pause/speaker/capitalized-interrogative rules can coalesce nearby turns or misclassify ASR punctuation; exact raw source remains available and bounded.",
+    "localEnglishQuestionOpeningFallback": true,
+    "questionOpeningLookbackMilliseconds": 180000,
+    "lexicalFallbackUsesSemanticSentenceStarts": true,
+    "recognizedQuestionMarkNotRequiredForQuestionClassification": true,
+    "completenessRequiresEndingPunctuationAndUnclippedSource": true
   },
   "tests": {
     "focusedFeature": {
-      "cases": 193,
+      "source": "e602f5a2ebc7",
+      "cases": 199,
       "failures": 0,
-      "durationSeconds": 10.007,
-      "configuration": "Debug, -debug-info-format none; Debug assertions retained",
-      "source": "fb7342b6e821",
-      "coreProjectionCases": 23
+      "durationSeconds": 9.875,
+      "configuration": "Debug with symbols and assertions; same fresh test binary used for Core-only and skip-build final feature gate. Completed rebuildable Debug scratch removed after verification for disk capacity.",
+      "coreProjectionCases": 29
     },
     "initialBuildFailure": "Temporary disk exhaustion during debug-symbol generation; no Swift source error and no tests executed in that attempt.",
     "fullRunOnce": {
@@ -62,9 +67,166 @@
       "durationSeconds": 9.749,
       "configuration": "Debug, -debug-info-format none; Debug assertions retained",
       "source": "1136349991ae"
+    },
+    "previousFocusedFeature": {
+      "cases": 193,
+      "failures": 0,
+      "durationSeconds": 10.007,
+      "configuration": "Debug, -debug-info-format none; Debug assertions retained",
+      "source": "fb7342b6e821",
+      "coreProjectionCases": 23
+    },
+    "coreProjectionFinal": {
+      "source": "e602f5a2ebc7",
+      "cases": 29,
+      "failures": 0,
+      "durationSeconds": 0.016
+    },
+    "resolvedFallbackIteration": {
+      "source": "working-tree precursor to e602f5a2ebc7",
+      "cases": 199,
+      "assertionFailures": 10,
+      "affectedCoreCases": 5,
+      "resolvedBy": "Lexical fallback uses semantic sentence starts, not pause fragments; final 29 Core and 199 feature cases passed."
     }
   },
   "realChatGPTVMFlow": {
+    "syntheticOnly": true,
+    "terminalRequests": 5,
+    "summaryRequests": 3,
+    "explicitAnswers": 2,
+    "movedOnBeforeUpdate": true,
+    "inferenceCallsBeforeNotification": 1,
+    "inferenceCallsAfterNotification": 1,
+    "stages": [
+      {
+        "label": "initial",
+        "anchor": "Given that the pilot still needs security approval and we have discussed several launch conditions across this meeting, what is the corrected budget ceiling, and can we promise a production launch on Friday?",
+        "nowStartMs": 860000,
+        "nowEndMs": 900000,
+        "summaryCallsAtAsk": 0,
+        "syntheticAnswer": "The corrected ceiling is $38,000, but Friday’s production launch cannot be promised.\n\n- The ceiling hasn’t been approved, and security approval is still required before the test account connects.",
+        "checks": {
+          "all_source_processed": true,
+          "answer_completed": true,
+          "answer_denies_unapproved_launch": false,
+          "answer_preserves_corrected_budget": true,
+          "general_summary_present": true,
+          "long_question_retained_from_before_thirty_second_boundary": true,
+          "no_foreground_summary_call": true,
+          "now_source_present": true,
+          "three_minute_summary_present": true
+        },
+        "firstTextMs": 1339.825791,
+        "firstSentenceMs": 1685.2161660000002,
+        "completionMs": 3536.102875
+      },
+      {
+        "label": "updated",
+        "anchor": "Who owns emergency route AMBER-17, and what is our corrected pilot ceiling?",
+        "nowStartMs": 860000,
+        "nowEndMs": 914050,
+        "summaryCallsAtAsk": 0,
+        "syntheticAnswer": "Hana Lin owns AMBER-17, and the corrected pilot ceiling is $38,000.",
+        "checks": {
+          "all_source_processed": true,
+          "answer_completed": true,
+          "conversation_moved_on_flag_cleared_for_current_snapshot": true,
+          "explicit_update_has_own_visible_user_turn": true,
+          "general_summary_present": true,
+          "new_now_anchor_contains_latest_complete_question": true,
+          "new_question_notification_did_not_infer": true,
+          "no_foreground_summary_call": true,
+          "now_source_present": true,
+          "prior_completed_answer_retained": true,
+          "three_minute_summary_present": true,
+          "updated_answer_mentions_route_and_owner": true,
+          "updated_answer_preserves_corrected_budget": true
+        },
+        "firstTextMs": 1476.746584,
+        "firstSentenceMs": 1809.100875,
+        "completionMs": 2070.772667
+      }
+    ],
+    "manualSemanticReviewPassed": true,
+    "lexicalQualification": "The initial literal denial check remains false: output says production launch cannot be promised, outside its marker list. Manual review confirms denial and preserves the false flag.",
+    "timingQualification": "Generated-source Debug helper, not native capture or pixel latency; not a provider comparison.",
+    "source": "e602f5a2ebc7",
+    "qualificationDate": "2026-10-31"
+  },
+  "privacy": "Public data contains only synthetic helper output and structural observations. Interrupted real-audio recording and conversation/AI content remain private and excluded, along with account/calendar identifiers, credentials, skills/examples, recordings and backups.",
+  "initialInstallation": {
+    "supportedSignedReleaseInstalled": true,
+    "strictDeepSignatureVerified": true,
+    "privateDatabaseBackupQuickCheck": "ok",
+    "installedSource": "1136349991ae",
+    "savedMeetingsRetained": true,
+    "savedMeetingCount": 17,
+    "settingsUnchanged": true,
+    "originalAppUnchanged": true,
+    "activeCaptureLocks": 0,
+    "nativeQAPreferencesTouched": false,
+    "nativeCheckBlockedByMacLock": true,
+    "source": "1136349991ae"
+  },
+  "installation": {
+    "supportedSignedReleaseInstalled": true,
+    "strictDeepSignatureVerified": true,
+    "installedSource": "e602f5a2ebc7",
+    "builtAtUTC": "2026-10-31T17:21:35Z",
+    "baselineMeetingsRetained": true,
+    "baselineMeetingCount": 17,
+    "currentMeetingCount": 20,
+    "diagnosticMeetingsAdded": 2,
+    "interruptedPrivateRecordingAdded": 1,
+    "activeRecordingLockCount": 0,
+    "exactOriginalQAPreferencesAndAbsenceRestored": true,
+    "normalCaptureAndCalendarSelectionsVerifiedInUI": true,
+    "databaseQuickCheck": "ok",
+    "originalAppUnchanged": true
+  },
+  "nativePreFixDiagnostic": {
+    "source": "1136349991ae",
+    "durationSeconds": 334,
+    "systemOnly": true,
+    "rawMicrophoneBytes": 0,
+    "realThreeMinuteTimerObserved": true,
+    "threeMinuteAndGeneralSummariesVisible": true,
+    "silenceDidNotMarkStaleSeconds": 43,
+    "laterQuestionOfferedUpdate": true,
+    "answerCountBeforeExplicitUpdate": 1,
+    "explicitNativeUpdateCompleted": true,
+    "priorCompletedAnswerRetained": true,
+    "initialTimingMs": {
+      "firstText": 1921.1,
+      "firstSentence": 2163.1,
+      "completion": 3198.7
+    },
+    "updateTimingMs": {
+      "firstText": 1929.1,
+      "firstSentence": 2184.6,
+      "completion": 2616.1
+    },
+    "normalStopAndTranscriptChatSaved": true,
+    "strictAudioDecodePassed": true,
+    "nilCalendarAndNoProjectMembership": true,
+    "recoveryImportReceiptCount": 1,
+    "longQuestionBoundaryFailed": true,
+    "observedDefect": "Observed recognized punctuation split a long played question and shortened its Now opening; complete transcript remained available. Speech recognition alone was not established as the sole origin of extra or broken words.",
+    "qualifiesCorrectedNativeFlow": false
+  },
+  "initialBlockedNativePreparation": {
+    "status": "blocked_by_locked_mac",
+    "userUnlockRequested": true,
+    "qaPreferencesChanged": false,
+    "audioPlayed": false,
+    "testRecordingStarted": false,
+    "syntheticClipsReady": true,
+    "preparedPlan": "system-only capture, temporarily exclude calendars, All Meetings, real 180-second tick, long question, silence, new question, manual Update, normal Stop, key-only preference restore",
+    "source": "1136349991ae",
+    "stage": "Historical initial locked-Mac preparation, before the later native diagnostic. These values do not describe the completed diagnostic or current corrected-build attempt."
+  },
+  "priorRealChatGPTVMFlow": {
     "syntheticOnly": true,
     "terminalRequests": 5,
     "summaryRequests": 3,
@@ -128,22 +290,80 @@
     "source": "fb7342b6e821",
     "qualificationDate": "2026-10-31"
   },
-  "privacy": "Only synthetic output and structural checks. No real calendar identifiers, meeting content, skill, writing examples, credentials or backups.",
-  "initialInstallation": {
-    "supportedSignedReleaseInstalled": true,
-    "strictDeepSignatureVerified": true,
-    "privateDatabaseBackupQuickCheck": "ok",
-    "installedSource": "1136349991ae",
-    "savedMeetingsRetained": true,
-    "savedMeetingCount": 17,
-    "settingsUnchanged": true,
-    "originalAppUnchanged": true,
-    "activeCaptureLocks": 0,
-    "nativeQAPreferencesTouched": false,
-    "nativeCheckBlockedByMacLock": true,
-    "source": "1136349991ae"
+  "historicalLockedStartupAttempt": {
+    "source": "fb7342b6e821",
+    "completed": false,
+    "blockedByMacLock": true,
+    "startAttemptFailedDuringLock": true,
+    "startupFailureType": "MeetingAudioError.systemAudioCaptureFailed",
+    "startupFailureCode": 2,
+    "testRecordingPersisted": false,
+    "activeRecording": false,
+    "microphonePermissionsResetOrRequested": false,
+    "urlRecordingControlRemainedDisabled": true
   },
-  "installation": {
+  "nativeGapDiagnostic": {
+    "source": "fb7342b6e821",
+    "durationSeconds": 383.5,
+    "playedGeneratedClips": true,
+    "exclusiveSyntheticCaptureNotEstablished": true,
+    "realThreeMinuteTimerAndBothSummariesObserved": true,
+    "recognizedOpeningRetained": false,
+    "observedNowStart": "3:37",
+    "observedOpeningStart": "3:11",
+    "silenceDidNotMarkStaleSeconds": 81,
+    "noticeDidNotInfer": true,
+    "nativeUpdateCompleted": true,
+    "oldAnswerAndUnsentDraftRetained": true,
+    "savedChatRoles": [
+      "user",
+      "assistant",
+      "user",
+      "assistant"
+    ],
+    "normalStopAndStrictAudioDecodePassed": true,
+    "nilCalendarAndNoProject": true,
+    "microphoneBytes": 0,
+    "recoveryImportReceiptCount": 1,
+    "minutesInitiallyRejectedUnverifiedQuote": true,
+    "minutesRetryValidated": true,
+    "qualifiesFinalSource": false,
+    "initialTimingMs": {
+      "firstText": 2457.6,
+      "firstSentence": 2713.6,
+      "completion": 3796.1
+    },
+    "updateTimingMs": {
+      "firstText": 1803.5,
+      "firstSentence": 2060.6,
+      "completion": 2252.5
+    }
+  },
+  "native": {
+    "source": "e602f5a2ebc7",
+    "completed": false,
+    "blockedByMacLock": false,
+    "pendingControlledAudioWindow": true,
+    "competingSystemAudioDetected": true,
+    "privateContentExcluded": true,
+    "interruptedCaptureSeconds": 307.9,
+    "normalStopCompleted": true,
+    "interruptedRecordingRetainedPrivately": true,
+    "strictAudioDecodePassed": true,
+    "savedChatRoles": [
+      "user",
+      "assistant"
+    ],
+    "nilCalendarAndNoProject": true,
+    "updateBTested": false,
+    "recordingActive": false,
+    "qaPreferencesRestored": true,
+    "restorationVerifiedInNativeUI": true,
+    "calendarConnectionAndOriginalSelectionsRetained": true,
+    "urlRecordingControlRemainedDisabled": true,
+    "remaining": "Controlled long-question/Update-answer capture after other system audio is paused. No rerun before user reply."
+  },
+  "previousInstallation": {
     "supportedSignedReleaseInstalled": true,
     "strictDeepSignatureVerified": true,
     "installedSource": "fb7342b6e821",
@@ -155,60 +375,5 @@
     "activeRecordingLockCount": 0,
     "exactOriginalQAPreferencesAndAbsenceRestored": true,
     "originalAppUnchanged": true
-  },
-  "nativePreFixDiagnostic": {
-    "source": "1136349991ae",
-    "durationSeconds": 334,
-    "systemOnly": true,
-    "rawMicrophoneBytes": 0,
-    "realThreeMinuteTimerObserved": true,
-    "threeMinuteAndGeneralSummariesVisible": true,
-    "silenceDidNotMarkStaleSeconds": 43,
-    "laterQuestionOfferedUpdate": true,
-    "answerCountBeforeExplicitUpdate": 1,
-    "explicitNativeUpdateCompleted": true,
-    "priorCompletedAnswerRetained": true,
-    "initialTimingMs": {
-      "firstText": 1921.1,
-      "firstSentence": 2163.1,
-      "completion": 3198.7
-    },
-    "updateTimingMs": {
-      "firstText": 1929.1,
-      "firstSentence": 2184.6,
-      "completion": 2616.1
-    },
-    "normalStopAndTranscriptChatSaved": true,
-    "strictAudioDecodePassed": true,
-    "nilCalendarAndNoProjectMembership": true,
-    "recoveryImportReceiptCount": 1,
-    "longQuestionBoundaryFailed": true,
-    "observedDefect": "ASR inserted sentence punctuation inside one 37.8-second spoken question, shortening its Now anchor/raw opening; full transcript still supplied facts. Fixed in fb7342b6e821 and covered by four added regressions.",
-    "qualifiesCorrectedNativeFlow": false
-  },
-  "native": {
-    "source": "fb7342b6e821",
-    "completed": false,
-    "blockedByMacLock": true,
-    "startAttemptFailedDuringLock": true,
-    "startupFailureType": "MeetingAudioError.systemAudioCaptureFailed",
-    "startupFailureCode": 2,
-    "testRecordingPersisted": false,
-    "activeRecording": false,
-    "microphonePermissionsResetOrRequested": false,
-    "originalQASettingsRestored": true,
-    "urlRecordingControlRemainedDisabled": true,
-    "remaining": "Unlocked native long-question/Update-button recording and normal save on corrected build."
-  },
-  "initialBlockedNativePreparation": {
-    "status": "blocked_by_locked_mac",
-    "userUnlockRequested": true,
-    "qaPreferencesChanged": false,
-    "audioPlayed": false,
-    "testRecordingStarted": false,
-    "syntheticClipsReady": true,
-    "preparedPlan": "system-only capture, temporarily exclude calendars, All Meetings, real 180-second tick, long question, silence, new question, manual Update, normal Stop, key-only preference restore",
-    "source": "1136349991ae",
-    "stage": "Historical initial locked-Mac preparation, before the later native diagnostic. These values do not describe the completed diagnostic or current corrected-build attempt."
   }
 }
