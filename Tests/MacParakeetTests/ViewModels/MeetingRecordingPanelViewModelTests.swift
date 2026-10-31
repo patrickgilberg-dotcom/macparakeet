@@ -530,11 +530,11 @@ final class MeetingRecordingPanelViewModelTests: XCTestCase {
         )
     }
 
-    func testLivePanelTabAllCasesOrderedNotesTranscriptAsk() {
+    func testLivePanelTabPreservesFirstThreeAndAppendsBoard() {
         XCTAssertEqual(
             MeetingRecordingPanelViewModel.LivePanelTab.allCases,
-            [.notes, .transcript, .ask],
-            "Tab order is Notes / Transcript / Ask — left-to-right matches ⌘1 / ⌘2 / ⌘3"
+            [.notes, .transcript, .ask, .board],
+            "Board is appended; Notes stays the default and shortcuts 1–3 stay unchanged."
         )
     }
 

@@ -41,6 +41,8 @@ public enum LiveAnswerContext {
         Previous project meeting context is historical and separate from the current call. Attribute its facts to that
         meeting. Previously recorded actions have no verified completion status unless current evidence updates them.
         Do not treat silence or a summary omission as proof an action was missed, overdue, completed or cancelled.
+        The prepared_project_brief is a historical pre-meeting aid. Use it to remember follow-ups and the user's
+        notes when relevant. The user's current question and fresh live speech always keep priority over that brief.
         """
 
     public static func messages(
@@ -77,11 +79,13 @@ public enum LiveAnswerContext {
     public static func messages(
         question: String, context: LiveMeetingMemorySnapshot,
         notes: String?, preparation: String, history: [ChatMessage],
-        eventPreparation: String = "", previousMeeting: String = "", sourceLimitations: String = ""
+        eventPreparation: String = "", previousMeeting: String = "", sourceLimitations: String = "",
+        generatedPreparation: String = ""
     ) -> [ChatMessage] {
         let quotedContextAndQuestion = """
             <event_preparation>\(String(eventPreparation.prefix(notesCharacterLimit)))</event_preparation>
             <previous_project_meeting>\(previousMeeting)</previous_project_meeting>
+            <prepared_project_brief>\(String(generatedPreparation.prefix(8_000)))</prepared_project_brief>
             <preparation>\(String(preparation.prefix(notesCharacterLimit)))</preparation>
             <meeting_notes>\(String((notes ?? "").prefix(notesCharacterLimit)))</meeting_notes>
             <source_limitations>\(sourceLimitations)</source_limitations>

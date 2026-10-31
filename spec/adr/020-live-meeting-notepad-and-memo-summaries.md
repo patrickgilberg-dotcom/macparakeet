@@ -5,6 +5,19 @@
 > Related: ADR-013 (prompt library + multi-summary), ADR-014 (meeting recording), ADR-017 (calendar auto-start), ADR-018 (live meeting Ask tab), ADR-019 (crash-resilient meeting recording)
 > Naming Note (2026-04-28): The persisted table remains `summaries`, but the current Swift names are `PromptResult`, `PromptResultRepository`, and `PromptResultsViewModel`.
 
+## Personal-fork amendment (2026-10-31, evidence board and project preparation)
+
+MacParakeet Live appends a fourth Board tab (Command-4), keeping Notes as the
+default and preserving shortcuts 1–3. Generated decisions, actions, questions,
+resolution/reopening evidence and project carryover remain separate from
+authored Notes. Clicking a quotation discloses its exact captured source.
+A small collapsible project-prep card reuses the brief generated approximately
+15 minutes before explicitly project-assigned events, including full-source
+processing of the latest previous meeting's saved notes. These personal-fork
+surfaces do not change the upstream stable release claim. Scope, priority,
+source validation and privacy are specified in the
+[board/preparation contract](../contracts/live-meeting-board-and-preparation.md).
+
 ## Amendment (2026-10-02, Summary default and notes guidance — issue #1204)
 
 Newly seeded built-in **Summary** prompts enable `includeMeetingNotes` by

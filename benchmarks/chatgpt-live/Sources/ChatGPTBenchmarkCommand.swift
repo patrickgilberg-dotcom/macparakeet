@@ -65,6 +65,10 @@ struct ChatGPTBenchmarkCommand {
             try await FreshnessCheck.run(
                 client: client, requestedModel: stringOption("--model", in: arguments),
                 outputPath: stringOption("--output", in: arguments) ?? "/tmp/macparakeet-live-freshnesscheck.json")
+        case "boardprepcheck":
+            try await BoardPreparationCheck.run(
+                client: client,
+                outputPath: stringOption("--output", in: arguments) ?? "/tmp/macparakeet-live-boardprepcheck.json")
         case "idlecheck":
             guard transport == .webSocket else {
                 throw CommandError.message("Idle qualification uses --transport websocket.")

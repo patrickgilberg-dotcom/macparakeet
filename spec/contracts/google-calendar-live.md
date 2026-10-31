@@ -129,8 +129,17 @@ cancels and awaits prefetch, re-reads the selected source, and retries necessary
 preparation before answering. Ready prior transcripts are processed in full
 through bounded semantic-summary chunks. The answer receives up to 8,000 summary
 characters, 6,000 exact question-relevant excerpt characters, a 3,000-character
-raw prior tail and 4,000 prior-note characters, with project/title/date/status
-provenance. This is selective, lossy context, not guaranteed verbatim recall.
+raw prior tail, with project/title/date/status provenance. Notes up to 4,000
+characters are included whole. Longer notes are processed in full in a separate
+memory lane, with up to 4,000 summary characters, 4,000 exact question-relevant
+excerpt characters and a 2,000-character raw tail. Notes remain available when
+the latest transcript is unready, and are explicitly personal notes rather than
+spoken commitments. This is selective, lossy context, not guaranteed verbatim recall.
+
+Project-assigned occurrences also support automatic preparation 15 minutes
+before their start and a live evidence board. Generated briefs have separate
+storage and never overwrite authored context or notes. See the
+[board/preparation contract](live-meeting-board-and-preparation.md).
 
 The prior-source scope includes project and source identity, readiness, effective
 transcript hash, speaker/correction revision, metadata and notes. Edits, deletion,

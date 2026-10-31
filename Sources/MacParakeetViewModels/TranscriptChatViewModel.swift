@@ -53,6 +53,32 @@ public final class TranscriptChatViewModel {
     public private(set) var liveMeetingMemoryBackgroundError: String?
     public private(set) var liveProjectContextStatus: String?
     public private(set) var lastLiveProjectContext: LiveProjectMeetingSnapshot?
+    public private(set) var liveBoard: MeetingBoardSnapshot?
+    public private(set) var isRefreshingLiveBoard = false
+    public private(set) var liveBoardError: String?
+    public private(set) var liveBoardSourceStatus: String?
+    public private(set) var generatedMeetingPreparation: MeetingGeneratedPreparation?
+    private var boardEngine = MeetingBoardEngine()
+    private var boardRecordingID: UUID?
+    private var boardMeetingTitle = "Current meeting"
+    private var beforeLiveBackgroundWork: (@MainActor () async -> Void)?
+
+    public var isPerformingLiveAIWork: Bool {
+        isStreaming || backgroundSummaryTask != nil || projectPrefetchTask != nil
+    }
+
+    public func configureLiveBackgroundWorkPriority(_ preempt: @escaping @MainActor () async -> Void) {
+        beforeLiveBackgroundWork = preempt
+    }
+
+    public var liveBoardIsStale: Bool {
+        guard let liveBoard, let recordingID = boardRecordingID else { return false }
+        let transcript = liveBoard.documents.first { $0.id == recordingID.uuidString + ":transcript" }?.text ?? ""
+        let notes = liveBoard.documents.first { $0.id == recordingID.uuidString + ":notes" }?.text ?? ""
+        let current =
+            transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : meetingTranscriptSnapshot()
+        return current != transcript || (userNotesProvider?() ?? "") != notes
+    }
     private var eventPreparationContext = ""
     private var projectSourceProvider: (@Sendable () async throws -> LiveProjectMeetingSource?)?
     private var projectMeetingMemory = LiveProjectMeetingMemory()
@@ -183,6 +209,11 @@ public final class TranscriptChatViewModel {
         lastBackgroundSource = nil
         lastBackgroundFocusSource = nil
         lastBackgroundCacheKey = nil
+        liveBoard = nil
+        liveBoardError = nil
+        generatedMeetingPreparation = nil
+        boardRecordingID = nil
+        boardEngine = MeetingBoardEngine()
         self.summaryRefreshInterval = summaryRefreshInterval
         resumeLiveMeetingMemory()
     }
@@ -201,11 +232,17 @@ public final class TranscriptChatViewModel {
         eventPreparationContext = eventPreparation
         clearLiveAnswerFreshness()
         projectSourceProvider = sourceProvider
+        liveBoard = nil
+        generatedMeetingPreparation = nil
+        boardEngine = MeetingBoardEngine()
         lastLiveProjectContext = nil
         liveProjectContextStatus = nil
         guard let sourceProvider, let sessionProvider = directLiveSessionProvider else { return }
         let memory = projectMeetingMemory
         projectPrefetchTask = Task { @MainActor [weak self] in
+            defer {
+                if self?.projectConfigurationGeneration == generation { self?.projectPrefetchTask = nil }
+            }
             do {
                 await previousPrefetch?.value
                 try Task.checkCancellation()
@@ -224,6 +261,19 @@ public final class TranscriptChatViewModel {
                 self?.liveProjectContextStatus = "Previous meeting context will retry when you ask."
             }
         }
+    }
+
+    /// Generated preparation is a source-checked historical aid, never authored Notes.
+    public func configureLiveMeetingBoard(
+        recordingID: UUID, title: String, preparation: MeetingGeneratedPreparation? = nil
+    ) {
+        boardRecordingID = recordingID
+        boardMeetingTitle = title
+        generatedMeetingPreparation = preparation
+    }
+
+    public func refreshLiveBoard() {
+        beginBackgroundSummaryUpdate()
     }
 
     public func resumeLiveMeetingMemory() {
@@ -257,6 +307,7 @@ public final class TranscriptChatViewModel {
         backgroundSummaryTask = nil
         projectPrefetchTask?.cancel()
         liveMeetingMemoryProgress = nil
+        isRefreshingLiveBoard = false
     }
 
     private static let previewGapWarning =
@@ -272,46 +323,61 @@ public final class TranscriptChatViewModel {
         guard summaryUpdatesEnabled, !isStreaming, backgroundSummaryTask == nil,
             let provider = directLiveSessionProvider
         else { return }
-        guard !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let source = meetingTranscriptSnapshot()
+        let hasTranscript = !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard hasTranscript || boardRecordingID != nil else { return }
+        let source = hasTranscript ? meetingTranscriptSnapshot() : ""
+        let notes = userNotesProvider?() ?? ""
+        let recordingID = boardRecordingID
+        let projectGeneration = projectConfigurationGeneration
+        let sourceProvider = projectSourceProvider
+        let engine = boardEngine
+        let projectPrefetch = projectPrefetchTask
         let focusSource = focusSourceProvider?()
         summaryGeneration &+= 1
         let generation = summaryGeneration
         let snapshotAt = Date()
         let memory = liveMeetingMemory
+        isRefreshingLiveBoard = recordingID != nil
         backgroundSummaryTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer {
                 if summaryGeneration == generation {
                     backgroundSummaryTask = nil
                     liveMeetingMemoryProgress = nil
+                    isRefreshingLiveBoard = false
                 }
             }
             do {
+                await beforeLiveBackgroundWork?()
+                try Task.checkCancellation()
+                await projectPrefetch?.value
+                try Task.checkCancellation()
+                guard projectConfigurationGeneration == projectGeneration else { return }
                 let session = try await provider()
                 try Task.checkCancellation()
                 guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming else { return }
-                if source == lastBackgroundSource, focusSource == lastBackgroundFocusSource,
-                    session.cacheKey == lastBackgroundCacheKey
-                {
-                    return
-                }
+                let memoryChanged =
+                    source != lastBackgroundSource || focusSource != lastBackgroundFocusSource
+                    || session.cacheKey != lastBackgroundCacheKey
+                if !memoryChanged, recordingID == nil { return }
                 if lastBackgroundCacheKey != session.cacheKey { liveMeetingMemoryLastUpdated = nil }
-                _ = try await memory.update(
-                    transcript: source, cacheKey: session.cacheKey, focusSource: focusSource,
-                    summarize: { messages in
-                        var result = ""
-                        for try await text in session.stream(messages: messages) {
+                if hasTranscript, memoryChanged {
+                    _ = try await memory.update(
+                        transcript: source, cacheKey: session.cacheKey, focusSource: focusSource,
+                        summarize: { messages in
+                            var result = ""
+                            for try await text in session.stream(messages: messages) {
+                                try Task.checkCancellation()
+                                result += text
+                            }
                             try Task.checkCancellation()
-                            result += text
-                        }
-                        try Task.checkCancellation()
-                        return result
-                    },
-                    progress: { [weak self] progress in
-                        guard let self else { return }
-                        await self.publishBackgroundMemoryProgress(progress, generation: generation)
-                    })
+                            return result
+                        },
+                        progress: { [weak self] progress in
+                            guard let self else { return }
+                            await self.publishBackgroundMemoryProgress(progress, generation: generation)
+                        })
+                }
                 try Task.checkCancellation()
                 try await session.validate()
                 guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming else { return }
@@ -323,9 +389,52 @@ public final class TranscriptChatViewModel {
                 lastBackgroundSource = source
                 lastBackgroundFocusSource = focusSource
                 lastBackgroundCacheKey = session.cacheKey
-                liveMeetingMemoryLastUpdated = snapshotAt
+                if hasTranscript, memoryChanged { liveMeetingMemoryLastUpdated = snapshotAt }
                 liveMeetingMemoryBackgroundError = nil
                 AudioCaptureDiagnostics.appendAsync("live_meeting_memory outcome=updated source_chars=\(source.count)")
+                guard let recordingID, boardRecordingID == recordingID,
+                    projectConfigurationGeneration == projectGeneration
+                else { return }
+                isRefreshingLiveBoard = true
+                let project = try await sourceProvider?()
+                try Task.checkCancellation()
+                let scope = recordingID.uuidString + "|" + (project?.scopeKey ?? "no-project")
+                var documents = [MeetingEvidenceDocument]()
+                if !source.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    documents.append(
+                        .init(
+                            id: recordingID.uuidString + ":transcript", kind: .currentTranscript,
+                            title: boardMeetingTitle, text: source))
+                }
+                if !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    documents.append(
+                        .init(
+                            id: recordingID.uuidString + ":notes", kind: .currentNotes,
+                            title: "Your notes · " + boardMeetingTitle, text: notes))
+                }
+                documents += Self.previousBoardDocuments(project)
+                let result = try await engine.update(scopeKey: scope, documents: documents, session: session)
+                try Task.checkCancellation()
+                let currentProject = try await sourceProvider?()
+                try await session.validate()
+                guard summaryUpdatesEnabled, summaryGeneration == generation, !isStreaming,
+                    boardRecordingID == recordingID, projectConfigurationGeneration == projectGeneration,
+                    currentProject?.scopeKey == project?.scopeKey,
+                    meetingTranscriptSnapshot().hasPrefix(source), (userNotesProvider?() ?? "") == notes
+                else { return }
+                liveBoard = result
+                liveBoardError = nil
+                if let previous = project?.previous, previous.state != .ready {
+                    let notesStatus =
+                        documents.contains { $0.kind == .previousNotes }
+                        ? "Its saved notes are included." : "It has no saved notes."
+                    liveBoardSourceStatus =
+                        "The latest previous transcript is unavailable. \(notesStatus) No older meeting was substituted."
+                } else if project != nil, project?.previous == nil {
+                    liveBoardSourceStatus = "This project has no previous meeting yet."
+                } else {
+                    liveBoardSourceStatus = nil
+                }
             } catch is CancellationError {
                 // Explicit Ask, pause and stop preempt background work.
             } catch LiveMeetingMemoryError.backgroundDeferred {
@@ -334,9 +443,31 @@ public final class TranscriptChatViewModel {
                 guard summaryUpdatesEnabled, summaryGeneration == generation else { return }
                 liveMeetingMemoryBackgroundError =
                     "Your question retries required earlier context. The next summary update retries recent focus."
+                liveBoardError = "The board could not refresh. Your last checked items are still available."
                 AudioCaptureDiagnostics.appendAsync("live_meeting_memory outcome=failed")
             }
         }
+    }
+
+    private static func previousBoardDocuments(_ source: LiveProjectMeetingSource?) -> [MeetingEvidenceDocument] {
+        guard let previous = source?.previous else { return [] }
+        let title = previous.title + " · " + previous.createdAt.formatted(date: .abbreviated, time: .shortened)
+        var documents = [MeetingEvidenceDocument]()
+        if previous.state == .ready, let transcript = previous.effectiveTranscript,
+            !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            documents.append(
+                .init(
+                    id: previous.transcriptionID.uuidString + ":transcript", kind: .previousTranscript,
+                    title: title, text: transcript))
+        }
+        if let notes = previous.userNotes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            documents.append(
+                .init(
+                    id: previous.transcriptionID.uuidString + ":notes", kind: .previousNotes,
+                    title: "Your notes · " + title, text: notes))
+        }
+        return documents
     }
 
     private func publishBackgroundMemoryProgress(_ progress: LiveMeetingMemoryProgress, generation: UInt64) {
@@ -357,6 +488,7 @@ public final class TranscriptChatViewModel {
         projectPrefetchTask = nil
         backgroundSummaryTask = nil
         liveMeetingMemoryProgress = nil
+        isRefreshingLiveBoard = false
         previous?.cancel()
         previousProject?.cancel()
         await previous?.value
@@ -635,6 +767,7 @@ public final class TranscriptChatViewModel {
         let projectGeneration = projectConfigurationGeneration
         let capturedProjectSourceProvider = projectSourceProvider
         let capturedEventPreparation = eventPreparationContext
+        let capturedGeneratedPreparation = generatedMeetingPreparation
         let capturedPreferencesProvider = liveAnswerPreferencesProvider
         if directLiveSessionProvider != nil {
             clearLiveAnswerFreshness()
@@ -746,15 +879,22 @@ public final class TranscriptChatViewModel {
                     preparedMeetingMemory = memorySnapshot
                     liveAnswerTiming?.contextReadyMs = LiveAnswerTiming.milliseconds(
                         requestStarted.duration(to: .now))
-                    if let sourceProvider = capturedProjectSourceProvider, let source = try await sourceProvider() {
+                    if let sourceProvider = capturedProjectSourceProvider {
+                        let source = try await sourceProvider()
+                        let sourceScope = source?.scopeKey ?? "no-project"
+                        if let liveBoard, !liveBoard.scopeKey.hasSuffix("|" + sourceScope) {
+                            self.liveBoard = nil
+                        }
                         try Task.checkCancellation()
                         guard projectConfigurationGeneration == projectGeneration else { return }
-                        preparedProjectContext = try await projectMeetingMemory.prepare(
-                            source: source, question: question, session: session)
-                        try Task.checkCancellation()
-                        let currentSource = try await sourceProvider()
-                        guard currentSource?.scopeKey == preparedProjectContext?.scopeKey else {
-                            throw LiveProjectContextChanged()
+                        if let source {
+                            preparedProjectContext = try await projectMeetingMemory.prepare(
+                                source: source, question: question, session: session)
+                            try Task.checkCancellation()
+                            let currentSource = try await sourceProvider()
+                            guard currentSource?.scopeKey == preparedProjectContext?.scopeKey else {
+                                throw LiveProjectContextChanged()
+                            }
                         }
                     }
                     try Task.checkCancellation()
@@ -763,6 +903,14 @@ public final class TranscriptChatViewModel {
                     else { return }
                     liveAnswerTiming?.contextReadyMs = LiveAnswerTiming.milliseconds(requestStarted.duration(to: .now))
                     let projectScope = preparedProjectContext?.scopeKey
+                    let readyPreparation = capturedGeneratedPreparation.flatMap {
+                        $0.sourceScopeKey == projectScope && $0.matchesProvider(session)
+                            && $0.manualContextHash == MeetingGeneratedPreparation.hash(capturedEventPreparation)
+                            ? $0 : nil
+                    }
+                    if capturedGeneratedPreparation != nil, readyPreparation == nil {
+                        generatedMeetingPreparation = nil
+                    }
                     if projectScope != lastAnswerProjectScopeKey { liveHistoryStartIndex = historyForRequest.count }
                     let scopedHistory = Array(historyForRequest.dropFirst(liveHistoryStartIndex))
                     var contextMessages = LiveAnswerContext.messages(
@@ -770,7 +918,8 @@ public final class TranscriptChatViewModel {
                         preparation: livePreparationContext, history: scopedHistory,
                         eventPreparation: capturedEventPreparation,
                         previousMeeting: preparedProjectContext?.quotedContext ?? "",
-                        sourceLimitations: liveTranscriptHasEarlierGap ? Self.previewGapWarning : "")
+                        sourceLimitations: liveTranscriptHasEarlierGap ? Self.previewGapWarning : "",
+                        generatedPreparation: readyPreparation?.quotedContext ?? "")
                     if let answerPreferences {
                         contextMessages = LiveAnswerStyleContext.applying(
                             to: contextMessages, enabled: answerPreferences.answerStyleEnabled,
@@ -1140,6 +1289,11 @@ public final class TranscriptChatViewModel {
     }
 
     public func loadTranscript(_ text: String, transcriptionId: UUID?) {
+        liveBoard = nil
+        boardRecordingID = nil
+        generatedMeetingPreparation = nil
+        liveBoardError = nil
+        liveBoardSourceStatus = nil
         cancelStreaming()
         self.transcriptText = text
         self.transcriptionId = transcriptionId

@@ -28,12 +28,14 @@ public final class MeetingRecordingPanelViewModel {
         case notes
         case transcript
         case ask
+        case board
 
         public var title: String {
             switch self {
             case .notes: return "Notes"
             case .transcript: return "Transcript"
             case .ask: return "Ask"
+            case .board: return "Board"
             }
         }
     }
@@ -498,6 +500,9 @@ public final class MeetingRecordingPanelViewModel {
         switch tab {
         case .notes, .transcript, .ask:
             return nil
+        case .board:
+            let count = chatViewModel.liveBoard?.items.count ?? 0
+            return count > 0 ? String(count) : nil
         }
     }
 

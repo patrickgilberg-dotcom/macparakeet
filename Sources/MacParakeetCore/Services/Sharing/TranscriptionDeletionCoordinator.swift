@@ -8,20 +8,34 @@ public enum TranscriptionDeletionCoordinator {
         _ transcription: Transcription,
         repository: TranscriptionRepositoryProtocol,
         credentials: ShareCredentialStoring = ShareCredentialStore(),
+        purgeGeneratedPreparation: ((Set<UUID>) throws -> Void)? = nil,
         removeAssets: ((Transcription) throws -> Void)? = nil
     ) throws -> Bool {
         try TranscriptionAssetCleanup.withMeetingMediaMutationLease(for: transcription) {
-            let childProcessingLease = try splitChildProcessingLease(for: transcription)
-            defer { childProcessingLease?.release() }
+            let delete = {
+                let childProcessingLease = try splitChildProcessingLease(for: transcription)
+                defer { childProcessingLease?.release() }
 
-            let shareIds = try repository.prepareForDeletion(id: transcription.id)
-            for id in shareIds { try credentials.removeContentKey(forRemoteShareId: id) }
-            if let removeAssets {
-                try removeAssets(transcription)
-            } else {
-                try TranscriptionAssetCleanup.removeOwnedAssetsUnlocked(for: transcription, fileManager: .default)
+                let shareIds = try repository.prepareForDeletion(id: transcription.id)
+                for id in shareIds { try credentials.removeContentKey(forRemoteShareId: id) }
+                if let removeAssets {
+                    try removeAssets(transcription)
+                } else {
+                    try TranscriptionAssetCleanup.removeOwnedAssetsUnlocked(for: transcription, fileManager: .default)
+                }
+                return try repository.delete(id: transcription.id)
             }
-            return try repository.delete(id: transcription.id)
+            if transcription.sourceType == .meeting, purgeGeneratedPreparation == nil {
+                // Preserve the synchronous app/CLI contract and complete the
+                // private-copy purge in order. Lock/intent failure happens
+                // before source deletion; later file failures remain retryable.
+                return try MeetingGeneratedPreparationStore.withSourceDeletion([transcription.id], operation: delete)
+            }
+            let deleted = try delete()
+            if deleted, transcription.sourceType == .meeting {
+                try purgeGeneratedPreparation?([transcription.id])
+            }
+            return deleted
         }
     }
 
@@ -35,8 +49,8 @@ public enum TranscriptionDeletionCoordinator {
         for transcription: Transcription
     ) throws -> MeetingSplitChildProcessingLease? {
         guard transcription.sourceType == .meeting,
-              transcription.splitProvenance != nil,
-              let folderURL = MeetingArtifactStore.sessionFolderURL(for: transcription)
+            transcription.splitProvenance != nil,
+            let folderURL = MeetingArtifactStore.sessionFolderURL(for: transcription)
         else {
             return nil
         }

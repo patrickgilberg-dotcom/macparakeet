@@ -191,6 +191,11 @@ final class AppEnvironmentConfigurer {
         meetingsWorkspaceViewModel.planner = LiveMeetingPlannerViewModel(
             projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
             transcriptionRepository: env.transcriptionRepo)
+        if LiveAppIdentity.isLive {
+            meetingsWorkspaceViewModel.planner?.automaticPrep = LiveMeetingPrepViewModel(
+                projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
+                sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() })
+        }
         Task { [weak meetingsWorkspaceViewModel, weak settingsViewModel] in
             _ = await GoogleCalendarAuth.shared.connection()
             await settingsViewModel?.refreshCalendarAccess()
@@ -456,6 +461,7 @@ final class AppEnvironmentConfigurer {
             configStore: env.llmConfigStore,
             preparationRepository: env.meetingPreparationRepo,
             projectRepository: env.meetingProjectRepo,
+            automaticPrep: meetingsWorkspaceViewModel.planner?.automaticPrep,
             sttManager: env.sttScheduler,
             speechEngineSelectionProvider: { SpeechEngineSelection.liveSpeech() },
             meetingAudioSourceModeProvider: { env.runtimePreferences.meetingAudioSourceMode },
@@ -629,6 +635,18 @@ final class AppEnvironmentConfigurer {
         // feature flag because calendar integration only makes sense when
         // the user can actually record meetings.
         if AppFeatures.meetingRecordingEnabled {
+            meetingsWorkspaceViewModel.planner?.automaticPrep?.start(
+                eventsProvider: { [weak settingsViewModel] in
+                    let events = try await GoogleCalendarService.shared.fetchUpcomingEvents(days: 1)
+                    let excluded = await MainActor.run { settingsViewModel?.calendarExcludedIdentifiers ?? [] }
+                    return events.filter { event in
+                        event.calendarIdentifier.map { !excluded.contains($0) } ?? true
+                    }
+                },
+                isBusy: { [weak meetingCoordinator, weak chatViewModel, weak minutes = env.liveMinutes] in
+                    (meetingCoordinator?.isLiveAIWorkActive ?? false)
+                        || (chatViewModel?.isStreaming ?? false) || minutes?.activeJobID != nil
+                })
             let coordinator = MeetingAutoStartCoordinator(
                 calendarService: GoogleCalendarService.shared,
                 settingsViewModel: settingsViewModel,

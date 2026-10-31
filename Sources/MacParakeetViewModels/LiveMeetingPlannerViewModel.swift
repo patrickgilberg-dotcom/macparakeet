@@ -27,6 +27,8 @@ public final class LiveMeetingPlannerViewModel {
     public private(set) var isSaving = false
     public private(set) var isAssigning = false
     public var errorMessage: String?
+    /// Generated briefs have separate storage; authored draft fields remain local user input.
+    public var automaticPrep: LiveMeetingPrepViewModel?
 
     @ObservationIgnored private let projectRepository: any MeetingProjectRepositoryProtocol
     @ObservationIgnored private let preparationRepository: any MeetingPreparationRepositoryProtocol

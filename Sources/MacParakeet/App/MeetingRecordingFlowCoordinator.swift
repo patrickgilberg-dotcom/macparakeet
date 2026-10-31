@@ -68,6 +68,15 @@ final class MeetingRecordingFlowCoordinator {
         stateMachine.state == .recording
     }
 
+    /// Capture itself does not exclude prep for a back-to-back meeting. The
+    /// current call's inference always preempts that lower-priority work.
+    var isLiveAIWorkActive: Bool {
+        if stateMachine.state == .recording {
+            return panelViewModel?.chatViewModel.isPerformingLiveAIWork ?? false
+        }
+        return isMeetingRecordingActive
+    }
+
     var quitState: MeetingRecordingQuitState? {
         switch stateMachine.state {
         case .idle, .finishing:
@@ -93,6 +102,7 @@ final class MeetingRecordingFlowCoordinator {
     private let cliConfigStore: LocalCLIConfigStore
     private let preparationRepository: (any MeetingPreparationRepositoryProtocol)?
     private let projectRepository: (any MeetingProjectRepositoryProtocol)?
+    private let automaticPrep: LiveMeetingPrepViewModel?
     private var pendingPreparation: MeetingPreparation?
     private var activePreparedRecordingID: UUID?
     private var activeProjectID: UUID?
@@ -182,6 +192,7 @@ final class MeetingRecordingFlowCoordinator {
         cliConfigStore: LocalCLIConfigStore = LocalCLIConfigStore(),
         preparationRepository: (any MeetingPreparationRepositoryProtocol)? = nil,
         projectRepository: (any MeetingProjectRepositoryProtocol)? = nil,
+        automaticPrep: LiveMeetingPrepViewModel? = nil,
         sttManager: (any STTRuntimeManaging)? = nil,
         speechEngineSelectionProvider: (@Sendable () async -> SpeechEngineSelection?)? = nil,
         meetingAudioSourceModeProvider: @escaping @MainActor @Sendable () -> MeetingAudioSourceMode = {
@@ -233,6 +244,7 @@ final class MeetingRecordingFlowCoordinator {
         self.cliConfigStore = cliConfigStore
         self.preparationRepository = preparationRepository
         self.projectRepository = projectRepository
+        self.automaticPrep = automaticPrep
         self.sttManager = sttManager
         self.speechEngineSelectionProvider = speechEngineSelectionProvider
         self.meetingAudioSourceModeProvider = meetingAudioSourceModeProvider
@@ -792,6 +804,8 @@ final class MeetingRecordingFlowCoordinator {
                         guard let self, let panelVM, self.stateMachine.state == .recording else {
                             throw MeetingRecordingService.LiveAnswerTranscriptError.sessionChanged
                         }
+                        await self.automaticPrep?.preempt()
+                        try Task.checkCancellation()
                         if let update = try await self.meetingRecordingService.prepareLiveAnswerTranscript() {
                             let lines = await Task.detached(priority: .userInitiated) {
                                 Self.makePreviewLines(from: update)
@@ -809,6 +823,9 @@ final class MeetingRecordingFlowCoordinator {
                     focusSourceProvider: { [weak panelVM] in panelVM?.liveMeetingFocusSource },
                     nowSourceProvider: { [weak panelVM] in panelVM?.liveMeetingNowSnapshot }
                 )
+                panelVM.chatViewModel.configureLiveBackgroundWorkPriority { [weak self] in
+                    await self?.automaticPrep?.preempt()
+                }
                 configureProjectContext(for: panelVM.chatViewModel)
                 chatGPTPreparationTask?.cancel()
                 let chatViewModel = panelVM.chatViewModel
@@ -909,6 +926,8 @@ final class MeetingRecordingFlowCoordinator {
             )
             actionTask = Task { @MainActor in
                 do {
+                    await automaticPrep?.preempt()
+                    guard self.ownsPendingStart(generation: gen) else { return }
                     var preparation = explicitPreparation
                     if preparation == nil, let calendarID = calendarEventSnapshot?.calendarIdentifier,
                         let eventID = calendarEventSnapshot?.providerEventID, let preparationRepository
@@ -973,7 +992,22 @@ final class MeetingRecordingFlowCoordinator {
                             return
                         }
                     }
-                    if let chat = self.panelViewModel?.chatViewModel { self.configureProjectContext(for: chat) }
+                    if let chat = self.panelViewModel?.chatViewModel {
+                        self.configureProjectContext(for: chat)
+                        var generated: MeetingGeneratedPreparation?
+                        if let key = preparation?.key, let projectID = activeProjectID {
+                            generated = await automaticPrep?.validatedPreparation(
+                                key: key, projectID: projectID, before: activeMeetingStartedAt,
+                                excludingRecordingID: ownedRecordingID)
+                        }
+                        guard self.ownsPendingStart(generation: gen) else { return }
+                        if let recordingID = ownedRecordingID {
+                            chat.configureLiveMeetingBoard(
+                                recordingID: recordingID,
+                                title: title ?? calendarEventSnapshot?.title ?? "Current meeting",
+                                preparation: generated)
+                        }
+                    }
                     let activeSpeechPlan = await meetingRecordingService.activeMeetingSpeechPlan
                     guard self.ownsPendingStart(generation: gen) else {
                         self.recordIgnoredStartResult(generation: gen, outcome: "success")

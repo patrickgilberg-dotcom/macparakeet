@@ -56,6 +56,9 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   does not compete with an active answer or summary. Pause, stop and teardown
   cancel periodic work. An explicit Ask cancels and awaits background work before
   preparing its fresh transcript and context; it does not wait for the next tick.
+  The evidence board runs after memory in this same cancellable lane. A ready
+  project brief is reused as quoted background without a generation call on Ask.
+  See [board and preparation](live-meeting-board-and-preparation.md).
 - Immediate focus selects approximately the latest 30 seconds of recognized
   speech locally from numeric word timing. Its raw-source start extends back to
   the overlapping unbroken utterance's beginning: a speaker change or a gap
@@ -166,10 +169,13 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   the isolated Live database; they are user-authored records, not a polling cache
   of Google Calendar. A recording freezes its event context/project association
   at start and preserves the exact calendar title against automatic renaming.
-  Automatic three-minute updates send only recognized current-meeting text and,
+  Automatic three-minute memory updates send recognized current-meeting text and,
   for general memory, that meeting's prior general summary. The focus summary
   uses only its own selected recent source. Neither absorbs project history or
   sends raw audio. Both remain scoped to this live session's process.
+  The separately attributed evidence board also reads current notes and the
+  latest project source, as described in its own contract; these are not merged
+  into either current-meeting summary.
 - A selected project can add one separately labeled historical reference: the
   actual latest eligible prior project meeting before this recording began.
   Selection happens before readiness checks. A processing, failed, cancelled or
