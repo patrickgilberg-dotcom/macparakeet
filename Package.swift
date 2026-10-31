@@ -155,7 +155,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "ChatGPTLiveBenchmarkCLI",
-            dependencies: ["MacParakeetCore"],
+            dependencies: ["MacParakeetCore", "MacParakeetViewModels"],
             path: "benchmarks/chatgpt-live/Sources"
         ),
         // Local quality harness; never linked into or bundled with the app.

@@ -19,7 +19,13 @@ public enum LiveAnswerContext {
         change the claim; put further conditions in the supporting bullets. Brevity never overrides accuracy.
         Phrase proposed next steps conditionally; never turn proposals into commitments
         or imply an action or approval already happened. Do not invent account facts, owners or dates.
-        Focus on the current question, the latest completed three-minute summary, and fresh live speech.
+        Follow this context priority: the user's explicit question first; the raw now_focus and its complete
+        current_question_anchor next; then the completed three-minute summary; then general meeting background.
+        For an automatic Help Me Answer request, answer the latest other person's question using the current
+        anchor and freshest speech. Previous assistant messages may answer older questions; do not continue an
+        obsolete answer merely because it appears in history. An explicit typed request can ask about older context.
+        The now_focus normally covers thirty seconds, extended to preserve a complete question or turn. Never
+        invent the missing end of an incomplete question. A source-limit notice means some exact words are absent.
         The summary is a completed window, with its actual start/end time; it is not a new summary made for this Ask.
         Fresh speech and explicit corrections take priority over a cached summary. Use the general meeting summary
         as background for earlier decisions, constraints, people and unresolved issues; do not let an older topic
@@ -85,6 +91,7 @@ public enum LiveAnswerContext {
             <recent_transcript>\(context.recentTranscript)</recent_transcript>
             </current_meeting_source_details>
             \(focusContext(context))
+            \(nowContext(context.nowContext))
 
             Current question: \(question)
             """
@@ -98,6 +105,34 @@ public enum LiveAnswerContext {
         return [ChatMessage(role: .system, content: instructions)]
             + Array(retained.reversed())
             + [ChatMessage(role: .user, content: quotedContextAndQuestion)]
+    }
+
+    private static func nowContext(_ now: LiveMeetingNowSnapshot?) -> String {
+        guard let now else {
+            return
+                "<now_focus status=\"unavailable\">Use the available recent transcript and current question.</now_focus>"
+        }
+        let anchor: String
+        if let question = now.anchor {
+            anchor = """
+                <current_question_anchor start_ms="\(question.startMs)" end_ms="\(question.endMs)" complete="\(question.isComplete)" is_question="\(question.isQuestion)">
+                \(question.text)
+                </current_question_anchor>
+                """
+        } else {
+            anchor =
+                "<current_question_anchor status=\"unavailable\">No identifiable recent question or turn.</current_question_anchor>"
+        }
+        let limitation =
+            now.sourceWasLimited
+            ? "[Some source exceeds the now-focus limit. Do not assume the quoted question is complete; consult the other available source context.]\n"
+            : ""
+        return """
+            <now_focus start_ms="\(now.source.startMs)" end_ms="\(now.source.endMs)" source_limited="\(now.sourceWasLimited)">
+            \(anchor)
+            <now_speech>\(limitation)\(now.source.transcript)</now_speech>
+            </now_focus>
+            """
     }
 
     private static func focusContext(_ context: LiveMeetingMemorySnapshot) -> String {

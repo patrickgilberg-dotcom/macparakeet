@@ -806,7 +806,8 @@ final class MeetingRecordingFlowCoordinator {
                         }
                     },
                     sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() },
-                    focusSourceProvider: { [weak panelVM] in panelVM?.liveMeetingFocusSource }
+                    focusSourceProvider: { [weak panelVM] in panelVM?.liveMeetingFocusSource },
+                    nowSourceProvider: { [weak panelVM] in panelVM?.liveMeetingNowSnapshot }
                 )
                 configureProjectContext(for: panelVM.chatViewModel)
                 chatGPTPreparationTask?.cancel()

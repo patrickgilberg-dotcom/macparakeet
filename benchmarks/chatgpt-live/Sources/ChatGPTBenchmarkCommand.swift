@@ -61,6 +61,10 @@ struct ChatGPTBenchmarkCommand {
                     ?? (command == "focuscheck"
                         ? "/tmp/macparakeet-live-focuscheck.json" : "/tmp/macparakeet-live-contextcheck.json"),
                 includeFocus: command == "focuscheck")
+        case "freshnesscheck":
+            try await FreshnessCheck.run(
+                client: client, requestedModel: stringOption("--model", in: arguments),
+                outputPath: stringOption("--output", in: arguments) ?? "/tmp/macparakeet-live-freshnesscheck.json")
         case "idlecheck":
             guard transport == .webSocket else {
                 throw CommandError.message("Idle qualification uses --transport websocket.")
@@ -181,7 +185,7 @@ struct ChatGPTBenchmarkCommand {
         case "disconnect": try await auth.disconnect(); print("Disconnected locally.")
         default:
             print(
-                "chatgpt-live-benchmark login|unlock|status|models|benchmark|websocket|idlecheck|contextcheck|focuscheck|disconnect\nbenchmark options: --transport websocket|http-sse --trials 5 --models 3 [--model slug] --output /absolute/report.json\nwebsocket options: [--model selected-slug] --trials 5 (isolated socket versus explicit HTTP comparison)\nidlecheck options: --seconds 180 (30–600) --output /absolute/report.json; production warmUp, unused idle, then one synthetic request\ncontextcheck options: [--model selected-slug] --transport websocket|http-sse --output /absolute/report.json; synthetic periodic memory plus two cached Asks\nfocuscheck options: same options; separate three-minute focus/general summaries plus fresh speech and three cached Asks"
+                "chatgpt-live-benchmark login|unlock|status|models|benchmark|websocket|idlecheck|contextcheck|focuscheck|freshnesscheck|disconnect\nbenchmark options: --transport websocket|http-sse --trials 5 --models 3 [--model slug] --output /absolute/report.json\nwebsocket options: [--model selected-slug] --trials 5 (isolated socket versus explicit HTTP comparison)\nidlecheck options: --seconds 180 (30–600) --output /absolute/report.json; production warmUp, unused idle, then one synthetic request\ncontextcheck options: [--model selected-slug] --transport websocket|http-sse --output /absolute/report.json; synthetic periodic memory plus two cached Asks\nfocuscheck options: same options; separate three-minute focus/general summaries plus fresh speech and three cached Asks\nfreshnesscheck options: same options; real ViewModel Ask/Update with complete thirty-second questions and fresh context"
             )
         }
     }

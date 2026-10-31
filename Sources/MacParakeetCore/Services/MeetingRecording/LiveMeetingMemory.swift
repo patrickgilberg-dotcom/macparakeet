@@ -78,15 +78,17 @@ public struct LiveMeetingMemorySnapshot: Sendable, Equatable {
     public let coverage: LiveMeetingMemoryCoverage
     public let focusSummary: LiveMeetingFocusSummary?
     public let focusSource: LiveMeetingFocusSource?
+    public let nowContext: LiveMeetingNowSnapshot?
 
     public init(
         recentTranscript: String, earlierSummary: String, questionExcerpts: String,
         coverage: LiveMeetingMemoryCoverage,
-        focusSummary: LiveMeetingFocusSummary? = nil, focusSource: LiveMeetingFocusSource? = nil
+        focusSummary: LiveMeetingFocusSummary? = nil, focusSource: LiveMeetingFocusSource? = nil,
+        nowContext: LiveMeetingNowSnapshot? = nil
     ) {
         self.recentTranscript = recentTranscript; self.earlierSummary = earlierSummary
         self.questionExcerpts = questionExcerpts; self.coverage = coverage
-        self.focusSummary = focusSummary; self.focusSource = focusSource
+        self.focusSummary = focusSummary; self.focusSource = focusSource; self.nowContext = nowContext
     }
 }
 
@@ -171,6 +173,7 @@ public actor LiveMeetingMemory {
     public func prepare(
         transcript: String, question: String, cacheKey: String = "",
         focusSource: LiveMeetingFocusSource? = nil,
+        nowContext: LiveMeetingNowSnapshot? = nil,
         summarize: @escaping @Sendable ([ChatMessage]) async throws -> String,
         progress: (@Sendable (LiveMeetingMemoryProgress) async -> Void)? = nil
     ) async throws -> LiveMeetingMemorySnapshot {
@@ -187,7 +190,7 @@ public actor LiveMeetingMemory {
                 coverage: .init(
                     mode: .fullRaw, totalCharacters: source.count, rawCharacters: source.count,
                     summarizedCharacters: summarized, overlapCharacters: summarized),
-                focusSummary: readyFocus(for: focusSource), focusSource: focusSource)
+                focusSummary: readyFocus(for: focusSource), focusSource: focusSource, nowContext: nowContext)
         }
         let rawStart = source.count - limits.recent
         try await build(
@@ -202,7 +205,7 @@ public actor LiveMeetingMemory {
             coverage: .init(
                 mode: .allEarlierSummarized, totalCharacters: source.count, rawCharacters: limits.recent,
                 summarizedCharacters: summarized, overlapCharacters: max(0, summarized - rawStart)),
-            focusSummary: readyFocus(for: focusSource), focusSource: focusSource)
+            focusSummary: readyFocus(for: focusSource), focusSource: focusSource, nowContext: nowContext)
     }
 
     /// Summarize the entire recognized snapshot, including short meetings. A

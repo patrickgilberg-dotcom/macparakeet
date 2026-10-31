@@ -39,6 +39,13 @@ public final class TranscriptChatViewModel {
     /// Local-only account/meeting facts prepared before the call. Sent only on an explicit Ask.
     public var livePreparationContext: String = ""
     public private(set) var liveAnswerTiming: LiveAnswerTiming?
+    public private(set) var liveAnswerQuestionAnchor: String?
+    public private(set) var liveAnswerSnapshotDate: Date?
+    public private(set) var liveAnswerConversationMovedOn = false
+    private var liveAnswerNowSnapshot: LiveMeetingNowSnapshot?
+    private var lastLiveQuestionPrompt: String?
+    private static let defaultLiveQuestionPrompt =
+        "Help me answer the latest question the other person asked. Give me a concise, natural reply I can say aloud now."
     public private(set) var usesDirectLiveAnswers = false
     public private(set) var liveMeetingMemoryProgress: LiveMeetingMemoryProgress?
     public private(set) var lastLiveMeetingMemory: LiveMeetingMemorySnapshot?
@@ -107,6 +114,7 @@ public final class TranscriptChatViewModel {
     private var userNotesProvider: (@MainActor () -> String?)?
     private var prepareLiveTranscript: (@MainActor () async throws -> Void)?
     private var focusSourceProvider: (@MainActor () -> LiveMeetingFocusSource?)?
+    private var nowSourceProvider: (@MainActor () -> LiveMeetingNowSnapshot?)?
     private var directLiveSessionProvider: (@Sendable () async throws -> LiveAnswerStreamSession)?
     private var liveAnswerPreferencesProvider: (@Sendable () async throws -> LiveMeetingPreferences)?
     private var liveMeetingMemory = LiveMeetingMemory()
@@ -142,12 +150,13 @@ public final class TranscriptChatViewModel {
         prepareTranscript: @escaping @MainActor () async throws -> Void,
         stream: @escaping @Sendable ([ChatMessage]) -> AsyncThrowingStream<String, Error>,
         focusSourceProvider: (@MainActor () -> LiveMeetingFocusSource?)? = nil,
+        nowSourceProvider: (@MainActor () -> LiveMeetingNowSnapshot?)? = nil,
         summaryRefreshInterval: Duration = .seconds(180)
     ) {
         configureDirectLiveAnswers(
             prepareTranscript: prepareTranscript,
             sessionProvider: { LiveAnswerStreamSession(cacheKey: "injected-live-provider", stream: stream) },
-            focusSourceProvider: focusSourceProvider,
+            focusSourceProvider: focusSourceProvider, nowSourceProvider: nowSourceProvider,
             summaryRefreshInterval: summaryRefreshInterval)
     }
 
@@ -156,6 +165,7 @@ public final class TranscriptChatViewModel {
         prepareTranscript: @escaping @MainActor () async throws -> Void,
         sessionProvider: @escaping @Sendable () async throws -> LiveAnswerStreamSession,
         focusSourceProvider: (@MainActor () -> LiveMeetingFocusSource?)? = nil,
+        nowSourceProvider: (@MainActor () -> LiveMeetingNowSnapshot?)? = nil,
         summaryRefreshInterval: Duration = .seconds(180)
     ) {
         cancelStreaming()
@@ -163,6 +173,8 @@ public final class TranscriptChatViewModel {
         usesDirectLiveAnswers = true
         self.prepareLiveTranscript = prepareTranscript
         self.focusSourceProvider = focusSourceProvider
+        self.nowSourceProvider = nowSourceProvider
+        clearLiveAnswerFreshness()
         directLiveSessionProvider = sessionProvider
         liveMeetingMemory = LiveMeetingMemory()
         lastLiveMeetingMemory = nil
@@ -187,6 +199,7 @@ public final class TranscriptChatViewModel {
         liveHistoryStartIndex = chatHistory.count
         lastAnswerProjectScopeKey = nil
         eventPreparationContext = eventPreparation
+        clearLiveAnswerFreshness()
         projectSourceProvider = sourceProvider
         lastLiveProjectContext = nil
         liveProjectContextStatus = nil
@@ -355,10 +368,45 @@ public final class TranscriptChatViewModel {
         guard canSendMessage else { return }
         cancelStreaming()
         inputText = "Help me answer this"
-        sendMessage(
-            richPrompt:
-                "Help me answer the latest question the other person asked. Give me a concise, natural reply I can say aloud now.",
-            requestedAt: requestedAt)
+        sendMessage(richPrompt: Self.defaultLiveQuestionPrompt, requestedAt: requestedAt)
+    }
+
+    public var canUpdateLiveAnswer: Bool {
+        usesDirectLiveAnswers && canSendMessage && liveAnswerConversationMovedOn && lastLiveQuestionPrompt != nil
+    }
+
+    /// Local observation only. New speech never starts or restarts inference.
+    public func refreshLiveAnswerFreshness() {
+        guard usesDirectLiveAnswers, !liveAnswerConversationMovedOn,
+            let previous = liveAnswerNowSnapshot, let current = nowSourceProvider?()
+        else { return }
+        if LiveMeetingNowTranscript.conversationMovedOn(from: previous, to: current) {
+            liveAnswerConversationMovedOn = true
+        }
+    }
+
+    /// Refresh the prior intent, preserving an unsent composer draft. A running
+    /// request reuses its admitted user turn; a completed answer stays readable.
+    public func updateLiveAnswer() {
+        guard canUpdateLiveAnswer, let question = lastLiveQuestionPrompt else { return }
+        let draft = inputText
+        defer { inputText = draft }
+        if isStreaming { cancelStreaming() }
+        errorMessage = nil
+        if chatHistory.last?.role == .user {
+            startStreamingAssistant(question: question, historyForRequest: Array(chatHistory.dropLast()))
+        } else {
+            inputText = "Update answer"
+            sendMessage(richPrompt: question)
+        }
+    }
+
+    private func clearLiveAnswerFreshness() {
+        liveAnswerNowSnapshot = nil
+        liveAnswerQuestionAnchor = nil
+        liveAnswerSnapshotDate = nil
+        liveAnswerConversationMovedOn = false
+        lastLiveQuestionPrompt = nil
     }
 
     public var modelDisplayName: String {
@@ -588,7 +636,11 @@ public final class TranscriptChatViewModel {
         let capturedProjectSourceProvider = projectSourceProvider
         let capturedEventPreparation = eventPreparationContext
         let capturedPreferencesProvider = liveAnswerPreferencesProvider
-        if directLiveSessionProvider != nil { liveAnswerTiming = LiveAnswerTiming() }
+        if directLiveSessionProvider != nil {
+            clearLiveAnswerFreshness()
+            lastLiveQuestionPrompt = question
+            liveAnswerTiming = LiveAnswerTiming()
+        }
 
         let assistantID = UUID()
         let assistantMessage = ChatDisplayMessage(id: assistantID, role: .assistant, content: "", isStreaming: true)
@@ -655,6 +707,15 @@ public final class TranscriptChatViewModel {
                 // Read after the audio barrier, so the pending end of the question is included.
                 let transcript = directLiveSessionProvider == nil ? capturedTranscript : meetingTranscriptSnapshot()
                 let focusSource = directLiveSessionProvider == nil ? nil : focusSourceProvider?()
+                let nowContext = directLiveSessionProvider == nil ? nil : nowSourceProvider?()
+                if directLiveSessionProvider != nil, streamingAssistantID == assistantID {
+                    liveAnswerNowSnapshot = nowContext
+                    liveAnswerSnapshotDate = Date()
+                    liveAnswerQuestionAnchor =
+                        question == Self.defaultLiveQuestionPrompt
+                        ? nowContext?.anchor?.text ?? "Latest live question" : question
+                    liveAnswerConversationMovedOn = false
+                }
                 let userNotes = directLiveSessionProvider == nil ? capturedNotes : userNotesProvider?()
                 let stream: AsyncThrowingStream<String, Error>
                 if let session = liveSession {
@@ -663,7 +724,7 @@ public final class TranscriptChatViewModel {
                     let memory = liveMeetingMemory
                     let memorySnapshot = try await memory.prepare(
                         transcript: transcript, question: question, cacheKey: session.cacheKey,
-                        focusSource: focusSource,
+                        focusSource: focusSource, nowContext: nowContext,
                         summarize: { messages in
                             var result = ""
                             for try await text in session.stream(messages: messages) {
@@ -813,6 +874,7 @@ public final class TranscriptChatViewModel {
                     isStreaming = false
                     if directLiveSessionProvider != nil {
                         lastLiveMeetingMemory = preparedMeetingMemory
+                        refreshLiveAnswerFreshness()
                         lastLiveProjectContext = preparedProjectContext
                         lastAnswerProjectScopeKey = preparedProjectContext?.scopeKey
                         liveProjectContextStatus = preparedProjectContext?.statusLabel
@@ -984,6 +1046,7 @@ public final class TranscriptChatViewModel {
     /// should run against the latest text without losing prior turns.
     public func updateTranscriptText(_ text: String) {
         transcriptText = text
+        refreshLiveAnswerFreshness()
     }
 
     /// Wire a closure that returns the user's typed meeting notes at chat-send
@@ -1131,6 +1194,7 @@ public final class TranscriptChatViewModel {
 
     public func newChat() {
         detachCurrentStreaming()
+        clearLiveAnswerFreshness()
         discardEmptyCurrentConversation()
 
         messages.removeAll()
@@ -1150,6 +1214,7 @@ public final class TranscriptChatViewModel {
 
     public func switchConversation(_ conversation: ChatConversation) {
         detachCurrentStreaming()
+        clearLiveAnswerFreshness()
         discardEmptyCurrentConversation()
 
         loadConversationMessages(conversation)
@@ -1197,6 +1262,7 @@ public final class TranscriptChatViewModel {
     /// Clears all conversations for the current transcript (used when retranscribing).
     public func clearHistory() {
         cancelStreaming()
+        clearLiveAnswerFreshness()
         lastLiveMeetingMemory = nil
         lastLiveProjectContext = nil
         lastAnswerProjectScopeKey = nil

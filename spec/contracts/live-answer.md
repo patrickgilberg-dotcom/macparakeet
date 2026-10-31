@@ -15,9 +15,9 @@ account conversations or personal memory. The editable starter reflects only
 the user's requested concise, direct wording; no biography or example messages
 are invented. See [meeting preferences](live-meeting-preferences-v1.md).
 
-- Help me answer this and custom questions prioritize the latest completed
-  three-minute focus summary and fresh speech, while retaining general meeting
-  memory as background. An explicit question about earlier discussion can use
+- Help me answer this and custom questions prioritize the explicit question and
+  immediate raw-speech focus, followed by the latest completed three-minute
+  summary, while retaining general meeting memory as background. An explicit question about earlier discussion can use
   that background and exact excerpts. They prepare current context and then
   perform one final streamed answer call. Periodic and catch-up summaries can
   make additional model calls through the same approved ChatGPT client.
@@ -56,6 +56,32 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   does not compete with an active answer or summary. Pause, stop and teardown
   cancel periodic work. An explicit Ask cancels and awaits background work before
   preparing its fresh transcript and context; it does not wait for the next tick.
+- Immediate focus selects approximately the latest 30 seconds of recognized
+  speech locally from numeric word timing. Selection extends to preserve the
+  complete relevant question or speaker turn rather than cutting it at a fixed
+  time boundary. A complete question can remain the answer anchor during
+  silence. This raw source requires no additional model summary call. Existing
+  complete-source context remains available when a question needs more history.
+  Immediate source, three-minute source, transcript and user notes are captured
+  as one answer snapshot before asynchronous preference or context preparation.
+  Their data remains quoted context and cannot override the answer rules.
+- Each explicit live answer keeps its captured question/turn and capture time
+  visible while preparing, streaming and completed. This is a stable answer
+  anchor, not a claim that an in-flight request continuously receives new
+  speech. Context-capture time does not promise an acoustic speech boundary.
+- Meaningful new discussion or a correction can mark the anchored answer as
+  superseded. Silence, elapsed time and duplicate source emissions alone do not
+  make an answer stale. This detection is local and adds no model calls.
+  A visible “Conversation moved on” notice offers “Update answer” during or
+  after generation. Update is explicit: it cancels an in-flight generation,
+  crosses the fresh-transcript barrier and prepares a new consistent snapshot.
+  The current typed question stays explicit; an implicit Help request can use
+  the latest complete question. Refresh while an admitted request is active
+  reuses its existing user turn; refreshing a completed answer adds a visible
+  Update answer turn while preserving its original intent. An unsent composer
+  draft is retained. A new source token does not automatically restart inference.
+  Previously completed answers remain readable, and cancelled partial output
+  does not become a successful assistant/history turn.
 - Recent focus uses the recognized words overlapping the latest 180 seconds on
   the recording timeline, including a word that straddles the start boundary.
   Numeric word timestamps select this source independently of plain/rich text
@@ -128,8 +154,9 @@ are invented. See [meeting preferences](live-meeting-preferences-v1.md).
   [Google Calendar and project context](google-calendar-live.md).
 - Ask shows review progress and the last successful background update or its
   error. The optional context disclosure belongs to the last completed answer:
-  it shows that answer's recent focus and actual completed window, plus general
-  meeting background, including when the full raw transcript was available.
+  it shows that answer's immediate raw focus, recent summary and actual completed
+  windows, plus general meeting background, including when the full raw
+  transcript was available.
   Missing summaries are labeled explicitly. It also identifies raw/summary
   coverage and includes recent speech captured when Ask was pressed. It is not
   the continuously updating background summary. Summary omissions are disclosed, and the source
@@ -174,6 +201,9 @@ or establish acoustic speech-end timing. The validation report identifies each
 measured revision and the additional focused calendar-startup repair separately.
 
 The separate recent-focus/general-background policy is tracked in
-[its implementation plan](../../plans/active/2026-10-30-live-three-minute-focus.md).
-Its focused checks, signed build and installed qualification are pending; the
-earlier revision evidence above does not qualify this new request shape.
+[its implementation plan](../../plans/active/2026-10-30-live-three-minute-focus.md)
+and [source-specific qualification](../../docs/macparakeet-live-focus-validation.md).
+The immediate-focus and explicit-refresh extension is tracked in
+[its implementation plan](../../plans/active/2026-10-30-live-now-focus-and-refresh.md).
+Its qualification is pending; prior revision evidence does not qualify the new
+immediate-focus projection or refresh interaction.

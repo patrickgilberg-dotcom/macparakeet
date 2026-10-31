@@ -172,6 +172,7 @@ public final class MeetingRecordingPanelViewModel {
         liveTimelineWords = update.words
         liveTimelineSpeakers = update.speakers
         hasLiveTimeline = true
+        chatViewModel.refreshLiveAnswerFreshness()
     }
 
     public var liveMeetingFocusSource: LiveMeetingFocusSource? {
@@ -179,6 +180,15 @@ public final class MeetingRecordingPanelViewModel {
         let seconds = max(0, elapsedSeconds)
         let elapsedMs = seconds > Int.max / 1_000 ? Int.max : seconds * 1_000
         return LiveMeetingFocusTranscript.project(
+            words: liveTimelineWords, speakers: liveTimelineSpeakers, elapsedMs: elapsedMs,
+            includeTimestamps: transcriptAIContextModeProvider() == .richTranscript)
+    }
+
+    public var liveMeetingNowSnapshot: LiveMeetingNowSnapshot? {
+        guard hasLiveTimeline else { return nil }
+        let seconds = max(0, elapsedSeconds)
+        let elapsedMs = seconds > Int.max / 1_000 ? Int.max : seconds * 1_000
+        return LiveMeetingNowTranscript.project(
             words: liveTimelineWords, speakers: liveTimelineSpeakers, elapsedMs: elapsedMs,
             includeTimestamps: transcriptAIContextModeProvider() == .richTranscript)
     }

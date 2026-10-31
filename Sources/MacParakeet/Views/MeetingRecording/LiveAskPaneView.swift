@@ -187,8 +187,9 @@ struct LiveAskPaneView: View {
             )
             .font(.caption)
             .foregroundStyle(DesignSystem.Colors.textSecondary)
+            answerFreshnessControls
             Text(
-                "Summaries refresh every 3 minutes. Answers focus on the latest completed window and fresh speech, with general meeting background."
+                "Answers use the latest question and about 30 seconds of speech, plus three-minute and general summaries. Summaries refresh every 3 minutes."
             )
             .font(.caption)
             .foregroundStyle(DesignSystem.Colors.textSecondary)
@@ -210,7 +211,7 @@ struct LiveAskPaneView: View {
             if viewModel.liveMeetingMemoryProgress != nil {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.mini)
-                    Text("Reviewing earlier discussion…")
+                    Text("Preparing meeting context…")
                         .font(.caption)
                         .foregroundStyle(DesignSystem.Colors.textSecondary)
                 }
@@ -233,7 +234,19 @@ struct LiveAskPaneView: View {
             if let context = viewModel.lastLiveMeetingMemory {
                 DisclosureGroup("Context for last completed answer", isExpanded: $showingAnswerContext) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Recent focus").fontWeight(.semibold)
+                        Text("Now focus").fontWeight(.semibold)
+                        if let now = context.nowContext {
+                            Text(
+                                "Captured speech: \(focusWindowLabel(startMs: now.source.startMs, endMs: now.source.endMs))"
+                            )
+                            nowFocusDetails(now)
+                            if now.sourceWasLimited {
+                                Text("Immediate context was shortened. The full transcript remains available.")
+                            }
+                        } else {
+                            Text("Immediate focus was unavailable. The available transcript supplied context.")
+                        }
+                        Text("Three-minute focus").fontWeight(.semibold)
                         if let focus = context.focusSummary {
                             Text(
                                 "Latest completed window: \(focusWindowLabel(startMs: focus.startMs, endMs: focus.endMs))"
@@ -293,6 +306,83 @@ struct LiveAskPaneView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.md)
         .padding(.top, 8)
+    }
+
+    @ViewBuilder
+    private var answerFreshnessControls: some View {
+        if let capturedAt = viewModel.liveAnswerSnapshotDate {
+            VStack(alignment: .leading, spacing: 4) {
+                if let anchor = viewModel.liveAnswerQuestionAnchor, !anchor.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Answering").font(.caption2).fontWeight(.semibold)
+                        Text(anchor)
+                            .font(.caption)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                            .help(anchor)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("live-answer-snapshot-anchor")
+                }
+                HStack(spacing: 3) {
+                    Text("Context captured")
+                    Text(capturedAt, style: .relative)
+                    Text("ago")
+                }
+                .font(.caption2)
+                .foregroundStyle(DesignSystem.Colors.textTertiary)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("live-answer-context-captured")
+                if viewModel.liveAnswerConversationMovedOn {
+                    HStack(spacing: 8) {
+                        Text("Conversation moved on")
+                            .font(.caption)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                            .accessibilityIdentifier("live-answer-conversation-moved-on")
+                        Spacer(minLength: 4)
+                        Button {
+                            viewModel.updateLiveAnswer()
+                        } label: {
+                            Label("Update answer", systemImage: "arrow.clockwise")
+                        }
+                        .parakeetAction(.secondary)
+                        .controlSize(.small)
+                        .disabled(!viewModel.canUpdateLiveAnswer)
+                        .accessibilityIdentifier("live-answer-update-button")
+                        .help("Use fresh speech to update this answer.")
+                    }
+                }
+            }
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func nowFocusDetails(_ now: LiveMeetingNowSnapshot) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if let anchor = now.anchor {
+                    Text(
+                        anchor.isQuestion
+                            ? (anchor.isComplete ? "Complete question" : "Captured question")
+                            : (anchor.isComplete ? "Captured speaker turn" : "Captured speaker turn")
+                    )
+                    .fontWeight(.medium)
+                    Text(anchor.text).textSelection(.enabled)
+                }
+                if !now.source.transcript.isEmpty {
+                    if now.anchor != nil {
+                        Text("Immediate speech").fontWeight(.medium)
+                    }
+                    Text(now.source.transcript).textSelection(.enabled)
+                } else if now.anchor == nil {
+                    Text("No immediate speech was recognized for this answer.")
+                }
+            }
+            .font(.system(size: 12))
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: 150)
+        .accessibilityIdentifier("live-answer-now-context")
     }
 
     private func contextSummaryText(_ text: String) -> some View {
