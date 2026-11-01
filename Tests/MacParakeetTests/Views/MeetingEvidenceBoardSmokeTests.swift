@@ -36,7 +36,7 @@ final class MeetingEvidenceBoardSmokeTests: XCTestCase {
         }
     }
 
-    func testNativeSourceButtonOpensExactNoteQuotationAndProvenanceSheet() throws {
+    func testNativeSourceButtonOpensExactNoteQuotationAndProvenanceSheet() async throws {
         let quote = "Ask whether Zephyr still needs finance approval."
         let source =
             quote + "\n" + String(repeating: "My supporting personal note. ", count: 40) + "FULL_SOURCE_END_MARKER"
@@ -48,11 +48,20 @@ final class MeetingEvidenceBoardSmokeTests: XCTestCase {
         let snapshot = MeetingBoardSnapshot(
             scopeKey: "synthetic-source-disclosure", documents: [document], items: [item],
             coverageDescription: "Checked the captured notes.")
-        let host = NSHostingView(rootView: MeetingEvidenceBoardView(snapshot: snapshot))
+        let preparation = syntheticPreparation(snapshot: snapshot)
+        let host = NSHostingView(
+            rootView:
+                VStack(spacing: 0) {
+                    LivePreparedMeetingCard(preparation: preparation)
+                    Divider()
+                    MeetingEvidenceBoardView(snapshot: snapshot)
+                })
+        let originalActivationPolicy = NSApplication.shared.activationPolicy()
         let window = mount(host, size: NSSize(width: 420, height: 520), onScreen: true)
         defer {
             if let sheet = window.attachedSheet { window.endSheet(sheet); sheet.orderOut(nil) }
             window.orderOut(nil); window.close()
+            NSApplication.shared.setActivationPolicy(originalActivationPolicy)
         }
         // Optional short manual-check window: only this synthetic board is
         // shown, and its ordinary native controls remain usable by Cua/AX.
@@ -60,7 +69,7 @@ final class MeetingEvidenceBoardSmokeTests: XCTestCase {
             let seconds = Double(value), seconds > 0
         {
             print("Synthetic board UI available: \(window.title)")
-            settle(min(seconds, 60))
+            try await holdNativePreview(seconds: min(seconds, 60))
         }
         let objects = accessibilityObjects(window)
         guard
@@ -110,6 +119,17 @@ final class MeetingEvidenceBoardSmokeTests: XCTestCase {
         }
     }
 
+    private func syntheticPreparation(snapshot: MeetingBoardSnapshot) -> MeetingGeneratedPreparation {
+        MeetingGeneratedPreparation(
+            key: .init(calendarID: "synthetic-calendar", eventID: "synthetic-occurrence"),
+            projectID: UUID(uuidString: "79DDB78E-73E7-4B1C-B567-7F67683DA378")!,
+            projectName: "Synthetic Zephyr", sourceScopeKey: snapshot.scopeKey,
+            manualContextHash: MeetingGeneratedPreparation.hash("Synthetic approval review"),
+            eventTitle: "Synthetic approval review", startTime: Date().addingTimeInterval(900),
+            board: snapshot, providerIdentityHash: MeetingGeneratedPreparation.hash("synthetic-provider"),
+            sourceStatus: "Latest synthetic meeting and saved personal notes; completion is unverified.")
+    }
+
     private func fixture() -> MeetingBoardSnapshot {
         let documents = [
             MeetingEvidenceDocument(
@@ -148,6 +168,7 @@ final class MeetingEvidenceBoardSmokeTests: XCTestCase {
         window.contentView = host
         host.setFrameSize(size)
         if onScreen {
+            NSApplication.shared.setActivationPolicy(.regular)
             window.makeKeyAndOrderFront(nil)
             NSApplication.shared.activate(ignoringOtherApps: true)
         } else {
@@ -160,6 +181,37 @@ final class MeetingEvidenceBoardSmokeTests: XCTestCase {
 
     private func settle(_ seconds: TimeInterval = 0.2) {
         RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    /// Explicit manual acceptance mode needs AppKit's event dispatcher, not
+    /// just XCTest's timer loop. The posted wake event stays in this app queue.
+    private func holdNativePreview(seconds: TimeInterval) async throws {
+        let application = NSApplication.shared
+        print(
+            "Synthetic native preview: isRunning=\(application.isRunning), bundleID=\(Bundle.main.bundleIdentifier ?? "none")"
+        )
+        if application.isRunning {
+            try await Task.sleep(for: .seconds(seconds))
+            return
+        }
+        application.finishLaunching()
+        let timer = Timer(timeInterval: seconds, repeats: false) { _ in
+            MainActor.assumeIsolated {
+                let application = NSApplication.shared
+                application.stop(nil)
+                if let event = NSEvent.otherEvent(
+                    with: .applicationDefined, location: .zero, modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: 0, context: nil,
+                    subtype: 0, data1: 0, data2: 0)
+                {
+                    application.postEvent(event, atStart: true)
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        defer { timer.invalidate() }
+        application.run()
+        try Task.checkCancellation()
     }
 
     private func findScrollView(_ view: NSView) -> NSScrollView? {

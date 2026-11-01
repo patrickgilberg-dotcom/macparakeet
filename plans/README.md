@@ -189,5 +189,5 @@ These were merged/resolved but left in `active/`; moved with a ship-evidence not
 
 ## Personal fork implementation records
 
-- [Live evidence board and automatic project preparation](active/2026-10-31-live-board-and-meeting-prep.md) — implemented, installed and pushed on `feat/macparakeet-live`; **QA REMAINDER:** final on-screen acceptance awaits manual Mac unlock. The [validation report](../docs/macparakeet-live-board-preparation-validation.md) records provider checks, preserved data and full-suite limits.
+- [Live evidence board and automatic project preparation](completed/2026-10-31-live-board-and-meeting-prep.md) — implemented, installed and pushed on `feat/macparakeet-live`; final quiet Prepare/card/quotation acceptance completed after unlock. The [validation report](../docs/macparakeet-live-board-preparation-validation.md) records provider checks, preserved data and full-suite limits.
 - [Immediate live focus and explicit answer refresh](completed/2026-10-30-live-now-focus-and-refresh.md) — completed on `feat/macparakeet-live`. The [qualification report](../docs/macparakeet-live-now-validation.md) records the installed build, physical recording revision and test limits.
