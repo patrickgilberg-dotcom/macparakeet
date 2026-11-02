@@ -70,6 +70,15 @@ seeing an event in a shared calendar does not establish that the user attends;
 the Google provider supplies `isUserMeeting`, and automation applies that policy.
 This narrow draft store is not a mirrored calendar event database.
 
+The personal Live fork also organizes companies separately from projects. A
+local thirty-day sweep discovers companies from eligible business attendee or
+organizer domains on included calendars. Known-company title matching supports
+internal follow-ups without external guests; ambiguous cases stay unresolved.
+Company records contain names/domains, never a calendar inventory. Saved
+occurrence choices win. Company discovery does not choose a project or establish
+attendance for recording auto-start; project context remains latest-project-only.
+See `spec/contracts/live-company-organization.md` for the matching boundaries.
+
 Pass the selected event's exact title and matching snapshot into recording.
 Explicit title intent survives session, crash lock, output and transcription;
 automatic title generation must not replace it, including titles such as

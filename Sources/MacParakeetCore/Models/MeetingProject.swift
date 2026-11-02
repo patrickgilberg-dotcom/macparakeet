@@ -5,16 +5,18 @@ import GRDB
 public struct MeetingProject: Codable, Identifiable, Sendable, Equatable {
     public var id: UUID
     public var name: String
+    public var companyID: UUID?
     public var sortOrder: Int
     public var isArchived: Bool
     public var createdAt: Date
     public var updatedAt: Date
 
     public init(
-        id: UUID = UUID(), name: String, sortOrder: Int = 0, isArchived: Bool = false,
+        id: UUID = UUID(), name: String, companyID: UUID? = nil, sortOrder: Int = 0, isArchived: Bool = false,
         createdAt: Date = Date(), updatedAt: Date = Date()
     ) {
         self.id = id; self.name = name; self.sortOrder = sortOrder; self.isArchived = isArchived
+        self.companyID = companyID
         self.createdAt = createdAt; self.updatedAt = updatedAt
     }
 }
@@ -22,7 +24,7 @@ public struct MeetingProject: Codable, Identifiable, Sendable, Equatable {
 extension MeetingProject: FetchableRecord, PersistableRecord {
     public static let databaseTableName = "meeting_projects"
     public enum Columns: String, ColumnExpression {
-        case id, name, sortOrder, isArchived, createdAt, updatedAt
+        case id, name, companyID, sortOrder, isArchived, createdAt, updatedAt
     }
 }
 

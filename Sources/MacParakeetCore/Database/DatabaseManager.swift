@@ -2539,6 +2539,49 @@ public final class DatabaseManager: Sendable {
             try db.create(index: "meeting_minutes_jobs_source", on: "meeting_minutes_jobs", columns: ["transcriptionID", "createdAt"])
         }
 
+        migrator.registerMigration("v0.53-company-meeting-organization") { db in
+            try db.create(table: "meeting_companies") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("attendeeDomains", .text).notNull().defaults(to: "[]")
+                t.column("isArchived", .boolean).notNull().defaults(to: false)
+                t.column("createdAt", .datetime).notNull()
+                t.column("updatedAt", .datetime).notNull()
+            }
+            try db.execute(
+                sql: "CREATE UNIQUE INDEX idx_meeting_companies_name ON meeting_companies(name COLLATE NOCASE)")
+            try db.create(table: "transcription_company_memberships") { t in
+                t.column("transcriptionID", .text).primaryKey().references("transcriptions", onDelete: .cascade)
+                t.column("companyID", .text).notNull().references("meeting_companies", onDelete: .cascade)
+                t.column("assignedAt", .datetime).notNull()
+            }
+            try db.create(
+                index: "idx_transcription_company_memberships_company", on: "transcription_company_memberships",
+                columns: ["companyID", "transcriptionID"])
+            try db.alter(table: "meeting_projects") { t in
+                t.add(column: "companyID", .text).references("meeting_companies", onDelete: .setNull)
+            }
+            try db.drop(index: "idx_meeting_projects_name")
+            try db.execute(
+                sql: """
+                    CREATE UNIQUE INDEX idx_meeting_projects_company_name
+                    ON meeting_projects(companyID, name COLLATE NOCASE) WHERE companyID IS NOT NULL
+                    """)
+            try db.execute(
+                sql: """
+                    CREATE UNIQUE INDEX idx_meeting_projects_unowned_name
+                    ON meeting_projects(name COLLATE NOCASE) WHERE companyID IS NULL
+                    """)
+            try db.alter(table: "meeting_preparations") { t in
+                t.add(column: "companyID", .text).references("meeting_companies", onDelete: .setNull)
+                t.add(column: "companySelectionIsExplicit", .boolean)
+            }
+            try db.alter(table: "recording_meeting_associations") { t in
+                t.add(column: "companyID", .text).references("meeting_companies", onDelete: .setNull)
+                t.add(column: "companyNameSnapshot", .text)
+            }
+        }
+
         return migrator
     }
 

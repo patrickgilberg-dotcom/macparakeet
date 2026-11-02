@@ -62,6 +62,11 @@ public final class TranscriptChatViewModel {
     private var boardRecordingID: UUID?
     private var boardMeetingTitle = "Current meeting"
     private var beforeLiveBackgroundWork: (@MainActor () async -> Void)?
+    private var liveOrganizationIsSaving: (@MainActor () -> Bool)?
+
+    public func configureLiveOrganizationAvailability(_ isSaving: @escaping @MainActor () -> Bool) {
+        liveOrganizationIsSaving = isSaving
+    }
 
     public var isPerformingLiveAIWork: Bool {
         isStreaming || backgroundSummaryTask != nil || projectPrefetchTask != nil
@@ -161,7 +166,7 @@ public final class TranscriptChatViewModel {
     private let logger = Logger(subsystem: "com.macparakeet.viewmodels", category: "TranscriptChatViewModel")
 
     public var canSendMessage: Bool {
-        llmService != nil || directLiveSessionProvider != nil
+        (llmService != nil || directLiveSessionProvider != nil) && liveOrganizationIsSaving?() != true
     }
 
     /// Read saved preferences for each explicit Ask; never include writing samples in summaries.
@@ -263,6 +268,16 @@ public final class TranscriptChatViewModel {
         }
     }
 
+    /// A company/project change cancels and settles the old provider owners
+    /// before replacing historical context. Current transcript, typed notes,
+    /// completed answers and current-meeting summary memory remain intact.
+    public func preemptLiveOrganizationWork() async {
+        let previous = streamingTask
+        cancelStreaming()
+        await preemptBackgroundSummary()
+        await previous?.value
+    }
+
     /// Generated preparation is a source-checked historical aid, never authored Notes.
     public func configureLiveMeetingBoard(
         recordingID: UUID, title: String, preparation: MeetingGeneratedPreparation? = nil
@@ -320,7 +335,7 @@ public final class TranscriptChatViewModel {
     }
 
     private func beginBackgroundSummaryUpdate() {
-        guard summaryUpdatesEnabled, !isStreaming, backgroundSummaryTask == nil,
+        guard summaryUpdatesEnabled, liveOrganizationIsSaving?() != true, !isStreaming, backgroundSummaryTask == nil,
             let provider = directLiveSessionProvider
         else { return }
         let hasTranscript = !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -497,6 +512,7 @@ public final class TranscriptChatViewModel {
     }
 
     public func helpMeAnswer(requestedAt: ContinuousClock.Instant = ContinuousClock.now) {
+        guard !rejectWhileSavingOrganization() else { return }
         guard canSendMessage else { return }
         cancelStreaming()
         inputText = "Help me answer this"
@@ -520,6 +536,7 @@ public final class TranscriptChatViewModel {
     /// Refresh the prior intent, preserving an unsent composer draft. A running
     /// request reuses its admitted user turn; a completed answer stays readable.
     public func updateLiveAnswer() {
+        guard !rejectWhileSavingOrganization() else { return }
         guard canUpdateLiveAnswer, let question = lastLiveQuestionPrompt else { return }
         let draft = inputText
         defer { inputText = draft }
@@ -666,6 +683,7 @@ public final class TranscriptChatViewModel {
     ///   more") but the actual prompt deserves to be more comprehensive. The
     ///   user-visible bubble and persisted history both show `inputText`.
     public func sendMessage(richPrompt: String? = nil, requestedAt: ContinuousClock.Instant = ContinuousClock.now) {
+        guard !rejectWhileSavingOrganization() else { return }
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isStreaming, canSendMessage else { return }
         let llmQuestion: String
@@ -726,6 +744,7 @@ public final class TranscriptChatViewModel {
     /// regeneration would force a branching/forking model into a surface that's
     /// purposefully linear; we deliberately don't support it.
     public func regenerateLastResponse() {
+        guard !rejectWhileSavingOrganization() else { return }
         guard !isStreaming, canSendMessage else { return }
         guard let last = messages.last,
             last.role == .assistant,
@@ -759,6 +778,7 @@ public final class TranscriptChatViewModel {
         question: String, historyForRequest: [ChatMessage],
         requestedAt: ContinuousClock.Instant = ContinuousClock.now
     ) {
+        guard !rejectWhileSavingOrganization() else { return }
         guard canSendMessage else { return }
         let llmService = llmService
         let directLiveSessionProvider = directLiveSessionProvider
@@ -939,6 +959,9 @@ public final class TranscriptChatViewModel {
                 }
                 for try await token in stream {
                     try Task.checkCancellation()
+                    if directLiveSessionProvider != nil, liveOrganizationIsSaving?() == true {
+                        throw CancellationError()
+                    }
                     accumulated += token
                     if directLiveSessionProvider != nil, streamingAssistantID == assistantID {
                         let elapsed = LiveAnswerTiming.milliseconds(requestStarted.duration(to: .now))
@@ -964,7 +987,9 @@ public final class TranscriptChatViewModel {
                 if let liveSession { try await liveSession.validate() }
                 if directLiveSessionProvider != nil {
                     try Task.checkCancellation()
-                    guard projectConfigurationGeneration == projectGeneration else { throw CancellationError() }
+                    guard projectConfigurationGeneration == projectGeneration,
+                        liveOrganizationIsSaving?() != true
+                    else { throw CancellationError() }
                 }
                 if let preparedProjectContext, let sourceProvider = capturedProjectSourceProvider {
                     let currentSource = try await sourceProvider()
@@ -998,7 +1023,7 @@ public final class TranscriptChatViewModel {
                         }
                         try Task.checkCancellation()
                         guard checkpointGeneration == liveChatCheckpointGeneration,
-                            streamingAssistantID == assistantID
+                            streamingAssistantID == assistantID, liveOrganizationIsSaving?() != true
                         else { throw CancellationError() }
                         if let liveSession { try await liveSession.validate() }
                         if let preparedProjectContext, let sourceProvider = capturedProjectSourceProvider {
@@ -1096,6 +1121,12 @@ public final class TranscriptChatViewModel {
             liveAnswerTiming?.outcome = "cancelled"
             recordLiveTiming()
         }
+    }
+
+    private func rejectWhileSavingOrganization() -> Bool {
+        guard liveOrganizationIsSaving?() == true else { return false }
+        errorMessage = "Saving company and project… Ask again when the selection is saved."
+        return true
     }
 
     /// The caller binds one recording before accepting live questions. The

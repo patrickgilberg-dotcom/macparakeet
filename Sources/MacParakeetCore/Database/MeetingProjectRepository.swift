@@ -32,7 +32,28 @@ public final class MeetingProjectRepository: MeetingProjectRepositoryProtocol, @
         var value = project
         value.name = value.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.name.isEmpty else { throw MeetingProjectRepositoryError.emptyName }
-        try dbQueue.write { db in try value.save(db) }
+        try dbQueue.write { db in
+            if let companyID = value.companyID {
+                guard let company = try MeetingCompany.fetchOne(db, key: companyID), !company.isArchived else {
+                    throw MeetingCompanyRepositoryError.companyMissing
+                }
+            }
+            if let existing = try MeetingProject.fetchOne(db, key: value.id), existing.companyID != value.companyID {
+                let hasMeetings =
+                    try TranscriptionProjectMembership
+                    .filter(TranscriptionProjectMembership.Columns.projectID == value.id).fetchCount(db) > 0
+                let hasPreparation =
+                    try MeetingPreparation
+                    .filter(MeetingPreparation.Columns.projectID == value.id).fetchCount(db) > 0
+                let hasRecordings =
+                    try RecordingMeetingAssociation
+                    .filter(RecordingMeetingAssociation.Columns.projectID == value.id).fetchCount(db) > 0
+                guard !hasMeetings, !hasPreparation, !hasRecordings else {
+                    throw MeetingCompanyRepositoryError.projectCompanyChangeWithMeetings
+                }
+            }
+            try value.save(db)
+        }
     }
 
     public func fetch(id: UUID) throws -> MeetingProject? {
@@ -72,10 +93,12 @@ public final class MeetingProjectRepository: MeetingProjectRepositoryProtocol, @
         }
     }
 
-    static func assign(transcriptionIDs: Set<UUID>, to projectID: UUID?, in db: Database) throws {
-        if let projectID, try MeetingProject.fetchOne(db, key: projectID) == nil {
-            throw MeetingProjectRepositoryError.projectMissing
-        }
+    static func assign(
+        transcriptionIDs: Set<UUID>, to projectID: UUID?, in db: Database, allowArchived: Bool = false
+    ) throws {
+        let project = try projectID.flatMap { try MeetingProject.fetchOne(db, key: $0) }
+        if projectID != nil, project == nil { throw MeetingProjectRepositoryError.projectMissing }
+        if let project, project.isArchived, !allowArchived { throw MeetingProjectRepositoryError.projectMissing }
         // Validate the whole move before touching any membership.
         for id in transcriptionIDs {
             guard try Transcription.fetchOne(db, key: id) != nil else {
@@ -83,6 +106,10 @@ public final class MeetingProjectRepository: MeetingProjectRepositoryProtocol, @
             }
         }
         let assignedAt = Date()
+        if let project {
+            try MeetingCompanyRepository.assign(
+                transcriptionIDs: transcriptionIDs, to: project.companyID, in: db, allowArchived: allowArchived)
+        }
         for id in transcriptionIDs {
             if let projectID {
                 try TranscriptionProjectMembership(

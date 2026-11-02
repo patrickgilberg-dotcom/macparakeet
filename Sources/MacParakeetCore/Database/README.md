@@ -166,6 +166,11 @@ before the current start, excluding the active source and split children, before
 examining readiness. A processing, failed, cancelled or empty latest row does not
 fall back to an older completed one. Effective speaker/text corrections and
 their revision/fingerprint are resolved in the same read transaction.
+Companies (v0.53) own normalized attendee domains, independently of optional
+project membership. Existing projects remain unowned until explicitly assigned.
+Company-only recordings retain company membership. Organization edits are
+transactional and preserve transcript/audio/notes fields; no customer rules or
+event inventory are seeded by the migration.
 
 **Preparation is user-authored context, not a calendar cache.** Its unique key is
 the selected Google calendar ID and event/instance ID, never a title or current

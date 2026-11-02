@@ -11,6 +11,17 @@ public protocol MeetingPreparationRepositoryProtocol: Sendable {
     func fetchRecordingAssociation(recordingID: UUID) throws -> RecordingMeetingAssociation?
     @discardableResult func bindRecording(recordingID: UUID, to transcriptionID: UUID) throws
         -> RecordingMeetingAssociation
+    @discardableResult func updateRecordingOrganization(recordingID: UUID, companyID: UUID?, projectID: UUID?) throws
+        -> RecordingMeetingAssociation
+}
+
+public extension MeetingPreparationRepositoryProtocol {
+    @discardableResult
+    func updateRecordingOrganization(recordingID: UUID, companyID: UUID?, projectID: UUID?) throws
+        -> RecordingMeetingAssociation
+    {
+        throw MeetingCompanyRepositoryError.recordingOrganizationUnsupported
+    }
 }
 
 public final class MeetingPreparationRepository: MeetingPreparationRepositoryProtocol, @unchecked Sendable {
@@ -22,9 +33,7 @@ public final class MeetingPreparationRepository: MeetingPreparationRepositoryPro
         try Self.validate(key: preparation.key)
         return try dbQueue.write { db in
             var value = preparation
-            if let projectID = value.projectID, try MeetingProject.fetchOne(db, key: projectID) == nil {
-                throw MeetingProjectRepositoryError.projectMissing
-            }
+            _ = try Self.organization(companyID: value.companyID, projectID: value.projectID, in: db)
             if let existingID = try MeetingPreparation.fetchOne(db, key: preparation.id),
                 existingID.key != preparation.key
             {
@@ -74,6 +83,7 @@ public final class MeetingPreparationRepository: MeetingPreparationRepositoryPro
                 guard comparable == existing else { throw MeetingProjectRepositoryError.recordingAlreadyBound }
                 return existing
             }
+            _ = try Self.organization(companyID: association.companyID, projectID: association.projectID, in: db)
             var frozen = association
             // This boundary accepts native recording intent only. Binding a
             // Library row must pass through the atomic bind method below.
@@ -106,10 +116,49 @@ public final class MeetingPreparationRepository: MeetingPreparationRepositoryPro
             }
             association.transcriptionID = transcriptionID
             try association.update(db)
+            try MeetingCompanyRepository.assign(
+                transcriptionIDs: [transcriptionID], to: association.companyID, in: db, allowArchived: true)
             try MeetingProjectRepository.assign(
-                transcriptionIDs: [transcriptionID], to: association.projectID, in: db)
+                transcriptionIDs: [transcriptionID], to: association.projectID, in: db, allowArchived: true)
             return association
         }
+    }
+
+    /// Explicit organization edits preserve the frozen event title, authored
+    /// context and timing. Bound folder memberships change in the same write.
+    @discardableResult
+    public func updateRecordingOrganization(recordingID: UUID, companyID: UUID?, projectID: UUID?) throws
+        -> RecordingMeetingAssociation
+    {
+        try dbQueue.write { db in
+            guard var association = try RecordingMeetingAssociation.fetchOne(db, key: recordingID) else {
+                throw MeetingProjectRepositoryError.recordingAssociationMissing
+            }
+            let organization = try Self.organization(companyID: companyID, projectID: projectID, in: db)
+            if let transcriptionID = association.transcriptionID {
+                try MeetingCompanyRepository.assign(transcriptionIDs: [transcriptionID], to: companyID, in: db)
+                try MeetingProjectRepository.assign(transcriptionIDs: [transcriptionID], to: projectID, in: db)
+            }
+            association.companyID = companyID
+            association.projectID = projectID
+            association.companyNameSnapshot = organization.0?.name
+            association.projectNameSnapshot = organization.1?.name
+            try association.update(db)
+            return association
+        }
+    }
+
+    private static func organization(companyID: UUID?, projectID: UUID?, in db: Database) throws
+        -> (MeetingCompany?, MeetingProject?)
+    {
+        let company = try companyID.flatMap { try MeetingCompany.fetchOne(db, key: $0) }
+        if companyID != nil, company == nil { throw MeetingCompanyRepositoryError.companyMissing }
+        if let company, company.isArchived { throw MeetingCompanyRepositoryError.companyMissing }
+        let project = try projectID.flatMap { try MeetingProject.fetchOne(db, key: $0) }
+        if projectID != nil, project == nil { throw MeetingProjectRepositoryError.projectMissing }
+        if let project, project.isArchived { throw MeetingProjectRepositoryError.projectMissing }
+        if let project, project.companyID != companyID { throw MeetingCompanyRepositoryError.projectCompanyMismatch }
+        return (company, project)
     }
 
     private static func validate(key: MeetingPreparationKey) throws {

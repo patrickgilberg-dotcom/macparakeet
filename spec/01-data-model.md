@@ -66,15 +66,45 @@ records. Folder membership is separate from labels and prompt applicability.
 
 | Table | Identity and fields | Deletion/ownership |
 | --- | --- | --- |
-| `meeting_projects` | UUID `id`; case-insensitive unique nonempty `name`; `sortOrder`, `isArchived`, `createdAt`, `updatedAt`. | Explicit local user folders. Delete unfiles transcripts rather than deleting source data. |
+| `meeting_companies` | v0.53 UUID `id`, required `name`, `attendeeDomains` JSON text (default `[]`), `isArchived`, `createdAt`, `updatedAt`. Names are unique case-insensitively. | Local company groupings. Discovery initially uses an editable domain label, never an invented official company name. Domain rules are explicit local metadata, not an attendee/event cache. |
+| `transcription_company_memberships` | v0.53 primary key `transcriptionID`, required `companyID`, `assignedAt`. Index `(companyID, transcriptionID)`. | Both foreign keys cascade only this membership. A recording may have a company without a project. |
+| `meeting_projects` | UUID `id`; nonempty `name`; `sortOrder`, `isArchived`, `createdAt`, `updatedAt`; v0.53 optional `companyID`. | Projects belong to a company or retain a legacy unowned scope. v0.53 replaces global name uniqueness with case-insensitive uniqueness per company and a separate unowned-name index. Delete unfiles transcripts rather than deleting source data. |
 | `transcription_project_memberships` | Primary key `transcriptionID`; required `projectID`; `assignedAt`. One folder per transcript. Index `(projectID, transcriptionID)`. | Both foreign keys cascade only this membership. Moves validate all selected IDs and commit atomically. |
-| `meeting_preparations` | UUID `id`; unique case-sensitive `(calendarID, eventID)` for an explicit Google occurrence; user `context`; optional project; exact `titleSnapshot`, optional scheduled start/end snapshots; created/updated dates. | This is not an event inventory or attendee cache. Project deletion sets its project ID to null and preserves preparation. Rename/reschedule updates display snapshots without changing occurrence identity. |
-| `recording_meeting_associations` | Primary key native `recordingID`; optional unique `transcriptionID`; historical `preparationID`; optional project; frozen title/context/calendar/event/schedule/project-name snapshots and creation date. | Recording ID has no transcription foreign key, allowing intent before the Library row exists. Later binding assigns membership in one transaction. Source deletion nulls `transcriptionID`; project deletion nulls `projectID`. Preparation ID deliberately has no live foreign key, preserving original provenance after its editable draft is deleted. |
+| `meeting_preparations` | UUID `id`; unique case-sensitive `(calendarID, eventID)` for an explicit Google occurrence; user `context`; optional project; v0.53 optional company and nullable `companySelectionIsExplicit`; exact `titleSnapshot`, optional scheduled start/end snapshots; created/updated dates. | This is not an event inventory or attendee cache. Project/company deletion sets the corresponding ID to null and preserves preparation. Rename/reschedule updates display snapshots without changing occurrence identity. |
+| `recording_meeting_associations` | Primary key native `recordingID`; optional unique `transcriptionID`; historical `preparationID`; optional project and v0.53 company; frozen title/context/calendar/event/schedule/project-name snapshots, v0.53 company-name snapshot, and creation date. | Recording ID has no transcription foreign key, allowing intent before the Library row exists. Later binding assigns company/project memberships in one transaction. Source deletion nulls `transcriptionID`; project/company deletion nulls the corresponding ID. Preparation ID deliberately has no live foreign key, preserving original provenance after its editable draft is deleted. |
 
 Association snapshots are inserted once. Conflicting reuse of a recording UUID
 fails rather than overwriting context. Repeating the same final binding leaves a
 later user folder move intact, and normal transcription completion cannot
 overwrite these separate tables.
+
+`v0.53-company-meeting-organization` adds company tables and nullable links;
+it never assigns historical source rows or reclassifies existing folders.
+Repository saves normalize at most 100 company domains to lowercase sorted
+unique bare ASCII DNS values and reject addresses, URLs and wildcards. The
+transactional `ensureCompany(forDomain:)` returns a configured existing company,
+including an archived one without reviving it. Duplicate configured owners are
+an explicit ambiguity. A new rule initially uses the normalized domain as its
+editable name; a colliding unrelated name receives a numbered suffix rather
+than being merged into that company.
+
+`companySelectionIsExplicit` is null for pre-v0.53 rows/JSON, and new user-authored
+preparation defaults to true, including an explicit No company. A saved company,
+an explicit true flag or a legacy project choice suppresses company inference.
+A legacy context-only draft can acquire an inferred company while retaining its
+authored text, local ID and recording preparation provenance. An ambiguous or
+unavailable company never drops that authored context. Inferred choices are not
+written back as user-authored calendar preparation.
+
+Project assignment aligns company membership atomically; clearing only a project
+preserves its company. Company assignment clears an incompatible project while
+retaining a compatible one. A project's company cannot change after it has
+meeting memberships, preparation or recording associations. Preparation and
+recording writes reject mismatched company/project combinations. Explicit
+`updateRecordingOrganization` changes only company/project IDs and name
+snapshots, updating any bound memberships in the same transaction; frozen
+event title, context and timing stay unchanged. Ordinary repeated finalization
+does not undo a later explicit membership change.
 
 The latest previous meeting query joins folder membership across the complete
 database, filters `sourceType=meeting`, `createdAt < current recording start`,
@@ -1962,6 +1992,8 @@ migrator.registerMigration("v0.7-prompts-and-summaries") { db in
 | `chat_conversations` | v0.5 | Multi-conversation chat per transcription (FK → transcriptions) |
 | `ask_conversations` | v0.49-ask-conversations | Independent Ask conversations; bounded Codable payload, revision and run lease; no source foreign key |
 | `meeting_projects` / `transcription_project_memberships` | v0.50-project-meeting-preparation | Virtual single-project transcript folders; moves preserve source rows and media |
+| `meeting_companies` / `transcription_company_memberships` | v0.53-company-meeting-organization | Company grouping and exact attendee-domain rules, with independent company-only recording membership |
+| `meeting_projects.companyID` / `meeting_preparations.companyID` / `recording_meeting_associations.companyID`, `companyNameSnapshot` | v0.53-company-meeting-organization | Nullable company hierarchy and frozen recording organization; per-company project names |
 | `meeting_preparations` / `recording_meeting_associations` | v0.50-project-meeting-preparation | Explicit occurrence preparation and frozen recording intent, bound to a later Library row |
 | `transcriptions.thumbnailURL` | v0.5 | YouTube video thumbnail URL |
 | `transcriptions.channelName` | v0.5 | YouTube channel name |

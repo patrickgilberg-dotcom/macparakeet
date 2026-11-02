@@ -14,6 +14,7 @@ final class AppEnvironment {
     let shareCoordinator: ShareCoordinator?
     let dictationRepo: DictationRepository
     let transcriptionRepo: TranscriptionRepository
+    let meetingCompanyRepo: MeetingCompanyRepository
     let meetingProjectRepo: MeetingProjectRepository
     let meetingPreparationRepo: MeetingPreparationRepository
     let meetingTypeRepo: MeetingTypeRepository
@@ -98,6 +99,7 @@ final class AppEnvironment {
         // Repositories
         dictationRepo = DictationRepository(dbQueue: databaseManager.dbQueue)
         transcriptionRepo = TranscriptionRepository(dbQueue: databaseManager.dbQueue)
+        meetingCompanyRepo = MeetingCompanyRepository(dbQueue: databaseManager.dbQueue)
         meetingProjectRepo = MeetingProjectRepository(dbQueue: databaseManager.dbQueue)
         meetingPreparationRepo = MeetingPreparationRepository(dbQueue: databaseManager.dbQueue)
         meetingTypeRepo = MeetingTypeRepository(dbQueue: databaseManager.dbQueue)

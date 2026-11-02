@@ -39,6 +39,7 @@ The independent audio-evidence contract and ADR-010 direction are documented; ap
 
 | Plan | Title | Status | Priority | What's left |
 |------|-------|--------|----------|-------------|
+| [2026-11-02-company-project-organization](active/2026-11-02-company-project-organization.md) | Personal Live company discovery and separate projects | **IN PROGRESS** | P1 | Thirty-day company sweep, optional projects, organization persistence/UI, tests and signed installation. |
 | [2026-10-02-diarization-outcomes](active/2026-10-02-diarization-outcomes.md) | Durable speaker-detection outcomes and actual backend provenance | **DESIGN REVIEWED — IMPLEMENTATION PENDING** | P1 | Land cancellation-boundary repair first, then implement the typed local receipt across persistence, CLI/artifacts and result UI; acoustic policy and telemetry changes remain separate. |
 | [2026-09-24-issue-1142-event-taps-off-main](active/2026-09-24-issue-1142-event-taps-off-main.md) | Keyboard event taps off the main run loop (#1142) | **PR OPEN** | P1 | All four taps run on a dedicated event-tap thread; `HotkeyManager` consumes on the tap thread and processes gestures on main. Manual typing QA with `MACPARAKEET_DEBUG_MAIN_STALL_MS` remains. |
 | [2026-09-17-issue-449-streaming-cursor](../docs/plans/2026-09-17-issue-449-streaming-cursor.md) | Optional streaming cursor dictation insertion (#449) | **IMPLEMENTED ON FEATURE BRANCH** | P2 | Default-off Unicode caret stream; interrupt flush; paste fallback. Research in `docs/research/2026-09-17-issue-449-streaming-cursor.md`. |

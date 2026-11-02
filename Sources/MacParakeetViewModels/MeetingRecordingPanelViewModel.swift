@@ -70,6 +70,7 @@ public final class MeetingRecordingPanelViewModel {
     public let chatViewModel: TranscriptChatViewModel = TranscriptChatViewModel()
     public let notesViewModel: MeetingNotesViewModel = MeetingNotesViewModel()
     public let quickPromptsViewModel: QuickPromptsViewModel = QuickPromptsViewModel()
+    public var organization: LiveMeetingOrganizationViewModel?
     public private(set) var meetingTypes: [MeetingType] = []
     public private(set) var activeMeetingTypeID: UUID?
     public var onStop: (() -> Void)?
@@ -242,6 +243,7 @@ public final class MeetingRecordingPanelViewModel {
         meetingTypes = []
         activeMeetingTypeID = nil
         onMeetingTypeChange = nil
+        organization = nil
         notesViewModel.reset()
         chatViewModel.loadTranscript("", transcriptionId: nil)
     }

@@ -4,6 +4,52 @@ import XCTest
 
 @MainActor
 final class LiveMeetingPrepViewModelTests: XCTestCase {
+    func testCompanyOnlyPreparationNeverChoosesAProjectOrCompanyWidePreviousMeeting() async throws {
+        let fixture = try Fixture()
+        let company = MeetingCompany(name: "Customer", attendeeDomains: ["customer.example"])
+        try fixture.companies.save(company)
+        let project = MeetingProject(name: "Unchosen", companyID: company.id)
+        try fixture.projects.save(project)
+        let row = Transcription(
+            createdAt: fixture.now.addingTimeInterval(-300), fileName: "Other project",
+            rawTranscript: "COMPANY_WIDE_CONTEXT_MUST_NOT_BE_SENT", status: .completed, sourceType: .meeting)
+        try fixture.transcriptions.save(row)
+        try fixture.projects.assign(transcriptionIDs: [row.id], to: project.id)
+        let event = fixture.event()
+        try fixture.preparations.save(
+            .init(key: fixture.key(event), companyID: company.id, titleSnapshot: event.title))
+        await fixture.model.poll(events: [event], now: fixture.now)
+        XCTAssertNil(fixture.model.preparation(for: event))
+        let calls = await fixture.provider.count
+        XCTAssertEqual(calls, 0)
+    }
+
+    func testArchivingOnlyParentCompanyInvalidatesReadyPreparationWithoutNewInference() async throws {
+        let fixture = try Fixture()
+        var company = MeetingCompany(name: "Customer")
+        try fixture.companies.save(company)
+        var project = fixture.project
+        project.companyID = company.id
+        try fixture.projects.save(project)
+        let event = fixture.event()
+        try fixture.preparations.save(
+            .init(key: fixture.key(event), companyID: company.id, projectID: project.id, titleSnapshot: event.title))
+        try fixture.savePrevious(text: "Maya will send the report by Friday.")
+        await fixture.model.poll(events: [event], now: fixture.now)
+        XCTAssertNotNil(fixture.model.preparation(for: event))
+        let initialCalls = await fixture.provider.count
+        company.isArchived = true
+        try fixture.companies.save(company)
+        let restarted = fixture.makeModel()
+        await restarted.load(for: event)
+        XCTAssertNil(restarted.preparation(for: event))
+        await fixture.model.poll(events: [event], now: fixture.now)
+        XCTAssertNil(fixture.model.preparation(for: event))
+        let afterCalls = await fixture.provider.count
+        XCTAssertEqual(initialCalls, afterCalls)
+        XCTAssertFalse(try XCTUnwrap(fixture.projects.fetch(id: project.id)).isArchived)
+    }
+
     func testAutomaticWindowRequiresExplicitProjectChoiceAndIncludesSharedMeeting() async throws {
         let fixture = try Fixture()
         let selected = fixture.event(id: "selected", startsIn: 900)
@@ -243,6 +289,7 @@ final class LiveMeetingPrepViewModelTests: XCTestCase {
     private final class Fixture {
         let now = Date(timeIntervalSince1970: 2_000_000)
         let projects: MeetingProjectRepository
+        let companies: MeetingCompanyRepository
         let preparations: MeetingPreparationRepository
         let transcriptions: TranscriptionRepository
         let project = MeetingProject(name: "Delivery")
@@ -255,6 +302,7 @@ final class LiveMeetingPrepViewModelTests: XCTestCase {
         init() throws {
             let manager = try DatabaseManager()
             projects = MeetingProjectRepository(dbQueue: manager.dbQueue)
+            companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
             preparations = MeetingPreparationRepository(dbQueue: manager.dbQueue)
             transcriptions = TranscriptionRepository(dbQueue: manager.dbQueue)
             directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -270,6 +318,7 @@ final class LiveMeetingPrepViewModelTests: XCTestCase {
             let probe = provider
             return LiveMeetingPrepViewModel(
                 projectRepository: projects, preparationRepository: preparations,
+                companyRepository: companies,
                 sessionProvider: { await probe.session() }, store: store, defaults: defaults)
         }
 

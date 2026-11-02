@@ -305,6 +305,23 @@ preparation and selected-project reference may enter the separately authorized
 Live Ask context; this does not implicitly upload the full calendar snapshot or
 attendee/organizer data, and none belongs in telemetry.
 
+### Personal Live fork amendment — company organization (2026-11-02)
+
+Companies are independent of projects. An authorized local background sweep
+looks thirty days ahead across included calendars, including shared calendars,
+and creates missing company records from clear business email domains. Existing
+company names can resolve internal follow-up titles when external signals are
+absent; ambiguous meetings remain unresolved. Only company names and domains
+are persisted by discovery, never a calendar inventory. Saved occurrence
+choices remain authoritative and company discovery never selects a project.
+
+The user can start a company-only recording and choose a project during or after
+the meeting. Project selection alone determines latest-prior-meeting evidence;
+there is no company-wide historical substitute. Calendar read permissions,
+recording auto-start attendance policy, authored context, exact event titles and
+local audio boundaries remain unchanged. Company matching invokes no model and
+does not add attendee/organizer data to provider prompts or telemetry.
+
 ## Open Questions
 
 - **Naming in copy**: Settings still uses "Start automatically" / "Notify me". Per-event skip copy is settled: "Don't auto-record this meeting" / "Auto-record again".

@@ -24,16 +24,32 @@ struct MeetingPreparationSheet: View {
                     Text(event.startTime.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Picker("Project", selection: $planner.draftProjectID) {
-                        Text("No project").tag(Optional<UUID>.none)
-                        ForEach(planner.projects) { project in
+                    Picker("Company", selection: $planner.draftCompanyID) {
+                        Text("No company").tag(Optional<UUID>.none)
+                        ForEach(planner.companies) { company in
+                            Text(company.name).tag(Optional(company.id))
+                        }
+                    }
+                    .accessibilityLabel("Meeting company")
+                    .disabled(planner.isLoadingDraft || planner.isLoadingProjects || planner.isSaving)
+                    if let explanation = planner.draftCompanyExplanation {
+                        Text(explanation).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                    }
+                    Picker("Project (optional)", selection: $planner.draftProjectID) {
+                        Text("Choose later").tag(Optional<UUID>.none)
+                        ForEach(planner.draftProjects) { project in
                             Text(project.name).tag(Optional(project.id))
                         }
                         if let id = planner.draftProjectID, !planner.projects.contains(where: { $0.id == id }) {
                             Text(planner.draftProjectName ?? "Saved project").tag(Optional(id))
                         }
                     }
+                    .accessibilityLabel("Meeting project")
                     .disabled(planner.isLoadingDraft || planner.isLoadingProjects || planner.isSaving)
+                    Text(
+                        "Projects stay your choice. Select one now, during recording, or organize the meeting afterward."
+                    )
+                    .font(.caption).foregroundStyle(.secondary)
                     if isAddingProject {
                         HStack {
                             TextField("Project name", text: $newProjectName)
@@ -58,7 +74,7 @@ struct MeetingPreparationSheet: View {
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        Text("If you choose a project, live AI can also use its latest previous meeting.")
+                        Text("Choose a project to use its latest previous meeting and saved notes as background.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextEditor(text: $planner.draftContext)
@@ -135,7 +151,7 @@ struct MeetingPreparationSheet: View {
         else { return }
         let name = newProjectName
         Task { @MainActor in
-            await planner.createProject(named: name, selectForDraft: true).value
+            await planner.createProject(named: name, companyID: planner.draftCompanyID, selectForDraft: true).value
             if planner.errorMessage == nil {
                 newProjectName = ""
                 isAddingProject = false
@@ -157,7 +173,7 @@ private struct MeetingAutomaticPrepSection: View {
             Toggle("Prepare automatically 15 minutes before", isOn: $prep.enabled)
                 .font(.callout)
             Text(
-                "For meetings saved to a project, ChatGPT checks only that project's latest meeting and all your saved notes. This Mac must be awake and Live running. Your live answers and summaries get priority."
+                "When a project is selected, ChatGPT checks only that project's latest meeting and saved notes. Company organization happens automatically; projects remain your choice. This Mac must be awake and Live running for preparation."
             )
             .font(.caption).foregroundStyle(.secondary)
             HStack {

@@ -17,6 +17,10 @@ processing of the latest previous meeting's saved notes. These personal-fork
 surfaces do not change the upstream stable release claim. Scope, priority,
 source validation and privacy are specified in the
 [board/preparation contract](../contracts/live-meeting-board-and-preparation.md).
+The 2026-11-02 personal-fork extension organizes companies automatically and
+leaves projects as an optional user choice. Company matching does not broaden
+previous-project context. Manual occurrence choices remain authoritative;
+inferred company choices never become authored Notes or preparation text.
 
 ## Amendment (2026-10-02, Summary default and notes guidance — issue #1204)
 

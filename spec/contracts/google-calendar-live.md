@@ -101,12 +101,31 @@ calendar edit or deletion does not silently erase the user's preparation.
 
 `MeetingProject` is a virtual Library folder. Membership changes do not move or
 delete transcript/audio files. Removing a project unfiles its transcripts.
+Companies and projects are separate. Company email-domain rules organize
+upcoming meetings; projects belong to a company and remain an optional user
+choice. A local background sweep covers the next thirty days on included
+calendars, including shared calendars. It creates missing companies from clear
+business email domains and never invents a project. Domain-derived company
+names are editable labels, not verified legal names. A known-company title can
+resolve an internal follow-up without external guests; conflicting business
+signals remain a visible choice. Saved occurrence choices always win.
+
+Company discovery and matching do not invoke an AI model, upload calendar
+attendees or persist an event inventory. Recording auto-start participation
+policy is unchanged. The [company/project contract](live-company-organization.md)
+defines domain eligibility, ambiguity, private membership and live reassignment.
+
 When recording begins, `RecordingMeetingAssociation` freezes the chosen event,
 preparation and project against the native recording UUID. Finalization binds
 that association to the correct meeting row atomically. A later folder move is
 not undone by repeated finalization. The calendar title remains protected from
 automatic AI renaming; explicit user renames remain available. Filesystem-safe
 filenames do not change the stored event title.
+An automatically identified company does not create an authored preparation
+draft or select a project. Company-only recordings remain organized, and the
+user can choose a project at the start, during recording or afterward. Explicit
+live changes update organization only; the calendar title and authored event
+context stay unchanged.
 
 ## Live answer grounding
 

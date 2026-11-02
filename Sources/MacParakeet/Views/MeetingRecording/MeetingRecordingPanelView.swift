@@ -17,6 +17,10 @@ struct MeetingRecordingPanelView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if let organization = viewModel.organization {
+                LiveMeetingOrganizationControls(viewModel: organization)
+                Divider()
+            }
             if let preparation = viewModel.chatViewModel.generatedMeetingPreparation {
                 LivePreparedMeetingCard(preparation: preparation)
                 Divider()

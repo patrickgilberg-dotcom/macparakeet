@@ -27,6 +27,7 @@ public final class LiveMeetingPrepViewModel {
     public private(set) var preparations: [MeetingPreparationKey: MeetingGeneratedPreparation] = [:]
 
     @ObservationIgnored private let projectRepository: any MeetingProjectRepositoryProtocol
+    @ObservationIgnored private let companyRepository: (any MeetingCompanyRepositoryProtocol)?
     @ObservationIgnored private let preparationRepository: any MeetingPreparationRepositoryProtocol
     @ObservationIgnored private let sessionProvider: @Sendable () async throws -> LiveAnswerStreamSession
     @ObservationIgnored private let store: MeetingGeneratedPreparationStore
@@ -50,7 +51,8 @@ public final class LiveMeetingPrepViewModel {
         let status: String
 
         func matches(_ other: Inputs) -> Bool {
-            manual.key == other.manual.key && manual.projectID == other.manual.projectID
+            manual.key == other.manual.key && manual.companyID == other.manual.companyID
+                && manual.projectID == other.manual.projectID
                 && manualContextHash == other.manualContextHash && scopeKey == other.scopeKey
         }
     }
@@ -58,12 +60,14 @@ public final class LiveMeetingPrepViewModel {
     public init(
         projectRepository: any MeetingProjectRepositoryProtocol,
         preparationRepository: any MeetingPreparationRepositoryProtocol,
+        companyRepository: (any MeetingCompanyRepositoryProtocol)? = nil,
         sessionProvider: @escaping @Sendable () async throws -> LiveAnswerStreamSession,
         store: MeetingGeneratedPreparationStore = .shared,
         defaults: UserDefaults = AppPaths.sharedAppDefaults(),
         pollInterval: Duration = .seconds(60)
     ) {
         self.projectRepository = projectRepository; self.preparationRepository = preparationRepository
+        self.companyRepository = companyRepository
         self.sessionProvider = sessionProvider; self.store = store; self.defaults = defaults
         self.pollInterval = pollInterval
         enabled =
@@ -367,10 +371,15 @@ public final class LiveMeetingPrepViewModel {
     ) async throws -> Inputs? {
         let preparations = preparationRepository
         let projects = projectRepository
+        let companies = companyRepository
         let inputs = try await Task.detached(priority: .utility) { () throws -> Inputs? in
             guard let manual = try preparations.fetch(key: key), let projectID = manual.projectID,
-                let project = try projects.fetch(id: projectID), !project.isArchived
+                let project = try projects.fetch(id: projectID), !project.isArchived,
+                project.companyID == manual.companyID
             else { return nil }
+            if let companyID = manual.companyID, let companies {
+                guard let company = try companies.fetch(id: companyID), !company.isArchived else { return nil }
+            }
             let previous = try projects.latestPreviousMeeting(
                 projectID: projectID, before: before, excludingRecordingID: excludingRecordingID,
                 excludingTranscriptionID: nil)

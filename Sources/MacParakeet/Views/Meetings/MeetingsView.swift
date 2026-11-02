@@ -41,6 +41,9 @@ struct MeetingsView: View {
                     }
                 }
             }
+            .task(id: viewModel.upcomingEvents.map(CalendarOrganizationSnapshot.init)) {
+                await viewModel.planner?.loadEventChoices(for: viewModel.upcomingEvents)
+            }
     }
 
     private var layoutContent: some View {
@@ -422,7 +425,8 @@ struct MeetingsView: View {
                                     onSkipThisRepeatingMeeting: { viewModel.skipThisRepeatingMeeting(event) },
                                     onUnskipThisMeeting: { viewModel.unskipThisMeeting(event) },
                                     onUnskipThisRepeatingMeeting: { viewModel.unskipThisRepeatingMeeting(event) },
-                                    onPrepare: viewModel.planner == nil ? nil : { preparingEvent = event }
+                                    onPrepare: viewModel.planner == nil ? nil : { preparingEvent = event },
+                                    organizationCaption: viewModel.planner?.organizationCaption(for: event)
                                 )
                                 if event.id != viewModel.upcomingEvents.last?.id {
                                     MeetingsHairline()
@@ -508,7 +512,8 @@ struct MeetingsView: View {
             if LiveAppIdentity.isLive {
                 MeetingsInlineState(
                     icon: "doc.text.magnifyingglass",
-                    title: liveMinutes.automaticMinutesEnabled ? "Automatic meeting minutes" : "Automatic minutes paused",
+                    title: liveMinutes.automaticMinutesEnabled
+                        ? "Automatic meeting minutes" : "Automatic minutes paused",
                     detail:
                         "Your saved meeting skill runs after the final transcript is saved. Open a meeting to view minutes, progress, or retry a failed attempt.",
                     actionTitle: "Edit Meeting Skill", actionIcon: "square.and.pencil", action: onOpenAISettings)
@@ -722,12 +727,22 @@ struct MeetingsView: View {
         let audioAvailable = audioState == .saved
         let audioRemovable = MeetingAudioFile.isRemovable(for: transcription, state: audioState)
         if let planner = viewModel.planner {
+            Menu("Move to Company") {
+                Button("No Company") { planner.assignCompany(transcriptionIDs: [transcription.id], to: nil) }
+                ForEach(planner.companies) { company in
+                    Button(company.name) { planner.assignCompany(transcriptionIDs: [transcription.id], to: company.id) }
+                }
+            }
+            .disabled(planner.isAssigning)
             Menu("Move to Project") {
                 Button("Unfiled") { planner.assign(transcriptionIDs: [transcription.id], to: nil) }
                 ForEach(planner.projects) { project in
-                    Button(project.name) { planner.assign(transcriptionIDs: [transcription.id], to: project.id) }
+                    Button(planner.projectLabel(project)) {
+                        planner.assign(transcriptionIDs: [transcription.id], to: project.id)
+                    }
                 }
             }
+            .disabled(planner.isAssigning)
             Divider()
         }
         let artifactAvailable = MeetingArtifactActions.folderURL(for: transcription) != nil
@@ -1585,6 +1600,23 @@ private struct MeetingsLoadingRow: View {
     }
 }
 
+private struct CalendarOrganizationSnapshot: Hashable {
+    let id: String
+    let title: String
+    let start: Date
+    let end: Date
+    let participants: [EventParticipant]
+    let organizer: EventParticipant?
+    let calendarID: String?
+    let providerEventID: String?
+
+    init(_ event: CalendarEvent) {
+        id = event.id; title = event.title; start = event.startTime; end = event.endTime
+        participants = event.participants; organizer = event.organizer
+        calendarID = event.preparationCalendarID; providerEventID = event.preparationEventID
+    }
+}
+
 private struct CalendarEventRow: View {
     let event: CalendarEvent
     let skipScope: CalendarSkipScope?
@@ -1594,6 +1626,7 @@ private struct CalendarEventRow: View {
     var onUnskipThisMeeting: () -> Void
     var onUnskipThisRepeatingMeeting: () -> Void
     var onPrepare: (() -> Void)? = nil
+    var organizationCaption: String? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: DesignSystem.Spacing.md) {
@@ -1618,6 +1651,12 @@ private struct CalendarEventRow: View {
                 .font(DesignSystem.Typography.caption)
                 .foregroundStyle(DesignSystem.Colors.textSecondary)
                 .lineLimit(1)
+                if let organizationCaption {
+                    Text(organizationCaption)
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundStyle(DesignSystem.Colors.textSecondary)
+                        .lineLimit(2)
+                }
                 if let caption = skipCaption {
                     Text(caption)
                         .font(DesignSystem.Typography.caption)
@@ -1678,6 +1717,7 @@ private struct CalendarEventRow: View {
         if let caption = skipCaption {
             parts.append(caption)
         }
+        if let organizationCaption { parts.append(organizationCaption) }
         return parts.joined(separator: ", ")
     }
 

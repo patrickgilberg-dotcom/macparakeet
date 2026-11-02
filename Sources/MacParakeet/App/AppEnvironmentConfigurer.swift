@@ -190,14 +190,17 @@ final class AppEnvironmentConfigurer {
         )
         meetingsWorkspaceViewModel.planner = LiveMeetingPlannerViewModel(
             projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
+            companyRepository: env.meetingCompanyRepo,
             transcriptionRepository: env.transcriptionRepo)
         if LiveAppIdentity.isLive {
             meetingsWorkspaceViewModel.planner?.automaticPrep = LiveMeetingPrepViewModel(
                 projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
+                companyRepository: env.meetingCompanyRepo,
                 sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() })
         }
         Task { [weak meetingsWorkspaceViewModel, weak settingsViewModel] in
             _ = await GoogleCalendarAuth.shared.connection()
+            meetingsWorkspaceViewModel?.planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains()
             await settingsViewModel?.refreshCalendarAccess()
             await meetingsWorkspaceViewModel?.refreshUpcomingEvents().value
         }
@@ -461,6 +464,7 @@ final class AppEnvironmentConfigurer {
             configStore: env.llmConfigStore,
             preparationRepository: env.meetingPreparationRepo,
             projectRepository: env.meetingProjectRepo,
+            companyRepository: env.meetingCompanyRepo,
             automaticPrep: meetingsWorkspaceViewModel.planner?.automaticPrep,
             sttManager: env.sttScheduler,
             speechEngineSelectionProvider: { SpeechEngineSelection.liveSpeech() },
@@ -485,6 +489,10 @@ final class AppEnvironmentConfigurer {
             manualProjectIDProvider: { [weak meetingsWorkspaceViewModel] in
                 meetingsWorkspaceViewModel?.planner?.selectedProjectFilterID
             },
+            manualCompanyIDProvider: { [weak meetingsWorkspaceViewModel] in
+                meetingsWorkspaceViewModel?.planner?.selectedCompanyFilterID
+            },
+            internalCompanyDomainsProvider: { await Self.googleInternalCompanyDomains() },
             llmService: hasLLMConfig ? env.llmService : nil,
             pillViewModel: meetingPillViewModel,
             meetingRecordingSettlement: env.meetingRecordingSettlement,
@@ -638,6 +646,30 @@ final class AppEnvironmentConfigurer {
             let excludedCalendarIDs: @MainActor @Sendable () -> Set<String> = { [weak settingsViewModel] in
                 settingsViewModel?.calendarExcludedIdentifiers ?? []
             }
+            if LiveAppIdentity.isLive, let planner = meetingsWorkspaceViewModel.planner {
+                let companyOrganizer = LiveMeetingCompanyDiscoveryViewModel(
+                    companyRepository: env.meetingCompanyRepo,
+                    eventsProvider: {
+                        let events = try await GoogleCalendarService.shared.fetchUpcomingEvents(days: 30)
+                        let excluded = await excludedCalendarIDs()
+                        return events.filter {
+                            $0.calendarIdentifier.map { !excluded.contains($0) } ?? true
+                        }
+                    },
+                    internalDomainsProvider: { await Self.googleInternalCompanyDomains() },
+                    sourceIdentityProvider: {
+                        guard let connection = await GoogleCalendarAuth.shared.connection() else { return nil }
+                        let excluded = await excludedCalendarIDs()
+                        let fields = [connection.id] + excluded.sorted()
+                        return MeetingGeneratedPreparation.hash(fields.map { "\($0.utf8.count):\($0)" }.joined())
+                    },
+                    onCompaniesChanged: { [weak planner] in
+                        planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains()
+                        await planner?.refreshCompanies().value
+                    })
+                planner.companyOrganizer = companyOrganizer
+                companyOrganizer.start()
+            }
             meetingsWorkspaceViewModel.planner?.automaticPrep?.start(
                 eventsProvider: {
                     let events = try await GoogleCalendarService.shared.fetchUpcomingEvents(days: 1)
@@ -695,6 +727,13 @@ final class AppEnvironmentConfigurer {
             meetingAutoStartCoordinator: calendarCoordinator,
             meetingAutoStopCoordinator: meetingAutoStopCoordinator
         )
+    }
+
+    private nonisolated static func googleInternalCompanyDomains() async -> Set<String> {
+        guard let connection = await GoogleCalendarAuth.shared.connection(),
+            let domain = MeetingCompanyDomainMatcher.domain(fromEmail: connection.email)
+        else { return [] }
+        return [domain]
     }
 
     /// Read presentation preferences before selecting: quiet completion may

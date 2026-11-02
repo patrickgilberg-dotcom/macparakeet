@@ -141,6 +141,226 @@ final class LiveMeetingPlannerViewModelTests: XCTestCase {
         XCTAssertFalse(planner.isCreatingProject)
     }
 
+    func testAttendeeMatchChoosesCompanyWithoutInventingProjectOrSavingDraft() async throws {
+        let (planner, companies, projects, preparations, _) = try makeCompanyPlanner()
+        let company = MeetingCompany(name: "Customer", attendeeDomains: ["customer.example"])
+        try companies.save(company)
+        try projects.save(MeetingProject(name: "First project", companyID: company.id))
+        var upcoming = event(title: "  Exact title ✨  ")
+        upcoming.participants = [.init(email: "person@CUSTOMER.EXAMPLE")]
+
+        await planner.loadDraft(for: upcoming)
+
+        XCTAssertEqual(planner.draftCompanyID, company.id)
+        XCTAssertNil(planner.draftProjectID)
+        XCTAssertEqual(planner.draftProjects.map(\.name), ["First project"])
+        XCTAssertEqual(planner.draftCompanyMatch?.source, .attendeeDomain)
+        XCTAssertTrue(planner.draftCompanyExplanation?.contains("Customer") == true)
+        XCTAssertNil(try preparations.fetch(key: .init(calendarID: "shared-calendar", eventID: "series_instance_1")))
+    }
+
+    func testDraftCompanyChangeClearsDifferentCompanyProject() async throws {
+        let (planner, companies, projects, _, _) = try makeCompanyPlanner()
+        let first = MeetingCompany(name: "First")
+        let second = MeetingCompany(name: "Second")
+        try companies.save(first); try companies.save(second)
+        let project = MeetingProject(name: "Delivery", companyID: first.id)
+        try projects.save(project)
+        await planner.loadDraft(for: event())
+        planner.draftProjectID = project.id
+        XCTAssertEqual(planner.draftCompanyID, first.id)
+
+        planner.draftCompanyID = second.id
+
+        XCTAssertNil(planner.draftProjectID)
+        XCTAssertTrue(planner.draftProjects.isEmpty)
+    }
+
+    func testSavedNoCompanyOverridesMatchingAttendeeInDraftAndUpcomingCaption() async throws {
+        let (planner, companies, _, preparations, _) = try makeCompanyPlanner()
+        try companies.save(MeetingCompany(name: "Customer", attendeeDomains: ["customer.example"]))
+        let key = MeetingPreparationKey(calendarID: "shared-calendar", eventID: "series_instance_1")
+        try preparations.save(.init(key: key, context: "Private authored context", titleSnapshot: "Saved title"))
+        var upcoming = event()
+        upcoming.participants = [.init(email: "person@customer.example")]
+        await planner.refreshCompanies().value
+        XCTAssertEqual(planner.organizationCaption(for: upcoming), "Checking company…")
+
+        await planner.loadEventChoices(for: [upcoming])
+
+        XCTAssertEqual(planner.companyMatch(for: upcoming).source, .manual)
+        XCTAssertNil(planner.companyMatch(for: upcoming).company)
+        XCTAssertEqual(planner.organizationCaption(for: upcoming), "Company: not selected")
+        await planner.loadDraft(for: upcoming)
+        XCTAssertNil(planner.draftCompanyID)
+        XCTAssertNil(planner.draftProjectID)
+        XCTAssertEqual(planner.draftContext, "Private authored context")
+    }
+
+    func testUpcomingCaptionKeepsExplicitCompanyAndProjectAgainstOtherDomain() async throws {
+        let (planner, companies, projects, preparations, _) = try makeCompanyPlanner()
+        let chosen = MeetingCompany(name: "Chosen")
+        let inferred = MeetingCompany(name: "Inferred", attendeeDomains: ["customer.example"])
+        try companies.save(chosen); try companies.save(inferred)
+        let project = MeetingProject(name: "Delivery", companyID: chosen.id)
+        try projects.save(project)
+        let key = MeetingPreparationKey(calendarID: "shared-calendar", eventID: "series_instance_1")
+        try preparations.save(.init(key: key, companyID: chosen.id, projectID: project.id, titleSnapshot: "Saved"))
+        var upcoming = event()
+        upcoming.participants = [.init(email: "person@customer.example")]
+        await planner.refreshCompanies().value
+
+        await planner.loadEventChoices(for: [upcoming])
+
+        XCTAssertEqual(planner.organizationCaption(for: upcoming), "Company: Chosen · Project: Delivery")
+    }
+
+    func testCompanySaveAndProjectCreationRemainSeparateAndValidateDomains() async throws {
+        let (planner, companies, projects, _, _) = try makeCompanyPlanner()
+        let invalid = await planner.saveCompany(name: "Invalid", attendeeDomains: ["https://customer.example"])
+        XCTAssertFalse(invalid)
+        XCTAssertTrue(try companies.fetchAll().isEmpty)
+        let saved = await planner.saveCompany(name: "  Customer  ", attendeeDomains: [" @CUSTOMER.EXAMPLE "])
+        XCTAssertTrue(saved)
+        let company = try XCTUnwrap(companies.fetchAll().first)
+        XCTAssertEqual(company.name, "Customer")
+        XCTAssertEqual(company.attendeeDomains, ["customer.example"])
+        XCTAssertTrue(try projects.fetchAll().isEmpty)
+
+        await planner.createProject(named: "Delivery", companyID: company.id, selectForBrowsing: true).value
+
+        XCTAssertEqual(planner.selectedCompanyFilterID, company.id)
+        XCTAssertEqual(try projects.fetchAll().first?.companyID, company.id)
+        XCTAssertEqual(planner.filteredProjects.map(\.name), ["Delivery"])
+    }
+
+    func testCompanyBrowsingIncludesItsUnprojectedMeetingsAndMovePreservesSource() async throws {
+        let (planner, companies, projects, _, transcriptions) = try makeCompanyPlanner()
+        let first = MeetingCompany(name: "First")
+        let second = MeetingCompany(name: "Second")
+        try companies.save(first); try companies.save(second)
+        let project = MeetingProject(name: "Delivery", companyID: first.id)
+        try projects.save(project)
+        let projected = meeting(at: 10), unprojected = meeting(at: 20)
+        try transcriptions.save(projected); try transcriptions.save(unprojected)
+        try projects.assign(transcriptionIDs: [projected.id], to: project.id)
+        try companies.assign(transcriptionIDs: [unprojected.id], to: first.id)
+        planner.selectedCompanyFilterID = first.id
+        await planner.refreshProjectTranscriptionIDs().value
+        XCTAssertEqual(planner.filteredTranscriptionIDs, [projected.id, unprojected.id])
+
+        await planner.assignCompany(transcriptionIDs: [projected.id], to: second.id).value
+
+        XCTAssertEqual(planner.filteredTranscriptionIDs, [unprojected.id])
+        XCTAssertNil(try projects.project(for: projected.id))
+        XCTAssertEqual(try companies.company(for: projected.id)?.id, second.id)
+        XCTAssertEqual(try transcriptions.fetch(id: projected.id)?.rawTranscript, projected.rawTranscript)
+        XCTAssertEqual(try transcriptions.fetch(id: projected.id)?.updatedAt, projected.updatedAt)
+    }
+
+    func testInternalOrganizerDoesNotBlockKnownCompanyTitleMatch() async throws {
+        let (planner, companies, _, _, _) = try makeCompanyPlanner()
+        let company = MeetingCompany(name: "Zephyr", attendeeDomains: ["zephyr.example"])
+        try companies.save(company)
+        planner.internalCompanyDomains = ["internal.example"]
+        var upcoming = event(title: "Zephyr follow-up")
+        upcoming.organizer = .init(email: "person@internal.example")
+
+        await planner.loadDraft(for: upcoming)
+
+        XCTAssertEqual(planner.draftCompanyID, company.id)
+        XCTAssertEqual(planner.draftCompanyMatch?.source, .title)
+        XCTAssertNil(planner.draftProjectID)
+    }
+
+    func testDomainEditorAcceptsCommaNewlineAndSpaceSeparatedEntries() {
+        XCTAssertEqual(
+            LiveMeetingPlannerViewModel.domainEntries(from: " first.example,\nsecond.example ; @third.example "),
+            ["first.example", "second.example", "@third.example"])
+    }
+
+    func testCreatingProjectCannotRestoreCompanyAfterDraftSelectionChanges() async throws {
+        let manager = try DatabaseManager()
+        let companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
+        let base = MeetingProjectRepository(dbQueue: manager.dbQueue)
+        let delayed = DelayedPlannerProjectRepository(base: base, delayedName: "New workstream")
+        let planner = LiveMeetingPlannerViewModel(
+            projectRepository: delayed, preparationRepository: MeetingPreparationRepository(dbQueue: manager.dbQueue),
+            companyRepository: companies)
+        let first = MeetingCompany(name: "First"), second = MeetingCompany(name: "Second")
+        try companies.save(first); try companies.save(second)
+        await planner.loadDraft(for: event())
+        planner.draftCompanyID = first.id
+
+        let creation = planner.createProject(named: "New workstream", companyID: first.id, selectForDraft: true)
+        let blocked = await delayed.waitUntilSaveBlocked()
+        XCTAssertTrue(blocked)
+        planner.draftCompanyID = second.id
+        delayed.releaseSave()
+        await creation.value
+
+        XCTAssertEqual(planner.draftCompanyID, second.id)
+        XCTAssertNil(planner.draftProjectID)
+        XCTAssertEqual(try base.fetchAll().first?.companyID, first.id)
+        XCTAssertFalse(planner.isCreatingProject)
+    }
+
+    func testCreatingProjectCannotReplaceNewerBrowsingIntentEvenWhenCompanyReturnsToOriginal() async throws {
+        let manager = try DatabaseManager()
+        let companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
+        let base = MeetingProjectRepository(dbQueue: manager.dbQueue)
+        let delayed = DelayedPlannerProjectRepository(base: base, delayedName: "New workstream")
+        let planner = LiveMeetingPlannerViewModel(
+            projectRepository: delayed, preparationRepository: MeetingPreparationRepository(dbQueue: manager.dbQueue),
+            companyRepository: companies)
+        let first = MeetingCompany(name: "First"), second = MeetingCompany(name: "Second")
+        try companies.save(first); try companies.save(second)
+        planner.selectedCompanyFilterID = first.id
+
+        let creation = planner.createProject(named: "New workstream", companyID: first.id, selectForBrowsing: true)
+        let blocked = await delayed.waitUntilSaveBlocked()
+        XCTAssertTrue(blocked)
+        planner.selectedCompanyFilterID = second.id
+        planner.selectedCompanyFilterID = first.id
+        delayed.releaseSave()
+        await creation.value
+
+        XCTAssertEqual(planner.selectedCompanyFilterID, first.id)
+        XCTAssertNil(planner.selectedProjectFilterID)
+        XCTAssertEqual(try base.fetchAll().count, 1)
+    }
+
+    func testGlobalProjectLabelsDistinguishSameNameAcrossCompaniesAndLegacyScope() async throws {
+        let (planner, companies, projects, _, _) = try makeCompanyPlanner()
+        let first = MeetingCompany(name: "First"), second = MeetingCompany(name: "Second")
+        try companies.save(first); try companies.save(second)
+        let firstProject = MeetingProject(name: "Delivery", companyID: first.id)
+        let secondProject = MeetingProject(name: "Delivery", companyID: second.id)
+        let legacy = MeetingProject(name: "Delivery")
+        try projects.save(firstProject); try projects.save(secondProject); try projects.save(legacy)
+        await planner.refreshProjects().value
+
+        XCTAssertEqual(planner.projectLabel(firstProject), "First / Delivery")
+        XCTAssertEqual(planner.projectLabel(secondProject), "Second / Delivery")
+        XCTAssertEqual(planner.projectLabel(legacy), "No company / Delivery")
+        XCTAssertEqual(planner.projectLabel(firstProject, includingCompany: false), "Delivery")
+    }
+
+    private func makeCompanyPlanner() throws -> (
+        LiveMeetingPlannerViewModel, MeetingCompanyRepository, MeetingProjectRepository,
+        MeetingPreparationRepository, TranscriptionRepository
+    ) {
+        let manager = try DatabaseManager()
+        let companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
+        let projects = MeetingProjectRepository(dbQueue: manager.dbQueue)
+        let preparations = MeetingPreparationRepository(dbQueue: manager.dbQueue)
+        let transcriptions = TranscriptionRepository(dbQueue: manager.dbQueue)
+        let planner = LiveMeetingPlannerViewModel(
+            projectRepository: projects, preparationRepository: preparations,
+            companyRepository: companies, transcriptionRepository: transcriptions)
+        return (planner, companies, projects, preparations, transcriptions)
+    }
+
     private func makePlanner() throws -> (
         LiveMeetingPlannerViewModel, MeetingProjectRepository, MeetingPreparationRepository, TranscriptionRepository
     ) {
@@ -166,4 +386,53 @@ final class LiveMeetingPlannerViewModelTests: XCTestCase {
             rawTranscript: "Saved words.", status: .completed, sourceType: .meeting,
             updatedAt: Date(timeIntervalSince1970: time))
     }
+}
+
+final class DelayedPlannerProjectRepository: MeetingProjectRepositoryProtocol, @unchecked Sendable {
+    private let base: any MeetingProjectRepositoryProtocol
+    private let delayedName: String
+    private let entered = DispatchSemaphore(value: 0)
+    private let release = DispatchSemaphore(value: 0)
+
+    init(base: any MeetingProjectRepositoryProtocol, delayedName: String) {
+        self.base = base; self.delayedName = delayedName
+    }
+
+    func waitUntilSaveBlocked() async -> Bool {
+        await Task.detached { self.entered.wait(timeout: .now() + 2) == .success }.value
+    }
+
+    func releaseSave() { release.signal() }
+
+    func save(_ project: MeetingProject) throws {
+        if project.name == delayedName {
+            entered.signal()
+            guard release.wait(timeout: .now() + 5) == .success else { throw DelayError.timedOut }
+        }
+        try base.save(project)
+    }
+
+    func fetch(id: UUID) throws -> MeetingProject? { try base.fetch(id: id) }
+    func fetchAll(includeArchived: Bool) throws -> [MeetingProject] {
+        try base.fetchAll(includeArchived: includeArchived)
+    }
+    func setArchived(id: UUID, isArchived: Bool) throws { try base.setArchived(id: id, isArchived: isArchived) }
+    func delete(id: UUID) throws -> Bool { try base.delete(id: id) }
+    func assign(transcriptionIDs: Set<UUID>, to projectID: UUID?) throws {
+        try base.assign(transcriptionIDs: transcriptionIDs, to: projectID)
+    }
+    func project(for transcriptionID: UUID) throws -> MeetingProject? { try base.project(for: transcriptionID) }
+    func projectIDs(for transcriptionIDs: Set<UUID>) throws -> [UUID: UUID] {
+        try base.projectIDs(for: transcriptionIDs)
+    }
+    func transcriptionIDs(in projectID: UUID) throws -> Set<UUID> { try base.transcriptionIDs(in: projectID) }
+    func latestPreviousMeeting(
+        projectID: UUID, before: Date, excludingRecordingID: UUID?, excludingTranscriptionID: UUID?
+    ) throws -> ProjectPreviousMeeting? {
+        try base.latestPreviousMeeting(
+            projectID: projectID, before: before, excludingRecordingID: excludingRecordingID,
+            excludingTranscriptionID: excludingTranscriptionID)
+    }
+
+    private enum DelayError: Error { case timedOut }
 }

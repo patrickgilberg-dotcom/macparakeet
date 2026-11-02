@@ -19,6 +19,126 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
+    func testCalendarCompanyMatchFreezesCompanyWithoutChoosingAnyProject() async throws {
+        let fixture = try await CompanyFlowFixture()
+        let company = MeetingCompany(name: "Customer", attendeeDomains: ["customer.example"])
+        try fixture.companies.save(company)
+        let project = MeetingProject(name: "Unchosen Project", companyID: company.id)
+        try fixture.projects.save(project)
+        let coordinator = fixture.makeCoordinator(manualProjectID: project.id)
+        let event = fixture.event(title: "  Exact Calendar & Review ☕  ")
+        XCTAssertNotNil(
+            coordinator.startFromCalendar(calendarEventSnapshot: .init(event: event, confidence: .confirmed)))
+        try await waitForLiveRecording(coordinator)
+        let association = try XCTUnwrap(
+            fixture.preparations.fetchRecordingAssociation(recordingID: fixture.output.sessionID))
+        XCTAssertEqual(association.companyID, company.id)
+        XCTAssertEqual(association.companyNameSnapshot, company.name)
+        XCTAssertNil(association.projectID, "A company match never chooses an arbitrary project or browsed folder.")
+        XCTAssertNil(association.preparationID, "Automatic company matching does not create a manual draft.")
+        XCTAssertEqual(association.titleSnapshot, event.title)
+        let starts = await fixture.recording.startCalls
+        XCTAssertEqual(starts.map(\.title), [event.title])
+        let organization = try XCTUnwrap(coordinator.testHook_panelViewModel?.organization)
+        XCTAssertEqual(organization.companyID, company.id)
+        XCTAssertNil(organization.projectID)
+        await coordinator.discardRecordingAndWaitForCompletion()
+    }
+
+    func testLiveCompanyChangeKeepsCurrentSpeechNotesAnswersAndOriginalEventContext() async throws {
+        let fixture = try await CompanyFlowFixture()
+        let first = MeetingCompany(name: "First", attendeeDomains: ["customer.example"])
+        let second = MeetingCompany(name: "Second", attendeeDomains: ["second.example"])
+        try fixture.companies.save(first)
+        try fixture.companies.save(second)
+        let firstProject = MeetingProject(name: "Original", companyID: first.id)
+        let secondProject = MeetingProject(name: "Other Project", companyID: second.id)
+        try fixture.projects.save(firstProject)
+        try fixture.projects.save(secondProject)
+        let prior = Transcription(
+            createdAt: Date().addingTimeInterval(-3600), fileName: "Unchosen company history",
+            rawTranscript: "COMPANY_WIDE_HISTORY_MUST_NOT_BE_USED", status: .completed, sourceType: .meeting)
+        try fixture.transcriptions.save(prior)
+        try fixture.projects.assign(transcriptionIDs: [prior.id], to: secondProject.id)
+        let event = fixture.event(title: "Original exact event title")
+        let preparation = try fixture.preparations.save(
+            .init(
+                key: .init(calendarID: "primary", eventID: "event"), context: "FROZEN_AUTHORED_AGENDA",
+                companyID: first.id, projectID: firstProject.id, titleSnapshot: event.title))
+        let coordinator = fixture.makeCoordinator()
+        XCTAssertNotNil(coordinator.startPreparedMeeting(event: event, preparation: preparation))
+        try await waitForLiveRecording(coordinator)
+        let panel = try XCTUnwrap(coordinator.testHook_panelViewModel)
+        let organization = try XCTUnwrap(panel.organization)
+        let provider = CompanyFlowAnswerProbe()
+        panel.chatViewModel.configure(llmService: nil, transcriptText: "CURRENT_SPEECH_MARKER: What should I say?")
+        panel.chatViewModel.configureDirectLiveAnswers(prepareTranscript: {}, stream: { provider.stream($0) })
+        panel.notesViewModel.restore("CURRENT_TYPED_NOTE_MARKER")
+        panel.chatViewModel.helpMeAnswer()
+        try await waitUntilOrganizationAnswerFinishes(panel.chatViewModel)
+        let completed = panel.chatViewModel.messages.map(\.content)
+        let memory = panel.chatViewModel.lastLiveMeetingMemory
+
+        await organization.selectCompany(second.id).value
+        XCTAssertNil(organization.errorMessage)
+        XCTAssertEqual(panel.notesViewModel.notesText, "CURRENT_TYPED_NOTE_MARKER")
+        XCTAssertEqual(panel.chatViewModel.messages.map(\.content), completed)
+        XCTAssertEqual(panel.chatViewModel.lastLiveMeetingMemory, memory)
+        XCTAssertEqual(coordinator.testHook_state, .recording)
+        let association = try XCTUnwrap(
+            fixture.preparations.fetchRecordingAssociation(recordingID: fixture.output.sessionID))
+        XCTAssertEqual(association.companyID, second.id)
+        XCTAssertNil(association.projectID)
+        XCTAssertEqual(association.contextSnapshot, "FROZEN_AUTHORED_AGENDA")
+        XCTAssertEqual(association.titleSnapshot, event.title)
+
+        panel.chatViewModel.helpMeAnswer()
+        try await waitUntilOrganizationAnswerFinishes(panel.chatViewModel)
+        let request = await provider.requests.last?.map(\.content).joined(separator: "\n") ?? ""
+        XCTAssertTrue(request.contains("CURRENT_SPEECH_MARKER"))
+        XCTAssertTrue(request.contains("CURRENT_TYPED_NOTE_MARKER"))
+        XCTAssertTrue(request.contains("FROZEN_AUTHORED_AGENDA"))
+        XCTAssertFalse(request.contains("COMPANY_WIDE_HISTORY_MUST_NOT_BE_USED"))
+        await coordinator.discardRecordingAndWaitForCompletion()
+    }
+
+    func testImmediateStopSettlesLastProjectSelectionAfterStoppingAudioAndBindsIt() async throws {
+        let fixture = try await CompanyFlowFixture()
+        let company = MeetingCompany(name: "Customer", attendeeDomains: ["customer.example"])
+        try fixture.companies.save(company)
+        let project = MeetingProject(name: "Chosen During Recording", companyID: company.id)
+        try fixture.projects.save(project)
+        let coordinator = fixture.makeCoordinator()
+        let event = fixture.event()
+        XCTAssertNotNil(
+            coordinator.startFromCalendar(calendarEventSnapshot: .init(event: event, confidence: .confirmed)))
+        try await waitForLiveRecording(coordinator)
+        let organization = try XCTUnwrap(coordinator.testHook_panelViewModel?.organization)
+        let saving = organization.selectProject(project.id)
+        XCTAssertTrue(coordinator.stopRecording())
+        await coordinator.testHook_waitForActionTask()
+        await saving.value
+        await coordinator.testHook_waitForMeetingTranscriptionQueue()
+        let stops = await fixture.recording.stopCallCount
+        XCTAssertEqual(stops, 1)
+        XCTAssertNil(organization.errorMessage)
+        let association = try XCTUnwrap(
+            fixture.preparations.fetchRecordingAssociation(recordingID: fixture.output.sessionID))
+        XCTAssertEqual(association.companyID, company.id)
+        XCTAssertEqual(association.projectID, project.id)
+        let transcriptionID = try XCTUnwrap(association.transcriptionID)
+        XCTAssertEqual(try fixture.projects.project(for: transcriptionID)?.id, project.id)
+        XCTAssertEqual(try fixture.companies.company(for: transcriptionID)?.id, company.id)
+        XCTAssertEqual(coordinator.testHook_state, .idle)
+    }
+
+    private func waitUntilOrganizationAnswerFinishes(_ chat: TranscriptChatViewModel) async throws {
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while chat.isStreaming, ContinuousClock.now < deadline { try await Task.sleep(for: .milliseconds(2)) }
+        XCTAssertFalse(chat.isStreaming)
+        XCTAssertEqual(chat.liveAnswerTiming?.outcome, "completed")
+    }
+
     func testLiveChatCheckpointsBelongToTheOwnedRecordingBeforeNormalStop() async throws {
         let output = makeRecordingOutput()
         let service = MeetingRecordingServiceSpy(output: output)
@@ -1302,12 +1422,12 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         )
 
         XCTAssertNotNil(coordinator.startRecording(trigger: .manual))
-        await coordinator.testHook_waitForActionTask()
+        try await waitForLiveRecording(coordinator)
 
         let snapshot = await recordingService.snapshot()
         XCTAssertEqual(snapshot.startCallCount, 1)
         XCTAssertEqual(snapshot.startTitles.count, 1)
-        XCTAssertEqual(snapshot.startTitles[0], expectedSnapshot.title)
+        XCTAssertEqual(snapshot.startTitles.first ?? nil, expectedSnapshot.title)
         XCTAssertEqual(snapshot.calendarEventSnapshots.first ?? nil, expectedSnapshot)
     }
 
@@ -1341,7 +1461,7 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         holder.snapshot = expectedSnapshot
 
         XCTAssertNotNil(coordinator.startRecording(trigger: .hotkey))
-        await coordinator.testHook_waitForActionTask()
+        try await waitForLiveRecording(coordinator)
 
         let snapshot = await recordingService.snapshot()
         XCTAssertEqual(snapshot.startCallCount, 1)
@@ -1375,7 +1495,7 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         )
 
         XCTAssertNotNil(coordinator.startFromCalendar(calendarEventSnapshot: expectedSnapshot))
-        await coordinator.testHook_waitForActionTask()
+        try await waitForLiveRecording(coordinator)
 
         let snapshot = await recordingService.snapshot()
         XCTAssertEqual(snapshot.startTitles, ["Confirmed Calendar Start"])
@@ -2074,6 +2194,74 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
             folderURL: folder
         )
         return folder
+    }
+}
+
+@MainActor
+private final class CompanyFlowFixture {
+    let companies: MeetingCompanyRepository
+    let projects: MeetingProjectRepository
+    let preparations: MeetingPreparationRepository
+    let transcriptions: TranscriptionRepository
+    let output: MeetingRecordingOutput
+    let recording: MeetingRecordingServiceSpy
+    let transcriptionService = MockTranscriptionService()
+
+    init() async throws {
+        let manager = try DatabaseManager()
+        companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
+        projects = MeetingProjectRepository(dbQueue: manager.dbQueue)
+        preparations = MeetingPreparationRepository(dbQueue: manager.dbQueue)
+        transcriptions = TranscriptionRepository(dbQueue: manager.dbQueue)
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        output = MeetingRecordingOutput(
+            sessionID: UUID(), displayName: "Synthetic organization check", folderURL: folder,
+            mixedAudioURL: folder.appendingPathComponent("mixed.m4a"),
+            microphoneAudioURL: folder.appendingPathComponent("microphone-raw.m4a"),
+            systemAudioURL: folder.appendingPathComponent("system-raw.m4a"), durationSeconds: 30,
+            sourceAlignment: .init(meetingOriginHostTime: nil, microphone: nil, system: nil))
+        recording = MeetingRecordingServiceSpy(output: output)
+        await transcriptionService.persistFinalizedMeetings(to: transcriptions)
+    }
+
+    func event(title: String = "Synthetic exact calendar title") -> CalendarEvent {
+        CalendarEvent(
+            id: "google/primary/event", title: title, startTime: Date().addingTimeInterval(-10),
+            endTime: Date().addingTimeInterval(1800),
+            participants: [.init(email: "person@customer.example", status: .accepted)],
+            organizer: .init(email: "organizer@internal.example", status: .accepted),
+            calendarIdentifier: "primary", provider: .google, providerEventID: "event", isUserMeeting: true)
+    }
+
+    func makeCoordinator(manualProjectID: UUID? = nil) -> MeetingRecordingFlowCoordinator {
+        MeetingRecordingFlowCoordinator(
+            meetingRecordingService: recording, transcriptionService: transcriptionService,
+            permissionService: MockPermissionService(), transcriptionRepo: transcriptions,
+            conversationRepo: MockChatConversationRepository(), quickPromptRepo: NoOpQuickPromptRepository(),
+            configStore: NoOpLLMConfigStore(), preparationRepository: preparations, projectRepository: projects,
+            companyRepository: companies, manualProjectIDProvider: { manualProjectID },
+            internalCompanyDomainsProvider: { ["internal.example"] }, llmService: nil,
+            pillViewModel: MeetingRecordingPillViewModel(),
+            meetingRecordingSettlement: MeetingRecordingSettlement(
+                lockFileStore: FlowRecordingLockFileStore(), transcriptionRepo: transcriptions),
+            onMenuBarIconUpdate: { _ in }, onTranscriptionReady: { _ in })
+    }
+}
+
+private actor CompanyFlowAnswerProbe {
+    private(set) var requests: [[ChatMessage]] = []
+    func response(_ messages: [ChatMessage]) -> String {
+        requests.append(messages)
+        return "The synthetic answer keeps the current conditions explicit."
+    }
+    nonisolated func stream(_ messages: [ChatMessage]) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let work = Task {
+                continuation.yield(await self.response(messages))
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in work.cancel() }
+        }
     }
 }
 

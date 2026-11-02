@@ -2,50 +2,80 @@ import MacParakeetCore
 import MacParakeetViewModels
 import SwiftUI
 
-/// Project membership is local. Browsing a folder does not depend on the recent meeting page.
+/// Company and project folders organize local membership without moving source files.
 struct ProjectFoldersView: View {
     @Bindable var planner: LiveMeetingPlannerViewModel
     let onOpen: (Transcription) -> Void
 
     @State private var newProjectName = ""
+    @State private var newProjectCompanyID: UUID?
     @State private var isAddingProject = false
+    @State private var companyEditor: CompanyEditorTarget?
 
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.sm) {
             HStack {
-                Label("Project Folders", systemImage: "folder")
+                Label("Companies & Projects", systemImage: "folder")
                     .font(DesignSystem.Typography.sectionTitle)
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
-                Button {
+                Button("New Company") { companyEditor = .init(company: nil) }
+                    .parakeetAction(.subtle)
+                Button("New Project") {
+                    newProjectCompanyID = planner.selectedCompanyFilterID
                     isAddingProject.toggle()
-                } label: {
-                    Label("New Folder", systemImage: "folder.badge.plus")
                 }
                 .parakeetAction(.subtle)
             }
-
             VStack(alignment: .leading, spacing: 12) {
-                if isAddingProject { newFolderForm }
-                folderButtons
-
-                if planner.isLoadingProjects {
-                    ProgressView("Loading projects…").controlSize(.small)
-                } else if planner.projects.isEmpty {
-                    Text(
-                        "Create a project folder, then choose it when preparing a meeting or move a saved transcript into it."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if isAddingProject { newProjectForm }
+                HStack {
+                    Picker("Company", selection: $planner.selectedCompanyFilterID) {
+                        Text("All companies").tag(Optional<UUID>.none)
+                        ForEach(planner.companies) { company in Text(company.name).tag(Optional(company.id)) }
+                    }
+                    .accessibilityLabel("Browse company")
+                    Picker("Project", selection: $planner.selectedProjectFilterID) {
+                        Text("All projects").tag(Optional<UUID>.none)
+                        ForEach(planner.filteredProjects) { project in
+                            Text(
+                                planner.projectLabel(project, includingCompany: planner.selectedCompanyFilterID == nil)
+                            )
+                            .tag(Optional(project.id))
+                        }
+                    }
+                    .accessibilityLabel("Browse project")
                 }
-
-                if planner.selectedProjectFilterID != nil { folderContents }
-
+                if let company = planner.companies.first(where: { $0.id == planner.selectedCompanyFilterID }) {
+                    HStack {
+                        Text(company.attendeeDomains.map { "@" + $0 }.joined(separator: ", "))
+                            .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        Spacer()
+                        Button("Edit Company") { companyEditor = .init(company: company) }
+                            .parakeetAction(.subtle)
+                    }
+                }
+                if let organizer = planner.companyOrganizer {
+                    HStack(alignment: .firstTextBaseline) {
+                        if organizer.isDiscovering { ProgressView().controlSize(.small) }
+                        Text(
+                            organizer.errorMessage ?? organizer.status ?? "Companies are found from upcoming meetings."
+                        )
+                        .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Find Companies") { Task { await organizer.sweep() } }
+                            .parakeetAction(.subtle)
+                            .disabled(organizer.isDiscovering)
+                    }
+                }
+                Text(
+                    "Company matches are automatic. Choose a project when you start recording, during the meeting, or afterward."
+                )
+                .font(.caption).foregroundStyle(.secondary)
+                if planner.isLoadingProjects { ProgressView("Loading folders…").controlSize(.small) }
+                if planner.selectedCompanyFilterID != nil || planner.selectedProjectFilterID != nil { folderContents }
                 if let message = planner.errorMessage {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(DesignSystem.Colors.errorRed)
-                        .textSelection(.enabled)
+                    Text(message).font(.caption).foregroundStyle(DesignSystem.Colors.errorRed).textSelection(.enabled)
                 }
             }
             .padding(DesignSystem.Spacing.md)
@@ -63,74 +93,61 @@ struct ProjectFoldersView: View {
             await planner.refreshProjects().value
             await planner.refreshProjectTranscriptionIDs().value
         }
+        .sheet(item: $companyEditor) { target in CompanyEditor(company: target.company, planner: planner) }
     }
 
-    private var newFolderForm: some View {
-        HStack {
-            TextField("Project name", text: $newProjectName)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { createProject() }
-            Button(planner.isCreatingProject ? "Creating…" : "Create") { createProject() }
-                .parakeetAction(.secondary)
-                .disabled(
-                    planner.isCreatingProject || newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
-    }
-
-    private var folderButtons: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), alignment: .leading)], alignment: .leading, spacing: 8) {
-            folderButton(name: "All Meetings", id: nil, icon: "square.stack")
-            ForEach(planner.projects) { project in
-                folderButton(name: project.name, id: project.id, icon: "folder.fill")
+    private var newProjectForm: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Picker("Company for new project", selection: $newProjectCompanyID) {
+                Text("No company").tag(Optional<UUID>.none)
+                ForEach(planner.companies) { company in Text(company.name).tag(Optional(company.id)) }
+            }
+            HStack {
+                TextField("Project name", text: $newProjectName)
+                    .textFieldStyle(.roundedBorder).accessibilityLabel("New project name")
+                    .onSubmit { createProject() }
+                Button(planner.isCreatingProject ? "Creating…" : "Create Project") { createProject() }
+                    .parakeetAction(.secondary)
+                    .disabled(
+                        planner.isCreatingProject
+                            || newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
-    }
-
-    private func folderButton(name: String, id: UUID?, icon: String) -> some View {
-        Button {
-            planner.selectedProjectFilterID = id
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                Text(name).lineLimit(1)
-                Spacer(minLength: 0)
-                if planner.selectedProjectFilterID == id {
-                    Image(systemName: "checkmark").font(.caption.weight(.semibold))
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 3)
-        }
-        .parakeetAction(planner.selectedProjectFilterID == id ? .primary : .secondary)
-        .help(name)
-        .accessibilityValue(planner.selectedProjectFilterID == id ? "Selected" : "")
+        .disabled(planner.isCreatingProject)
     }
 
     @ViewBuilder
     private var folderContents: some View {
         Divider()
         if planner.isLoadingProjectTranscriptions {
-            ProgressView("Loading transcripts…").controlSize(.small)
+            ProgressView("Loading meetings…").controlSize(.small)
         } else if planner.projectTranscriptions.isEmpty {
             Text(
-                "This folder is empty. Choose this project when preparing a meeting, or use Move to Project on a saved transcript."
+                "No saved meetings here yet. Company-matched recordings are filed automatically; projects are optional."
             )
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .font(.caption).foregroundStyle(.secondary)
         } else {
-            Text("\(planner.projectTranscriptions.count) saved transcripts")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text("\(planner.projectTranscriptions.count) saved meetings").font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(planner.projectTranscriptions) { transcription in
                         MeetingRowCard(transcription: transcription, onTap: { onOpen(transcription) }) {
-                            Button("Open") { onOpen(transcription) }
-                                .parakeetAction(.secondary)
+                            Button("Open") { onOpen(transcription) }.parakeetAction(.secondary)
+                            Menu("Move to Company") {
+                                Button("No Company") {
+                                    planner.assignCompany(transcriptionIDs: [transcription.id], to: nil)
+                                }
+                                ForEach(planner.companies) { company in
+                                    Button(company.name) {
+                                        planner.assignCompany(transcriptionIDs: [transcription.id], to: company.id)
+                                    }
+                                }
+                            }
+                            .disabled(planner.isAssigning)
                             Menu("Move to Project") {
                                 Button("No Project") { planner.assign(transcriptionIDs: [transcription.id], to: nil) }
                                 ForEach(planner.projects) { project in
-                                    Button(project.name) {
+                                    Button(planner.projectLabel(project)) {
                                         planner.assign(transcriptionIDs: [transcription.id], to: project.id)
                                     }
                                 }
@@ -146,16 +163,72 @@ struct ProjectFoldersView: View {
     }
 
     private func createProject() {
-        guard !planner.isCreatingProject,
-            !newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else { return }
+        guard !planner.isCreatingProject, !newProjectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
         let name = newProjectName
+        let companyID = newProjectCompanyID
         Task { @MainActor in
-            await planner.createProject(named: name, selectForBrowsing: true).value
-            if planner.errorMessage == nil {
-                newProjectName = ""
-                isAddingProject = false
+            await planner.createProject(named: name, companyID: companyID, selectForBrowsing: true).value
+            if planner.errorMessage == nil { newProjectName = ""; isAddingProject = false }
+        }
+    }
+}
+
+private struct CompanyEditorTarget: Identifiable {
+    let id = UUID()
+    let company: MeetingCompany?
+}
+
+private struct CompanyEditor: View {
+    let company: MeetingCompany?
+    @Bindable var planner: LiveMeetingPlannerViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var domains: String
+    @State private var saveTask: Task<Void, Never>?
+
+    init(company: MeetingCompany?, planner: LiveMeetingPlannerViewModel) {
+        self.company = company; self.planner = planner
+        _name = State(initialValue: company?.name ?? "")
+        _domains = State(initialValue: company?.attendeeDomains.joined(separator: ", ") ?? "")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(company == nil ? "New Company" : "Edit Company").font(.title3.weight(.semibold))
+            TextField("Company name", text: $name).textFieldStyle(.roundedBorder).accessibilityLabel("Company name")
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Attendee email domains").font(.caption.weight(.medium))
+                TextField("customer.com, partner.com", text: $domains)
+                    .textFieldStyle(.roundedBorder).accessibilityLabel("Company attendee email domains")
+                Text(
+                    "Matching attendee addresses organize upcoming meetings under this company. Separate domains with commas. Projects stay your choice."
+                )
+                .font(.caption).foregroundStyle(.secondary)
             }
+            if let message = planner.errorMessage {
+                Text(message).font(.caption).foregroundStyle(DesignSystem.Colors.errorRed).textSelection(.enabled)
+            }
+            HStack {
+                Button("Cancel") { dismiss() }.parakeetAction(.secondary).keyboardShortcut(.cancelAction)
+                    .disabled(planner.isSavingCompany)
+                Spacer()
+                Button(planner.isSavingCompany ? "Saving…" : "Save Company") { save() }
+                    .parakeetAction(.primary).keyboardShortcut(.defaultAction)
+                    .disabled(planner.isSavingCompany || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(22).frame(width: 460).interactiveDismissDisabled(planner.isSavingCompany)
+        .onAppear { planner.errorMessage = nil }.onDisappear { saveTask?.cancel() }
+    }
+
+    private func save() {
+        guard saveTask == nil else { return }
+        let entries = LiveMeetingPlannerViewModel.domainEntries(from: domains)
+        saveTask = Task { @MainActor in
+            defer { saveTask = nil }
+            if await planner.saveCompany(id: company?.id, name: name, attendeeDomains: entries) { dismiss() }
         }
     }
 }
