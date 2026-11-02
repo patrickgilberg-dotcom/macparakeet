@@ -96,6 +96,35 @@ public enum MeetingCompanyDomainMatcher {
         return normalizedDomain(rawDomain)
     }
 
+    /// Expand own-team domains only through one explicit configured company
+    /// that owns the exact signed-in mailbox domain. Similar names, parent
+    /// domains and ambiguous rule ownership never establish extra aliases.
+    /// Archived own-team configuration still identifies internal addresses;
+    /// this read does not restore or otherwise edit that company.
+    public static func internalDomains(accountEmail: String, companies: [MeetingCompany]) -> Set<String> {
+        guard let signedInDomain = domain(fromEmail: accountEmail) else { return [] }
+        let owners = companies.filter { company in
+            company.attendeeDomains.contains { normalizedDomain($0) == signedInDomain }
+        }
+        guard owners.count == 1, let owner = owners.first,
+            let aliases = try? normalizedDomains(owner.attendeeDomains)
+        else { return [signedInDomain] }
+        return Set(aliases)
+    }
+
+    /// Account, calendar selection and own-team aliases jointly define one
+    /// discovery scope. Changing only alias settings invalidates a stale sweep
+    /// before it can commit another company from the old interpretation.
+    public static func discoverySourceIdentity(
+        accountID: String, excludedCalendarIDs: Set<String>, internalDomains: Set<String>
+    ) -> String {
+        let fields =
+            ["company-discovery-v2", "account", accountID, "excluded", String(excludedCalendarIDs.count)]
+            + excludedCalendarIDs.sorted() + ["internal", String(internalDomains.count)] + internalDomains.sorted()
+        let identity = fields.map { "\($0.utf8.count):\($0)" }.joined()
+        return SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// Only plausible external business domains are company-discovery inputs.
     /// Internal domains include proper dot descendants, never suffix lookalikes.
     public static func discoverableDomains(event: CalendarEvent, internalDomains: Set<String> = []) -> [String] {
@@ -231,12 +260,21 @@ public enum MeetingCompanyDomainMatcher {
         guard participant.status != .declined, participant.kind == nil || participant.kind == .person,
             let email = participant.email, let domain = domain(fromEmail: email)
         else { return nil }
+        let sender = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !schedulingTransportSenders.contains(sender) else { return nil }
         let internalRules = internalDomains.compactMap(normalizedDomain)
         guard !internalRules.contains(where: { domain == $0 || domain.hasSuffix("." + $0) }),
             !nonBusinessDomains.contains(where: { domain == $0 || domain.hasSuffix("." + $0) })
         else { return nil }
         return domain
     }
+
+    // These mailboxes deliver another person's scheduling invitation. They
+    // do not establish Calendly as that meeting's company. Keep this precise:
+    // a real employee at the same domain remains a valid business signal.
+    private static let schedulingTransportSenders: Set<String> = [
+        "noreply@calendly.com", "no-reply@calendly.com", "notifications@calendly.com",
+    ]
 
     private static let nonBusinessDomains: Set<String> = [
         "gmail.com", "googlemail.com", "yahoo.com", "yahoo.ca", "yahoo.co.uk", "ymail.com", "rocketmail.com",

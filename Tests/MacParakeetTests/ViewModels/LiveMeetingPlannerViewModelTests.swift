@@ -346,6 +346,87 @@ final class LiveMeetingPlannerViewModelTests: XCTestCase {
         XCTAssertEqual(planner.projectLabel(firstProject, includingCompany: false), "Delivery")
     }
 
+    func testArchiveAndRestoreCompanyPreserveMeetingsProjectsAndAuthoredPreparation() async throws {
+        let (planner, companies, projects, preparations, transcriptions) = try makeCompanyPlanner()
+        let company = MeetingCompany(name: "Calendar service", attendeeDomains: ["calendar-service.example"])
+        try companies.save(company)
+        let project = MeetingProject(name: "Saved work", companyID: company.id)
+        try projects.save(project)
+        var row = meeting(at: 10)
+        row.userNotes = "Keep these personal notes."
+        try transcriptions.save(row)
+        try projects.assign(transcriptionIDs: [row.id], to: project.id)
+        let upcoming = event()
+        let preparation = MeetingPreparation(
+            key: .init(calendarID: "shared-calendar", eventID: "series_instance_1"),
+            context: "Keep authored meeting context.", companyID: company.id, projectID: project.id,
+            titleSnapshot: upcoming.title)
+        let savedPreparation = try preparations.save(preparation)
+        await planner.loadDraft(for: upcoming)
+        planner.draftContext = "Keep this unsaved edit too."
+        planner.selectedCompanyFilterID = company.id
+        planner.selectedProjectFilterID = project.id
+        await planner.refreshProjectTranscriptionIDs().value
+        let persistedProject = try XCTUnwrap(projects.fetch(id: project.id))
+        let persistedPreparation = try XCTUnwrap(preparations.fetch(id: savedPreparation.id))
+
+        let archived = await planner.archiveCompany(id: company.id)
+
+        XCTAssertTrue(archived)
+        XCTAssertTrue(planner.companies.isEmpty)
+        XCTAssertEqual(planner.archivedCompanies.map(\.id), [company.id])
+        XCTAssertTrue(planner.projects.isEmpty, "Archived company projects stay out of new-selection lists.")
+        XCTAssertNil(planner.selectedCompanyFilterID)
+        XCTAssertNil(planner.selectedProjectFilterID)
+        XCTAssertNil(planner.draftCompanyID)
+        XCTAssertNil(planner.draftProjectID)
+        XCTAssertEqual(planner.draftContext, "Keep this unsaved edit too.")
+        XCTAssertEqual(try projects.fetch(id: project.id), persistedProject)
+        XCTAssertEqual(try projects.project(for: row.id)?.id, project.id)
+        XCTAssertEqual(try companies.company(for: row.id)?.id, company.id)
+        XCTAssertEqual(try transcriptions.fetch(id: row.id)?.rawTranscript, row.rawTranscript)
+        XCTAssertEqual(try transcriptions.fetch(id: row.id)?.userNotes, row.userNotes)
+        XCTAssertEqual(try transcriptions.fetch(id: row.id)?.updatedAt, row.updatedAt)
+        XCTAssertEqual(try preparations.fetch(id: savedPreparation.id), persistedPreparation)
+        let rediscovered = try companies.ensureCompany(forDomain: "calendar-service.example")
+        XCTAssertEqual(rediscovered.id, company.id)
+        XCTAssertTrue(rediscovered.isArchived, "A sweep must not recreate or revive an archived company.")
+
+        await planner.loadDraft(for: upcoming)
+        XCTAssertNil(planner.draftCompanyID)
+        XCTAssertNil(planner.draftProjectID)
+        XCTAssertEqual(planner.draftContext, savedPreparation.context)
+        XCTAssertEqual(planner.draftCompanyMatch?.source, .manual)
+        let restored = await planner.restoreCompany(id: company.id)
+        XCTAssertTrue(restored)
+        XCTAssertEqual(planner.companies.map(\.id), [company.id])
+        XCTAssertTrue(planner.archivedCompanies.isEmpty)
+        XCTAssertEqual(planner.projects.map(\.id), [project.id])
+        XCTAssertEqual(try companies.fetchAll(includeArchived: true).count, 1)
+        XCTAssertEqual(try projects.project(for: row.id)?.id, project.id)
+        XCTAssertFalse(planner.isUpdatingCompanyArchive)
+        XCTAssertNil(planner.errorMessage)
+    }
+
+    func testArchivingMissingCompanyFailsWithoutChangingCurrentSelectionOrRecreatingRow() async throws {
+        let (planner, companies, _, _, _) = try makeCompanyPlanner()
+        let company = MeetingCompany(name: "Keep")
+        try companies.save(company)
+        await planner.refreshCompanies().value
+        planner.selectedCompanyFilterID = company.id
+
+        let archived = await planner.archiveCompany(id: UUID())
+
+        XCTAssertFalse(archived)
+        XCTAssertEqual(planner.selectedCompanyFilterID, company.id)
+        XCTAssertEqual(planner.companies.map(\.id), [company.id])
+        XCTAssertEqual(try companies.fetchAll(includeArchived: true).count, 1)
+        XCTAssertEqual(try companies.fetch(id: company.id)?.isArchived, false)
+        XCTAssertTrue(planner.archivedCompanies.isEmpty)
+        XCTAssertNotNil(planner.errorMessage)
+        XCTAssertFalse(planner.isUpdatingCompanyArchive)
+    }
+
     private func makeCompanyPlanner() throws -> (
         LiveMeetingPlannerViewModel, MeetingCompanyRepository, MeetingProjectRepository,
         MeetingPreparationRepository, TranscriptionRepository

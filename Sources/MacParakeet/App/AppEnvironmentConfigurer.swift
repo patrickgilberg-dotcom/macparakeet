@@ -130,6 +130,7 @@ final class AppEnvironmentConfigurer {
     }
 
     func configure(environment env: AppEnvironment, callbacks: Callbacks) -> Runtime {
+        let companyRepository = env.meetingCompanyRepo
         Task {
             // Only bootstrap trial if onboarding is already completed (returning user).
             // For new users, trial starts at onboarding completion, not during setup.
@@ -200,7 +201,8 @@ final class AppEnvironmentConfigurer {
         }
         Task { [weak meetingsWorkspaceViewModel, weak settingsViewModel] in
             _ = await GoogleCalendarAuth.shared.connection()
-            meetingsWorkspaceViewModel?.planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains()
+            meetingsWorkspaceViewModel?.planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains(
+                companyRepository: companyRepository)
             await settingsViewModel?.refreshCalendarAccess()
             await meetingsWorkspaceViewModel?.refreshUpcomingEvents().value
         }
@@ -492,7 +494,9 @@ final class AppEnvironmentConfigurer {
             manualCompanyIDProvider: { [weak meetingsWorkspaceViewModel] in
                 meetingsWorkspaceViewModel?.planner?.selectedCompanyFilterID
             },
-            internalCompanyDomainsProvider: { await Self.googleInternalCompanyDomains() },
+            internalCompanyDomainsProvider: {
+                await Self.googleInternalCompanyDomains(companyRepository: companyRepository)
+            },
             llmService: hasLLMConfig ? env.llmService : nil,
             pillViewModel: meetingPillViewModel,
             meetingRecordingSettlement: env.meetingRecordingSettlement,
@@ -656,15 +660,20 @@ final class AppEnvironmentConfigurer {
                             $0.calendarIdentifier.map { !excluded.contains($0) } ?? true
                         }
                     },
-                    internalDomainsProvider: { await Self.googleInternalCompanyDomains() },
+                    internalDomainsProvider: {
+                        await Self.googleInternalCompanyDomains(companyRepository: companyRepository)
+                    },
                     sourceIdentityProvider: {
                         guard let connection = await GoogleCalendarAuth.shared.connection() else { return nil }
                         let excluded = await excludedCalendarIDs()
-                        let fields = [connection.id] + excluded.sorted()
-                        return MeetingGeneratedPreparation.hash(fields.map { "\($0.utf8.count):\($0)" }.joined())
+                        let internalDomains = await Self.googleInternalCompanyDomains(
+                            companyRepository: companyRepository)
+                        return MeetingCompanyDomainMatcher.discoverySourceIdentity(
+                            accountID: connection.id, excludedCalendarIDs: excluded, internalDomains: internalDomains)
                     },
                     onCompaniesChanged: { [weak planner] in
-                        planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains()
+                        planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains(
+                            companyRepository: companyRepository)
                         await planner?.refreshCompanies().value
                     })
                 planner.companyOrganizer = companyOrganizer
@@ -729,11 +738,17 @@ final class AppEnvironmentConfigurer {
         )
     }
 
-    private nonisolated static func googleInternalCompanyDomains() async -> Set<String> {
+    private nonisolated static func googleInternalCompanyDomains(
+        companyRepository: any MeetingCompanyRepositoryProtocol
+    ) async -> Set<String> {
         guard let connection = await GoogleCalendarAuth.shared.connection(),
-            let domain = MeetingCompanyDomainMatcher.domain(fromEmail: connection.email)
+            MeetingCompanyDomainMatcher.domain(fromEmail: connection.email) != nil
         else { return [] }
-        return [domain]
+        let companies =
+            (try? await Task.detached(priority: .utility) {
+                try companyRepository.fetchAll(includeArchived: true)
+            }.value) ?? []
+        return MeetingCompanyDomainMatcher.internalDomains(accountEmail: connection.email, companies: companies)
     }
 
     /// Read presentation preferences before selecting: quiet completion may

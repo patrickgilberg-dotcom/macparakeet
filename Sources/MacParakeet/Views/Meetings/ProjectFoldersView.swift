@@ -53,7 +53,23 @@ struct ProjectFoldersView: View {
                         Spacer()
                         Button("Edit Company") { companyEditor = .init(company: company) }
                             .parakeetAction(.subtle)
+                            .disabled(planner.isUpdatingCompanyArchive || planner.isSavingCompany)
+                        Button("Archive Company") {
+                            Task { await planner.archiveCompany(id: company.id) }
+                        }
+                        .parakeetAction(.subtle)
+                        .help("Hide this company from matching. Its saved meetings and projects are kept.")
+                        .disabled(planner.isUpdatingCompanyArchive || planner.isSavingCompany)
                     }
+                }
+                if !planner.archivedCompanies.isEmpty {
+                    Menu("Archived Companies (\(planner.archivedCompanies.count))") {
+                        ForEach(planner.archivedCompanies) { company in
+                            Button("Restore \(company.name)") { Task { await planner.restoreCompany(id: company.id) } }
+                        }
+                    }
+                    .accessibilityLabel("Archived companies")
+                    .disabled(planner.isUpdatingCompanyArchive || planner.isSavingCompany)
                 }
                 if let organizer = planner.companyOrganizer {
                     HStack(alignment: .firstTextBaseline) {

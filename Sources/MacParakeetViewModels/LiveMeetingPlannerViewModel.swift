@@ -7,6 +7,7 @@ import MacParakeetCore
 @Observable
 public final class LiveMeetingPlannerViewModel {
     public private(set) var companies: [MeetingCompany] = []
+    public private(set) var archivedCompanies: [MeetingCompany] = []
     public private(set) var projects: [MeetingProject] = []
     public var selectedCompanyFilterID: UUID? {
         didSet {
@@ -70,6 +71,7 @@ public final class LiveMeetingPlannerViewModel {
     public private(set) var isLoadingProjectTranscriptions = false
     public private(set) var isCreatingProject = false
     public private(set) var isSavingCompany = false
+    public private(set) var isUpdatingCompanyArchive = false
     public private(set) var isLoadingDraft = false
     public private(set) var isSaving = false
     public private(set) var isAssigning = false
@@ -128,15 +130,21 @@ public final class LiveMeetingPlannerViewModel {
         let task = Task { @MainActor [weak self] in
             do {
                 let values = try await Task.detached(priority: .userInitiated) {
-                    (
-                        try repository.fetchAll(includeArchived: false),
-                        try companies?.fetchAll(includeArchived: false) ?? []
-                    )
+                    let allCompanies = try companies?.fetchAll(includeArchived: true) ?? []
+                    let activeCompanies = allCompanies.filter { !$0.isArchived }
+                    let activeCompanyIDs = Set(activeCompanies.map(\.id))
+                    let projects = try repository.fetchAll(includeArchived: false).filter {
+                        guard companies != nil, let companyID = $0.companyID else { return true }
+                        return activeCompanyIDs.contains(companyID)
+                    }
+                    return (projects, activeCompanies, allCompanies.filter(\.isArchived))
                 }.value
                 try Task.checkCancellation()
                 guard let self, self.projectGeneration == generation else { return }
                 self.projects = values.0
                 self.companies = values.1
+                self.archivedCompanies = values.2
+                self.clearUnavailableSelections()
                 self.isLoadingProjects = false
             } catch is CancellationError {
                 // A newer refresh owns publication.
@@ -152,6 +160,27 @@ public final class LiveMeetingPlannerViewModel {
 
     @discardableResult
     public func refreshCompanies() -> Task<Void, Never> { refreshProjects() }
+
+    private func clearUnavailableSelections() {
+        if let id = selectedCompanyFilterID, !companies.contains(where: { $0.id == id }) {
+            selectedCompanyFilterID = nil
+        }
+        if let id = selectedProjectFilterID, !projects.contains(where: { $0.id == id }) {
+            selectedProjectFilterID = nil
+        }
+        let companyUnavailable = draftCompanyID.map { id in !companies.contains(where: { $0.id == id }) } ?? false
+        let projectUnavailable = draftProjectID.map { id in !projects.contains(where: { $0.id == id }) } ?? false
+        guard companyUnavailable || projectUnavailable else { return }
+        isUpdatingDraftSelection = true
+        if companyUnavailable {
+            draftCompanyID = nil
+            draftCompanyName = nil
+            draftCompanyMatch = nil
+        }
+        draftProjectID = nil
+        draftProjectName = nil
+        isUpdatingDraftSelection = false
+    }
 
     public func projectLabel(_ project: MeetingProject, includingCompany: Bool = true) -> String {
         guard includingCompany else { return project.name }
@@ -292,13 +321,21 @@ public final class LiveMeetingPlannerViewModel {
         do {
             let result = try await Task.detached(priority: .userInitiated) {
                 let preparation = try repository.fetch(key: key)
-                let availableProjects = try projects.fetchAll(includeArchived: false)
-                let availableCompanies = try companies?.fetchAll(includeArchived: false) ?? []
+                let allCompanies = try companies?.fetchAll(includeArchived: true) ?? []
+                let availableCompanies = allCompanies.filter { !$0.isArchived }
+                let activeCompanyIDs = Set(availableCompanies.map(\.id))
+                let availableProjects = try projects.fetchAll(includeArchived: false).filter {
+                    guard companies != nil, let companyID = $0.companyID else { return true }
+                    return activeCompanyIDs.contains(companyID)
+                }
                 let match = MeetingCompanyDomainMatcher.resolve(
                     event: event, companies: availableCompanies, preparation: preparation,
                     internalDomains: internalDomains)
                 let project = preparation?.projectID.flatMap { id in availableProjects.first { $0.id == id } }
-                return (preparation, match, project, availableProjects, availableCompanies)
+                return (
+                    preparation, match, project, availableProjects, availableCompanies,
+                    allCompanies.filter(\.isArchived)
+                )
             }.value
             try Task.checkCancellation()
             guard generation == draftGeneration, draftKey == key else { return }
@@ -309,6 +346,7 @@ public final class LiveMeetingPlannerViewModel {
             draftContext = result.0?.context ?? ""
             self.projects = result.3
             self.companies = result.4
+            archivedCompanies = result.5
             isUpdatingDraftSelection = true
             draftCompanyID = result.1.company?.id ?? result.2?.companyID
             draftProjectID = result.2?.id
@@ -398,7 +436,7 @@ public final class LiveMeetingPlannerViewModel {
     }
 
     public func saveCompany(id: UUID? = nil, name: String, attendeeDomains: [String]) async -> Bool {
-        guard !isSavingCompany, let repository = companyRepository else { return false }
+        guard !isSavingCompany, !isUpdatingCompanyArchive, let repository = companyRepository else { return false }
         isSavingCompany = true
         errorMessage = nil
         defer { isSavingCompany = false }
@@ -424,6 +462,34 @@ public final class LiveMeetingPlannerViewModel {
             return true
         } catch {
             errorMessage = "The company could not be saved. \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    public func archiveCompany(id: UUID) async -> Bool { await setCompanyArchived(id: id, archived: true) }
+
+    public func restoreCompany(id: UUID) async -> Bool { await setCompanyArchived(id: id, archived: false) }
+
+    private func setCompanyArchived(id: UUID, archived: Bool) async -> Bool {
+        guard !isUpdatingCompanyArchive, !isSavingCompany, let repository = companyRepository else { return false }
+        isUpdatingCompanyArchive = true
+        errorMessage = nil
+        defer { isUpdatingCompanyArchive = false }
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                guard var company = try repository.fetch(id: id) else {
+                    throw MeetingCompanyRepositoryError.companyMissing
+                }
+                guard company.isArchived != archived else { return }
+                company.isArchived = archived
+                company.updatedAt = Date()
+                try repository.save(company)
+            }.value
+            await refreshCompanies().value
+            return true
+        } catch {
+            errorMessage =
+                "The company could not be \(archived ? "archived" : "restored"). \(error.localizedDescription)"
             return false
         }
     }

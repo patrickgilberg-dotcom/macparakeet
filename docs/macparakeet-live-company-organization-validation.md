@@ -23,13 +23,13 @@ and [calendar contract](../spec/contracts/google-calendar-live.md).
 
 ## Completed focused verification
 
-The final focused run executed **335 tests, one skipped, zero failures**, in
+The main integrated focused run executed **335 tests, one skipped, zero failures**, in
 **25.195s**, following a **32.17s** incremental build. It covers company discovery,
 matching, database migration, membership, planner/recording controls, live
 organization changes, Ask priority, Google Calendar occurrence/title handling,
 current 20–30-second/three-minute focus, and existing transcript chat behavior.
 The skipped case is an explicitly opt-in native company/project control check;
-it is not counted as completed interactive acceptance here.
+its separate completed interaction result is recorded below.
 
 Core coverage includes 28 matcher and 22 repository/migration cases. A unique
 external organizer can resolve the company; public mail, rooms/resources,
@@ -77,14 +77,49 @@ zero failures**, in **479.825s**. The separate Swift Testing runner passed
 **30 tests in three suites**. The command explicitly unset the temporary debug
 app-state override; the normal-path run therefore does not carry the isolated
 path-assumption failures from the earlier board/preparation task. The full
-suite was not repeated.
+suite was not repeated. This full run predates the later menu-layout and
+calendar-sweep hardening changes; their focused/native/build checks are recorded
+separately and do not retroactively change that source qualification.
 
-## Remaining installation checks
+## Native interaction and installed-calendar acceptance
 
-The signed build/install, genuine thirty-day calendar sweep and final quiet
-native acceptance are pending. Their completed results
-will replace this paragraph before the task is closed. No new microphone or
-system-audio recording is part of this quiet acceptance. This task does not
+The production controls were checked at the real panel width. A cramped single
+row clipped the company control; the final view uses two constrained menu rows
+and keeps long labels accessible. After that view change, **77 focused cases,
+one opt-in skip, zero failures** passed in **15.907s**. The separate native
+interaction case then passed **one case, zero skips/failures**, in **62.412s**:
+create a project in the first company, switch company (clearing that project),
+choose the second company's project, and verify the callback and persisted scope.
+The private native host uses synthetic in-memory data and no capture. Early
+native attempts exposed a blocked asynchronous test-host loop and menu tracking
+mode; those test-only issues were corrected before the completed result.
+
+Signed Release `03ee501ee3bd`, built `2026-11-02T17:58:29Z`, was installed through
+the supported scripts. The real thirty-day sweep checked **320 upcoming entries**
+and created **eight domain folders**. A later scan checked 319 as time advanced.
+Inspection surfaced a scheduling delivery sender and an own-team domain alias;
+these prompted the final hardening below rather than being accepted as correct
+client classifications. Requested familiar company labels were applied privately.
+
+The final hardening excludes precise scheduling-delivery mailboxes while keeping
+real vendor employees eligible. Own-team aliases come only from one company
+configured for the exact signed-in domain, including archived own-team metadata;
+missing, malformed or ambiguous ownership narrows to the signed-in domain.
+Account, excluded calendars and aliases define the sweep fingerprint. Archive
+and Restore change availability without deleting projects or source data.
+
+After those changes, **88 focused cases, one opt-in skip, zero failures** passed
+in **3.414s**. The initial hardening run had four assertion failures in two new
+fixtures: a generic company title correctly did not match, and pre-persistence
+objects carried dates beyond SQLite's saved precision. Concrete title and
+persisted snapshot baselines fixed those fixtures while retaining the matching
+policy and full-object preservation assertions. Review also closed malformed
+competing alias ownership before the final run. Strict formatting and whitespace
+checks pass; independent review found no remaining must-fix finding.
+
+The subsequent signed installation and final calendar/data acceptance remain in
+progress. No new microphone or system-audio
+recording is part of this quiet acceptance. This task does not
 establish a multi-hour recording guarantee or requalify every original-app
 feature.
 

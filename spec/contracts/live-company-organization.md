@@ -18,8 +18,11 @@ invoke an LLM. A failed/partial read is not reported as a completed sweep.
 
 Eligible signals are nondeclined people with valid business email domains,
 including the organizer. Rooms, resources, service calendars and common personal
-mail providers do not create companies. The connected account's own business
-domain is distinguished from external customer domains. Domain normalization is
+mail providers and known scheduling-delivery mailboxes do not create companies.
+A real person at a scheduling vendor remains eligible. The connected account's
+own business domain and aliases from its uniquely configured company are
+distinguished from external customer domains; aliases are never guessed from
+similar domain spelling. Domain normalization is
 case-insensitive, validated and exact; lookalike suffixes are not matches.
 
 An eligible external organizer provides the company's strongest signal.
@@ -42,7 +45,9 @@ legacy project selections remain authoritative.
 ## Persistence and context boundaries
 
 Company records contain a local identity, editable name, normalized domains and
-ordinary lifecycle metadata. No occurrence IDs, event bodies or attendee lists
+ordinary lifecycle metadata. Archiving and restoring a company changes its
+availability in organization controls without deleting projects, memberships or
+source artifacts. No occurrence IDs, event bodies or attendee lists
 are saved by the sweep. Companies and projects are distinct tables. A project
 can belong to one company; legacy projects remain valid with no company.
 Company membership is separate so a recording can have a company and no project.

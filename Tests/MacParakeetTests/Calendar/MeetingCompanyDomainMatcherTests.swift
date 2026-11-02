@@ -12,6 +12,84 @@ final class MeetingCompanyDomainMatcherTests: XCTestCase {
         XCTAssertEqual(try MeetingCompanyDomainMatcher.normalizedDomains([]), [])
     }
 
+    func testInternalAliasesRequireOneExactConfiguredAccountDomainOwnerAndStayOutOfClientMatching() {
+        let own = MeetingCompany(name: "Own Team", attendeeDomains: ["OWN-TEAM.TEST", " @own-alias.test "])
+        let client = MeetingCompany(name: "Zephyr", attendeeDomains: ["client.test"])
+        let internalDomains = MeetingCompanyDomainMatcher.internalDomains(
+            accountEmail: " Me@OWN-TEAM.TEST ", companies: [client, own])
+        XCTAssertEqual(internalDomains, ["own-team.test", "own-alias.test"])
+
+        var value = event([
+            .init(email: "colleague@own-alias.test"), .init(email: "guest@client.test"),
+            .init(email: "other@sub.own-alias.test"),
+        ])
+        value.organizer = .init(email: "organizer@own-team.test")
+        XCTAssertEqual(
+            MeetingCompanyDomainMatcher.discoverableDomains(event: value, internalDomains: internalDomains),
+            ["client.test"])
+        XCTAssertEqual(
+            MeetingCompanyDomainMatcher.resolve(
+                event: value, companies: [own, client], preparation: nil, internalDomains: internalDomains
+            ).company?.id, client.id)
+
+        value.title = "Zephyr follow-up"
+        value.participants = [.init(email: "colleague@own-alias.test")]
+        let titleMatch = MeetingCompanyDomainMatcher.resolve(
+            event: value, companies: [own, client], preparation: nil, internalDomains: internalDomains)
+        XCTAssertEqual(titleMatch.source, .title)
+        XCTAssertEqual(titleMatch.company?.id, client.id)
+    }
+
+    func testMissingLookalikeOrAmbiguousInternalOwnershipFallsBackToOnlySignedInDomain() {
+        let account = "me@own-team.test"
+        let first = MeetingCompany(name: "Own Team", attendeeDomains: ["own-team.test", "first-alias.test"])
+        let second = MeetingCompany(name: "Other", attendeeDomains: ["own-team.test", "second-alias.test"])
+        let lookalike = MeetingCompany(
+            name: "Own Team", attendeeDomains: ["not-own-team.test", "sub.own-team.test", "other-alias.test"])
+        let malformedOwner = MeetingCompany(
+            name: "Malformed", attendeeDomains: ["own-team.test", "https://invalid-alias.test"])
+        for companies in [[], [lookalike], [first, second], [first, malformedOwner], [malformedOwner]] {
+            XCTAssertEqual(
+                MeetingCompanyDomainMatcher.internalDomains(accountEmail: account, companies: companies),
+                ["own-team.test"])
+        }
+        XCTAssertEqual(
+            MeetingCompanyDomainMatcher.internalDomains(
+                accountEmail: "me@sub.own-team.test", companies: [first]), ["sub.own-team.test"])
+        XCTAssertTrue(MeetingCompanyDomainMatcher.internalDomains(accountEmail: "invalid", companies: [first]).isEmpty)
+    }
+
+    func testArchivedOwnCompanyStillDefinesInternalAliasesWithoutBeingRestored() {
+        let archived = MeetingCompany(
+            name: "Own Team", attendeeDomains: ["own-team.test", "own-alias.test"], isArchived: true)
+        XCTAssertEqual(
+            MeetingCompanyDomainMatcher.internalDomains(accountEmail: "me@own-team.test", companies: [archived]),
+            ["own-team.test", "own-alias.test"])
+        XCTAssertTrue(archived.isArchived)
+    }
+
+    func testDiscoveryScopeIdentityIncludesOwnAliasesAndSeparatesAllSourceDimensions() {
+        let original = MeetingCompanyDomainMatcher.discoverySourceIdentity(
+            accountID: "account", excludedCalendarIDs: ["excluded"], internalDomains: ["own-team.test"])
+        let addedAlias = MeetingCompanyDomainMatcher.discoverySourceIdentity(
+            accountID: "account", excludedCalendarIDs: ["excluded"],
+            internalDomains: ["own-team.test", "own-alias.test"])
+        XCTAssertNotEqual(original, addedAlias, "Changing only an own-team alias must invalidate the sweep.")
+        XCTAssertEqual(
+            addedAlias,
+            MeetingCompanyDomainMatcher.discoverySourceIdentity(
+                accountID: "account", excludedCalendarIDs: ["excluded"],
+                internalDomains: Set(["own-alias.test", "own-team.test"])))
+        XCTAssertNotEqual(
+            original,
+            MeetingCompanyDomainMatcher.discoverySourceIdentity(
+                accountID: "other-account", excludedCalendarIDs: ["excluded"], internalDomains: ["own-team.test"]))
+        XCTAssertNotEqual(
+            original,
+            MeetingCompanyDomainMatcher.discoverySourceIdentity(
+                accountID: "account", excludedCalendarIDs: ["different"], internalDomains: ["own-team.test"]))
+    }
+
     func testMalformedDomainRulesAreRejectedRatherThanLooselyMatched() {
         for value in [
             "", " ", "someone@example.com", "https://example.com", "*.example.com", "@@example.com",
@@ -392,6 +470,47 @@ final class MeetingCompanyDomainMatcherTests: XCTestCase {
         XCTAssertEqual(effective.id, legacy.id)
         XCTAssertEqual(effective.context, legacy.context)
         XCTAssertNil(effective.companyID)
+    }
+
+    func testSchedulingTransportSendersCannotCreateOrChooseTheirDeliveryCompany() {
+        let transportCompany = MeetingCompany(name: "Calendly", attendeeDomains: ["calendly.com"])
+        let client = MeetingCompany(name: "Client", attendeeDomains: ["client.test"])
+        for sender in ["noreply@calendly.com", " NO-REPLY@CALENDLY.COM ", "notifications@calendly.com"] {
+            var value = event([
+                .init(email: "person@client.test"), .init(email: sender, name: "A person's scheduling invitation"),
+            ])
+            value.organizer = .init(email: sender, name: "Trainer")
+            XCTAssertEqual(MeetingCompanyDomainMatcher.discoverableDomains(event: value), ["client.test"])
+            let result = MeetingCompanyDomainMatcher.resolve(
+                event: value, companies: [transportCompany, client], preparation: nil)
+            XCTAssertEqual(result.company?.id, client.id)
+            XCTAssertEqual(result.matchedDomains, ["client.test"])
+
+            value.participants = [.init(email: sender)]
+            XCTAssertTrue(MeetingCompanyDomainMatcher.discoverableDomains(event: value).isEmpty)
+            XCTAssertEqual(
+                MeetingCompanyDomainMatcher.resolve(
+                    event: value, companies: [transportCompany, client], preparation: nil
+                ).source, .unmatched)
+        }
+    }
+
+    func testActualSchedulingVendorEmployeeStillSuppliesBusinessDomain() {
+        let vendor = MeetingCompany(name: "Calendly", attendeeDomains: ["calendly.com"])
+        let client = MeetingCompany(name: "Client", attendeeDomains: ["client.test"])
+        var value = event([.init(email: "person@client.test"), .init(email: "noreply@calendly.com")])
+        value.organizer = .init(email: "morgan@calendly.com", name: "Morgan", kind: .person)
+        XCTAssertEqual(MeetingCompanyDomainMatcher.discoverableDomains(event: value), ["calendly.com", "client.test"])
+        let result = MeetingCompanyDomainMatcher.resolve(event: value, companies: [vendor, client], preparation: nil)
+        XCTAssertEqual(result.company?.id, vendor.id)
+        XCTAssertEqual(result.matchedDomains, ["calendly.com"])
+
+        value.organizer = nil
+        value.participants = [.init(email: "morgan@calendly.com"), .init(email: "no-reply@calendly.com")]
+        XCTAssertEqual(MeetingCompanyDomainMatcher.discoverableDomains(event: value), ["calendly.com"])
+        XCTAssertEqual(
+            MeetingCompanyDomainMatcher.resolve(event: value, companies: [vendor], preparation: nil).company?.id,
+            vendor.id)
     }
 
     private func resolve(_ participants: [EventParticipant], companies: [MeetingCompany]) -> MeetingCompanyResolution {
