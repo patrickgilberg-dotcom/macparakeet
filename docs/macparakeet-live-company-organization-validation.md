@@ -117,15 +117,34 @@ policy and full-object preservation assertions. Review also closed malformed
 competing alias ownership before the final run. Strict formatting and whitespace
 checks pass; independent review found no remaining must-fix finding.
 
-The subsequent signed installation and final calendar/data acceptance remain in
-progress. No new microphone or system-audio
+Final signed Release **`571fa9bc26bc`**, built **`2026-11-02T18:17:48Z`**, is
+installed at the separate Live application path and running on Meetings. Deep,
+strict signature verification passed for both installed apps, with Live's stable
+Apple Development identity and bundle ID retained. No new permission or account
+sign-in was needed.
+
+The final genuine sweep checked **319 upcoming entries**, matching **six external
+company folders with zero additions** on repeat. The configured own-team folder
+is retained separately, giving seven active company records. The one initial
+scheduling-service false folder was archived through the production UI. Restore
+made it available again, a second archive hid it, and another sweep neither
+recreated nor restored it. On-screen upcoming captions retained familiar company
+labels, title-only follow-up matching, exact event names and optional projects.
+The final screenshot inspection found no clipping in the company/project browse
+controls. No customer identities or event inventory are published here. No new microphone or system-audio
 recording is part of this quiet acceptance. This task does not
 establish a multi-hour recording guarantee or requalify every original-app
 feature.
 
-Before changes, a consistent private SQLite backup was made. The 21 canonical
-meetings, their source-field fingerprint, saved style/preferences fingerprint
-and original app executable fingerprint were recorded privately. A signed copy
-of the preceding installed Live build is retained as a rollback artifact.
+Before changes, a consistent private SQLite backup was made. The final
+read-only comparison found all **21 transcription rows equal in every existing
+column**. The existing project, authored preparation, six project memberships and
+eight recording associations also match the backup in every pre-existing column.
+All **21 recording paths and 21 meeting-artifact folders exist**. Database
+integrity is `ok`, with zero foreign-key violations. The saved style/preferences
+fingerprint and original app executable fingerprint are unchanged. A signed copy
+of the preceding installed Live build and the pre-migration database backup are
+retained together as rollback evidence; app-only downgrade compatibility is not
+claimed.
 Private calendar identities, event bodies, source speech and settings remain
 outside this report and the repository.

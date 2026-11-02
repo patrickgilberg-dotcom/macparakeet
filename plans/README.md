@@ -39,7 +39,6 @@ The independent audio-evidence contract and ADR-010 direction are documented; ap
 
 | Plan | Title | Status | Priority | What's left |
 |------|-------|--------|----------|-------------|
-| [2026-11-02-company-project-organization](active/2026-11-02-company-project-organization.md) | Personal Live company discovery and separate projects | **IN PROGRESS** | P1 | Thirty-day company sweep, optional projects, organization persistence/UI, tests and signed installation. |
 | [2026-10-02-diarization-outcomes](active/2026-10-02-diarization-outcomes.md) | Durable speaker-detection outcomes and actual backend provenance | **DESIGN REVIEWED — IMPLEMENTATION PENDING** | P1 | Land cancellation-boundary repair first, then implement the typed local receipt across persistence, CLI/artifacts and result UI; acoustic policy and telemetry changes remain separate. |
 | [2026-09-24-issue-1142-event-taps-off-main](active/2026-09-24-issue-1142-event-taps-off-main.md) | Keyboard event taps off the main run loop (#1142) | **PR OPEN** | P1 | All four taps run on a dedicated event-tap thread; `HotkeyManager` consumes on the tap thread and processes gestures on main. Manual typing QA with `MACPARAKEET_DEBUG_MAIN_STALL_MS` remains. |
 | [2026-09-17-issue-449-streaming-cursor](../docs/plans/2026-09-17-issue-449-streaming-cursor.md) | Optional streaming cursor dictation insertion (#449) | **IMPLEMENTED ON FEATURE BRANCH** | P2 | Default-off Unicode caret stream; interrupt flush; paste fallback. Research in `docs/research/2026-09-17-issue-449-streaming-cursor.md`. |
@@ -189,6 +188,8 @@ These were merged/resolved but left in `active/`; moved with a ship-evidence not
 - [Jev-powered Voice Control](active/2026-09-19-jev-voice-control.md) — PR [#1104](https://github.com/moona3k/macparakeet/pull/1104); Flights-to-results and mic qualification remain.
 
 ## Personal fork implementation records
+
+- [Live company discovery and separate projects](completed/2026-11-02-company-project-organization.md) — implemented and signed/installed on `feat/macparakeet-live`; real thirty-day sweep, native controls, repeat discovery and data preservation passed. The [validation report](../docs/macparakeet-live-company-organization-validation.md) distinguishes the full-suite source from later focused/native hardening checks.
 
 - [Live evidence board and automatic project preparation](completed/2026-10-31-live-board-and-meeting-prep.md) — implemented, installed and pushed on `feat/macparakeet-live`; final quiet Prepare/card/quotation acceptance completed after unlock. The [validation report](../docs/macparakeet-live-board-preparation-validation.md) records provider checks, preserved data and full-suite limits.
 - [Immediate live focus and explicit answer refresh](completed/2026-10-30-live-now-focus-and-refresh.md) — completed on `feat/macparakeet-live`. The [qualification report](../docs/macparakeet-live-now-validation.md) records the installed build, physical recording revision and test limits.
