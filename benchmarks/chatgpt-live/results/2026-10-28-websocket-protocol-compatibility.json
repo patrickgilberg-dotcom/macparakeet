@@ -1,0 +1,25 @@
+{
+  "purpose": "Protocol compatibility only; Debug timings are deliberately excluded.",
+  "transport": "websocket",
+  "model": "gpt-6-luna",
+  "optional_named_lane": {
+    "attempts": 4,
+    "completed": 0,
+    "errors": [
+      "ChatGPT request failed (HTTP 400, unknown_error).",
+      "ChatGPT request failed (HTTP 400, unknown_error).",
+      "ChatGPT request failed (HTTP 400, unknown_error).",
+      "ChatGPT request failed (HTTP 400, unknown_error)."
+    ]
+  },
+  "production_default_lane": {
+    "attempts": 3,
+    "completed": 3,
+    "nonempty_outputs": 3
+  },
+  "independent_default_lane_control": {
+    "websocket_completed": 2,
+    "http_completed": 2
+  },
+  "resolution": "Omit optional stream_id; serialize requests on one default connection; close on cancellation/error/incomplete without replay."
+}

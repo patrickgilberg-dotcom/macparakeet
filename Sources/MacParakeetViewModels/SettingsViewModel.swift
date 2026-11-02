@@ -1039,7 +1039,7 @@ public final class SettingsViewModel {
             AudioDeviceManager.defaultInputDeviceInfo()?.uid
         },
         permissionPollingInterval: Duration = .seconds(2),
-        calendarService: CalendarServicing = CalendarService.shared,
+        calendarService: CalendarServicing = GoogleCalendarService.shared,
         openURL: @escaping (URL) -> Bool = { NSWorkspace.shared.open($0) }
     ) {
         AutoSaveService.migrateLegacyMeetingSettingsIfNeeded(defaults: defaults)

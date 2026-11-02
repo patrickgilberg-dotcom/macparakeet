@@ -1,0 +1,189 @@
+{
+  "hardware" : "Apple M5",
+  "memoryGB" : 16,
+  "notes" : [
+    "First sentence timing uses punctuation after 12 characters; inspect stored outputs for usefulness.",
+    "First-process requests follow catalog retrieval and any rejected effort probes; they do not establish untouched network\/server cold latency.",
+    "Transport is explicit in each trial and summary. WebSocket reuses one socket after a completed response, with full bounded input on each turn.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem" : "Version 26.5.1 (Build 25F80)",
+  "processorCount" : 10,
+  "summaries" : [
+    {
+      "condition" : "first-inference-this-process-capability-probe-none",
+      "failures" : 0,
+      "medianCompletionMs" : 4450.830208370462,
+      "medianFirstSentenceMs" : 4217.223499901593,
+      "medianFirstTextMs" : 3999.5067082345486,
+      "model" : "gpt-6-luna",
+      "p95CompletionMs" : 4450.830208370462,
+      "p95FirstSentenceMs" : 4217.223499901593,
+      "p95FirstTextMs" : 3999.5067082345486,
+      "transport" : "websocket",
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 1432.6334584038705,
+      "medianFirstSentenceMs" : 1170.1807917561382,
+      "medianFirstTextMs" : 1007.3292083106935,
+      "model" : "gpt-6-luna",
+      "p95CompletionMs" : 1608.9889998547733,
+      "p95FirstSentenceMs" : 1420.425749849528,
+      "p95FirstTextMs" : 1217.2037914860994,
+      "transport" : "websocket",
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 0,
+      "medianCompletionMs" : 1343.947791494429,
+      "medianFirstSentenceMs" : 1100.405874894932,
+      "medianFirstTextMs" : 938.3884582202882,
+      "model" : "gpt-6-luna",
+      "p95CompletionMs" : 1980.2384583745152,
+      "p95FirstSentenceMs" : 1716.8943751603365,
+      "p95FirstTextMs" : 1587.2615000698715,
+      "transport" : "websocket",
+      "trials" : 5
+    }
+  ],
+  "timestamp" : "2026-10-28T21:41:41Z",
+  "trials" : [
+    {
+      "completed" : true,
+      "completionMs" : 4450.830208370462,
+      "condition" : "first-inference-this-process-capability-probe-none",
+      "firstSentenceMs" : 4217.223499901593,
+      "firstTextMs" : 3999.5067082345486,
+      "inputCharacters" : 2076,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could put the pilot at risk, depending on timing.\n\n- If security approves, we could use the test account then; meanwhile, we could plan the pilot and prepare offline.\n- Any connection would remain read-only, and no production rollout is approved.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1267.4138750880957,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1057.1133333723992,
+      "firstTextMs" : 911.3769582472742,
+      "inputCharacters" : 2076,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could put the pilot at risk, depending on the schedule.  \n- We could use the waiting period to plan the pilot and confirm success measures, without connecting the account before security approval.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1714.4494166132063,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1447.056750068441,
+      "firstTextMs" : 1215.3872500639409,
+      "inputCharacters" : 2076,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could put the pilot timing at risk, but not necessarily.\n\n- We could use the wait to agree on success measures and plan the read-only test, pending security approval.\n- The pilot would still need security approval before connecting the account; no production rollout is approved.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1287.584250094369,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1031.0119583737105,
+      "firstTextMs" : 850.3689167555422,
+      "inputCharacters" : 2076,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review could put the pilot at risk, depending on timing.\n\n- In the meantime, we could plan the pilot and review workflows without connecting the test account.\n- We’d need security approval before any connection; no production rollout is approved.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1980.2384583745152,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1716.8943751603365,
+      "firstTextMs" : 1587.2615000698715,
+      "inputCharacters" : 2076,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review could put the pilot at risk, depending on timing.\n\n- In the meantime, we could plan the pilot and success measures without connecting the account.\n- We’d need security approval before any integration; no production rollout is approved.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1343.947791494429,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1100.405874894932,
+      "firstTextMs" : 938.3884582202882,
+      "inputCharacters" : 2076,
+      "model" : "gpt-6-luna",
+      "output" : "Yes, a two-week security review could put the pilot timing at risk.\n- If useful, we could prepare the pilot plan and success measures while review is underway, without connecting the account.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1273.5651249531657,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 973.3027499169111,
+      "firstTextMs" : 858.6767083033919,
+      "inputCharacters" : 14463,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could put the six-week pilot at risk.\n\n- We could use the wait to map workflows offline, if you approve sharing the data export; connection would wait for security review.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1608.9889998547733,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1420.425749849528,
+      "firstTextMs" : 1217.2037914860994,
+      "inputCharacters" : 14463,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could pressure the pilot timeline, but wouldn’t automatically put it at risk.\n- We could use the wait to map workflows offline, subject to your approval, and revisit timing after security review.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1442.7831249777228,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1170.1807917561382,
+      "firstTextMs" : 1064.3135416321456,
+      "inputCharacters" : 14463,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could put the pilot timing at risk, depending on when it clears.\n- We could use the time for offline workflow mapping, subject to your approval.\n- We would connect the test account only after security review; no production rollout is approved.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1432.6334584038705,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1372.8592917323112,
+      "firstTextMs" : 1007.3292083106935,
+      "inputCharacters" : 14463,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week review could compress the six-week pilot, depending on timing.  \n- We could map workflows offline while security reviews the test account, subject to your approval.  \n- We would connect only after security approval; no production rollout is approved.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1292.5244166981429,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1059.885666705668,
+      "firstTextMs" : 918.2160415221006,
+      "inputCharacters" : 14463,
+      "model" : "gpt-6-luna",
+      "output" : "It could affect timing, but we can use the wait to prepare offline.\n\n- We’d complete security review before connecting the test account. If you approve, we could use the data export for offline workflow mapping.",
+      "reasoningEffort" : "none",
+      "transport" : "websocket"
+    }
+  ]
+}

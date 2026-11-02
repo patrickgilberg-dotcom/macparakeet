@@ -20,16 +20,23 @@ struct CalendarSettingsView: View {
 
     var body: some View {
         VStack(spacing: DesignSystem.Spacing.md) {
-            startRow
+            if LiveAppIdentity.isLive {
+                GoogleCalendarConnectionView(settings: viewModel)
+                if viewModel.calendarPermissionGranted { startRow }
+            } else {
+                startRow
+            }
 
             if viewModel.calendarPermissionGranted && viewModel.calendarAutoStartMode != .off {
                 startOptionsPanel
             }
 
-            Divider()
-            calendarAccountsRow
+            if !LiveAppIdentity.isLive {
+                Divider()
+                calendarAccountsRow
+            }
 
-            if viewModel.calendarPermissionGranted {
+            if viewModel.calendarPermissionGranted && !LiveAppIdentity.isLive {
                 Divider()
                 calendarListRow
             }
@@ -176,9 +183,11 @@ struct CalendarSettingsView: View {
             // macOS only shows the EventKit prompt once. Once denied, the
             // only path back is System Settings — a button that can't actually
             // re-prompt would mystify the user, so point them there explicitly.
-            return "Calendar access is blocked. Re-enable it in System Settings → Privacy & Security → Calendars to start meetings automatically."
+            return
+                "Calendar access is blocked. Re-enable it in System Settings → Privacy & Security → Calendars to start meetings automatically."
         case .notDetermined:
-            return "Start a recording when a scheduled meeting begins. Needs Calendar access — your events stay on your Mac and are never uploaded."
+            return
+                "Start a recording when a scheduled meeting begins. Needs Calendar access — your events stay on your Mac and are never uploaded."
         }
     }
 

@@ -190,6 +190,7 @@ final class MenuBarCoordinator: NSObject, NSMenuDelegate {
             keyEquivalent: ""
         )
         checkForUpdatesItem.target = updaterController
+        checkForUpdatesItem.isHidden = !LiveAppIdentity.upstreamUpdatesEnabled
         appMenu.addItem(checkForUpdatesItem)
         appMenu.addItem(NSMenuItem.separator())
 
@@ -330,22 +331,25 @@ final class MenuBarCoordinator: NSObject, NSMenuDelegate {
 
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
-        windowMenu.addItem(NSMenuItem(
-            title: "Close Window",
-            action: #selector(NSWindow.performClose(_:)),
-            keyEquivalent: "w"
-        ))
+        windowMenu.addItem(
+            NSMenuItem(
+                title: "Close Window",
+                action: #selector(NSWindow.performClose(_:)),
+                keyEquivalent: "w"
+            ))
         windowMenu.addItem(NSMenuItem.separator())
-        windowMenu.addItem(NSMenuItem(
-            title: "Minimize",
-            action: #selector(NSWindow.performMiniaturize(_:)),
-            keyEquivalent: "m"
-        ))
-        windowMenu.addItem(NSMenuItem(
-            title: "Zoom",
-            action: #selector(NSWindow.performZoom(_:)),
-            keyEquivalent: ""
-        ))
+        windowMenu.addItem(
+            NSMenuItem(
+                title: "Minimize",
+                action: #selector(NSWindow.performMiniaturize(_:)),
+                keyEquivalent: "m"
+            ))
+        windowMenu.addItem(
+            NSMenuItem(
+                title: "Zoom",
+                action: #selector(NSWindow.performZoom(_:)),
+                keyEquivalent: ""
+            ))
         windowMenu.addItem(NSMenuItem.separator())
         windowMenu.addItem(makeMenuItem(title: "Show \(appName)", action: #selector(openMainWindow), key: ""))
         windowMenuItem.submenu = windowMenu
@@ -565,6 +569,7 @@ final class MenuBarCoordinator: NSObject, NSMenuDelegate {
             keyEquivalent: ""
         )
         checkForUpdatesItem.target = updaterController
+        checkForUpdatesItem.isHidden = !LiveAppIdentity.upstreamUpdatesEnabled
         menu.addItem(checkForUpdatesItem)
 
         menu.addItem(NSMenuItem.separator())
@@ -777,10 +782,12 @@ final class MenuBarCoordinator: NSObject, NSMenuDelegate {
 
     @objc private func pasteRecentDictation(_ sender: NSMenuItem) {
         guard let env = environmentProvider(),
-              let id = sender.representedObject as? UUID else { return }
+            let id = sender.representedObject as? UUID
+        else { return }
         Task {
             guard let dictation = try? env.dictationRepo.fetch(id: id),
-                  dictation.status == .completed else { return }
+                dictation.status == .completed
+            else { return }
             let text = dictation.displayText
             await pasteFromMenu(text: text, clipboardService: env.clipboardService)
         }
@@ -796,7 +803,8 @@ final class MenuBarCoordinator: NSObject, NSMenuDelegate {
 
     @objc private func pasteRecentTransform(_ sender: NSMenuItem) {
         guard let env = environmentProvider(),
-              let id = sender.representedObject as? UUID else { return }
+            let id = sender.representedObject as? UUID
+        else { return }
         Task {
             guard let entry = try? env.transformHistoryRepo.fetch(id: id) else { return }
             await pasteFromMenu(text: entry.outputText, clipboardService: env.clipboardService)

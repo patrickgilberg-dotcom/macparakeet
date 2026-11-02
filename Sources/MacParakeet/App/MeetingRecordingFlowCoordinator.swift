@@ -3,6 +3,12 @@ import MacParakeetCore
 import MacParakeetViewModels
 import OSLog
 
+enum MeetingCalendarStartSelection {
+    case unmatched
+    case cancelled
+    case event(MeetingCalendarSnapshot)
+}
+
 enum MeetingRecordingQuitState: Equatable {
     case starting
     /// Capture has been requested. Source audio may already be on disk even
@@ -62,6 +68,15 @@ final class MeetingRecordingFlowCoordinator {
         stateMachine.state == .recording
     }
 
+    /// Capture itself does not exclude prep for a back-to-back meeting. The
+    /// current call's inference always preempts that lower-priority work.
+    var isLiveAIWorkActive: Bool {
+        if stateMachine.state == .recording {
+            return panelViewModel?.chatViewModel.isPerformingLiveAIWork ?? false
+        }
+        return isMeetingRecordingActive
+    }
+
     var quitState: MeetingRecordingQuitState? {
         switch stateMachine.state {
         case .idle, .finishing:
@@ -85,6 +100,16 @@ final class MeetingRecordingFlowCoordinator {
     private let quickPromptRepo: QuickPromptRepositoryProtocol
     private let configStore: LLMConfigStoreProtocol
     private let cliConfigStore: LocalCLIConfigStore
+    private let preparationRepository: (any MeetingPreparationRepositoryProtocol)?
+    private let projectRepository: (any MeetingProjectRepositoryProtocol)?
+    private let companyRepository: (any MeetingCompanyRepositoryProtocol)?
+    private let automaticPrep: LiveMeetingPrepViewModel?
+    private var pendingPreparation: MeetingPreparation?
+    private var activePreparedRecordingID: UUID?
+    private var activeCompanyID: UUID?
+    private var activeProjectID: UUID?
+    private var activeEventPreparation = ""
+    private var activeMeetingStartedAt = Date()
     private let sttManager: (any STTRuntimeManaging)?
     private let speechEngineSelectionProvider: (@Sendable () async -> SpeechEngineSelection?)?
     private let meetingAudioSourceModeProvider: @MainActor @Sendable () -> MeetingAudioSourceMode
@@ -95,6 +120,10 @@ final class MeetingRecordingFlowCoordinator {
     private let shouldShowFloatingMeetingPill: @MainActor @Sendable () -> Bool
     private let frontmostApplicationProvider: any FrontmostApplicationProviding
     private let probableCalendarSnapshotProvider: @MainActor @Sendable () -> MeetingCalendarSnapshot?
+    private let calendarStartSelectionProvider: (@MainActor () -> MeetingCalendarStartSelection)?
+    private let manualProjectIDProvider: @MainActor () -> UUID?
+    private let manualCompanyIDProvider: @MainActor () -> UUID?
+    private let internalCompanyDomainsProvider: @Sendable () async -> Set<String>
     private var llmService: LLMServiceProtocol?
     private let onMenuBarIconUpdate: (BreathWaveIcon.MenuBarState) -> Void
     private let onTranscriptionReady: (Transcription) -> Void
@@ -153,6 +182,8 @@ final class MeetingRecordingFlowCoordinator {
     private var currentMeetingTrigger: TelemetryMeetingOperationTrigger?
     private var pendingAudioSourceMode: MeetingAudioSourceMode?
     private var pendingLivePanelPresentation = false
+    private var liveAnswerHotkey: LiveAnswerHotkey?
+    private var chatGPTPreparationTask: Task<Void, Never>?
 
     init(
         meetingRecordingService: MeetingRecordingServiceProtocol,
@@ -163,6 +194,10 @@ final class MeetingRecordingFlowCoordinator {
         quickPromptRepo: QuickPromptRepositoryProtocol,
         configStore: LLMConfigStoreProtocol,
         cliConfigStore: LocalCLIConfigStore = LocalCLIConfigStore(),
+        preparationRepository: (any MeetingPreparationRepositoryProtocol)? = nil,
+        projectRepository: (any MeetingProjectRepositoryProtocol)? = nil,
+        companyRepository: (any MeetingCompanyRepositoryProtocol)? = nil,
+        automaticPrep: LiveMeetingPrepViewModel? = nil,
         sttManager: (any STTRuntimeManaging)? = nil,
         speechEngineSelectionProvider: (@Sendable () async -> SpeechEngineSelection?)? = nil,
         meetingAudioSourceModeProvider: @escaping @MainActor @Sendable () -> MeetingAudioSourceMode = {
@@ -177,6 +212,10 @@ final class MeetingRecordingFlowCoordinator {
         probableCalendarSnapshotProvider: @escaping @MainActor @Sendable () -> MeetingCalendarSnapshot? = {
             nil
         },
+        calendarStartSelectionProvider: (@MainActor () -> MeetingCalendarStartSelection)? = nil,
+        manualProjectIDProvider: @escaping @MainActor () -> UUID? = { nil },
+        manualCompanyIDProvider: @escaping @MainActor () -> UUID? = { nil },
+        internalCompanyDomainsProvider: @escaping @Sendable () async -> Set<String> = { [] },
         llmService: LLMServiceProtocol?,
         pillViewModel: MeetingRecordingPillViewModel,
         meetingRecordingSettlement: MeetingRecordingSettlement,
@@ -210,6 +249,10 @@ final class MeetingRecordingFlowCoordinator {
         self.quickPromptRepo = quickPromptRepo
         self.configStore = configStore
         self.cliConfigStore = cliConfigStore
+        self.preparationRepository = preparationRepository
+        self.projectRepository = projectRepository
+        self.companyRepository = companyRepository
+        self.automaticPrep = automaticPrep
         self.sttManager = sttManager
         self.speechEngineSelectionProvider = speechEngineSelectionProvider
         self.meetingAudioSourceModeProvider = meetingAudioSourceModeProvider
@@ -220,6 +263,10 @@ final class MeetingRecordingFlowCoordinator {
         self.shouldShowFloatingMeetingPill = shouldShowFloatingMeetingPill
         self.frontmostApplicationProvider = frontmostApplicationProvider
         self.probableCalendarSnapshotProvider = probableCalendarSnapshotProvider
+        self.calendarStartSelectionProvider = calendarStartSelectionProvider
+        self.manualProjectIDProvider = manualProjectIDProvider
+        self.manualCompanyIDProvider = manualCompanyIDProvider
+        self.internalCompanyDomainsProvider = internalCompanyDomainsProvider
         self.llmService = llmService
         self.pillViewModel = pillViewModel
         self.meetingTranscriptionQueue =
@@ -320,22 +367,29 @@ final class MeetingRecordingFlowCoordinator {
         pauseToggleTask = Task { @MainActor [meetingRecordingService, weak self] in
             await previous?.value
             guard !Task.isCancelled, let self,
-                  self.stateMachine.generation == generation,
-                  self.stateMachine.state == .recording else { return }
+                self.stateMachine.generation == generation,
+                self.stateMachine.state == .recording
+            else { return }
             if wantPause {
                 await meetingRecordingService.pauseRecording()
             } else {
                 await meetingRecordingService.resumeRecording()
             }
             guard !Task.isCancelled,
-                  self.stateMachine.generation == generation,
-                  self.stateMachine.state == .recording,
-                  self.pillViewModel.canTogglePause else { return }
+                self.stateMachine.generation == generation,
+                self.stateMachine.state == .recording,
+                self.pillViewModel.canTogglePause
+            else { return }
             self.pendingPauseTarget = nil
             self.pausePublicationRevision &+= 1
             self.pillViewModel.state = wantPause ? .paused : .recording
             self.pillController?.refreshState()
             self.panelViewModel?.isPaused = wantPause
+            if wantPause {
+                self.panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+            } else {
+                self.panelViewModel?.chatViewModel.resumeLiveMeetingMemory()
+            }
         }
     }
 
@@ -374,7 +428,20 @@ final class MeetingRecordingFlowCoordinator {
     ) -> Int? {
         guard stateMachine.state == .idle else { return nil }
         let resolvedTrigger = pendingTrigger ?? trigger
+        var chosenCalendar: MeetingCalendarSnapshot?
+        if title == nil, resolvedTrigger != .calendarAutoStart, let calendarStartSelectionProvider {
+            switch calendarStartSelectionProvider() {
+            case .cancelled: return nil
+            case .unmatched: break
+            case .event(let snapshot): chosenCalendar = snapshot
+            }
+        }
+        pendingPreparation = nil
         let sourceMode = meetingAudioSourceModeProvider()
+        activePreparedRecordingID = nil
+        activeCompanyID = nil
+        activeProjectID = nil
+        activeEventPreparation = ""
         pendingLivePanelPresentation = presentLivePanelWhenReady
         pendingTrigger = resolvedTrigger
         pendingTitle = title
@@ -382,8 +449,9 @@ final class MeetingRecordingFlowCoordinator {
         pendingStartContext = makeStartContext(trigger: resolvedTrigger, sourceMode: sourceMode)
         pendingCalendarEventSnapshot =
             (resolvedTrigger != .calendarAutoStart && title == nil)
-            ? probableCalendarSnapshotProvider()
+            ? (calendarStartSelectionProvider == nil ? probableCalendarSnapshotProvider() : chosenCalendar)
             : nil
+        if title == nil, let snapshot = pendingCalendarEventSnapshot { pendingTitle = snapshot.title }
         currentMeetingOperationContext = ObservabilityOperationContext()
         sendEvent(.startRequested)
         return stateMachine.generation
@@ -492,18 +560,36 @@ final class MeetingRecordingFlowCoordinator {
     /// often back-to-back meetings actually collide in the wild. Returns the
     /// recording generation on success (or `nil` when the state was busy).
     @discardableResult
-    func startFromCalendar(calendarEventSnapshot: MeetingCalendarSnapshot) -> Int? {
+    func startPreparedMeeting(event: CalendarEvent, preparation: MeetingPreparation) -> Int? {
+        guard stateMachine.state == .idle else { return nil }
+        return startFromCalendar(
+            calendarEventSnapshot: MeetingCalendarSnapshot(event: event, confidence: .confirmed),
+            trigger: .manual, presentLivePanelWhenReady: true, preparation: preparation)
+    }
+
+    @discardableResult
+    func startFromCalendar(
+        calendarEventSnapshot: MeetingCalendarSnapshot,
+        trigger: TelemetryMeetingRecordingTrigger = .calendarAutoStart,
+        presentLivePanelWhenReady: Bool = false,
+        preparation: MeetingPreparation? = nil
+    ) -> Int? {
         guard stateMachine.state == .idle else {
             Telemetry.send(.calendarAutoStartFailed(reason: "state_busy"))
             return nil
         }
-        pendingTrigger = .calendarAutoStart
+        activePreparedRecordingID = nil
+        activeCompanyID = nil
+        activeProjectID = nil
+        activeEventPreparation = ""
+        pendingPreparation = preparation
+        pendingTrigger = trigger
         pendingTitle = calendarEventSnapshot.title
         pendingCalendarEventSnapshot = calendarEventSnapshot
         let sourceMode = meetingAudioSourceModeProvider()
         pendingAudioSourceMode = sourceMode
-        pendingLivePanelPresentation = false
-        pendingStartContext = makeStartContext(trigger: .calendarAutoStart, sourceMode: sourceMode)
+        pendingLivePanelPresentation = presentLivePanelWhenReady
+        pendingStartContext = makeStartContext(trigger: trigger, sourceMode: sourceMode)
         currentMeetingOperationContext = ObservabilityOperationContext()
         sendEvent(.startRequested)
         return stateMachine.generation
@@ -687,6 +773,8 @@ final class MeetingRecordingFlowCoordinator {
             vm.captureHealth = initialCaptureHealth
             vm.state = .starting
             let panelVM = panelViewModel ?? MeetingRecordingPanelViewModel()
+            panelVM.showsOrganizationControls =
+                companyRepository != nil && projectRepository != nil && preparationRepository != nil
             panelVM.state = .starting
             panelVM.elapsedSeconds = 0
             panelVM.micLevel = 0
@@ -698,6 +786,7 @@ final class MeetingRecordingFlowCoordinator {
             panelVM.canToggleMicrophoneMute = false
             panelVM.updateLiveTranscriptStatus(.startingAudio)
             panelVM.updatePreviewLines([], isTranscriptionLagging: false)
+            panelVM.updateLiveMeetingTimeline(MeetingTranscriptUpdate(words: [], speakers: []))
             panelVM.onStop = { [weak self] in self?.toggleRecording() }
             panelVM.onPauseToggle = { [weak self] in self?.togglePause() }
             panelVM.onMicrophoneMuteToggle = { [weak self] in self?.toggleMicrophoneMute() }
@@ -718,6 +807,61 @@ final class MeetingRecordingFlowCoordinator {
                 configStore: configStore,
                 cliConfigStore: cliConfigStore
             )
+            if LiveAppIdentity.isLive {
+                panelVM.chatViewModel.configureLiveAnswerPreferences {
+                    try await LiveMeetingPreferencesStore.shared.snapshot()
+                }
+                panelVM.chatViewModel.livePreparationContext =
+                    AppPaths.sharedAppDefaults().string(forKey: "livePreparationContext") ?? ""
+                panelVM.chatViewModel.configureDirectLiveAnswers(
+                    prepareTranscript: { [weak self, weak panelVM] in
+                        guard let self, let panelVM, self.stateMachine.state == .recording else {
+                            throw MeetingRecordingService.LiveAnswerTranscriptError.sessionChanged
+                        }
+                        await self.automaticPrep?.preempt()
+                        try Task.checkCancellation()
+                        if let update = try await self.meetingRecordingService.prepareLiveAnswerTranscript() {
+                            let lines = await Task.detached(priority: .userInitiated) {
+                                Self.makePreviewLines(from: update)
+                            }.value
+                            try Task.checkCancellation()
+                            guard self.stateMachine.state == .recording else {
+                                throw MeetingRecordingService.LiveAnswerTranscriptError.sessionChanged
+                            }
+                            panelVM.updateLiveMeetingTimeline(update)
+                            panelVM.updatePreviewLines(lines, isTranscriptionLagging: update.isTranscriptionLagging)
+                            panelVM.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
+                        }
+                    },
+                    sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() },
+                    focusSourceProvider: { [weak panelVM] in panelVM?.liveMeetingFocusSource },
+                    nowSourceProvider: { [weak panelVM] in panelVM?.liveMeetingNowSnapshot }
+                )
+                panelVM.chatViewModel.configureLiveBackgroundWorkPriority { [weak self] in
+                    await self?.automaticPrep?.preempt()
+                }
+                configureProjectContext(for: panelVM.chatViewModel)
+                chatGPTPreparationTask?.cancel()
+                let chatViewModel = panelVM.chatViewModel
+                chatGPTPreparationTask = Task.detached(priority: .userInitiated) { [weak chatViewModel] in
+                    do {
+                        try await ChatGPTLiveClient.shared.warmUp()
+                    } catch is CancellationError {
+                        // Optional connection preparation never interrupts capture.
+                    } catch {
+                        guard !Task.isCancelled, let chatViewModel else { return }
+                        AudioCaptureDiagnostics.appendAsync(
+                            "meeting_chatgpt_prepare_failed error_type=\(String(reflecting: type(of: error)))"
+                        )
+                        let message = "ChatGPT is not ready yet. \(error.localizedDescription)"
+                        await MainActor.run {
+                            if chatViewModel.liveAnswerTiming == nil {
+                                chatViewModel.errorMessage = message
+                            }
+                        }
+                    }
+                }
+            }
             panelVM.quickPromptsViewModel.configure(repo: quickPromptRepo)
             // Wire the notepad's debounced persistence target through the
             // recording service. The service serializes lock-file writes and
@@ -731,6 +875,7 @@ final class MeetingRecordingFlowCoordinator {
                 await self?.meetingRecordingService.updateNotes(notes)
             }
             panelViewModel = panelVM
+            startLiveAnswerHotkey()
 
             if pillController == nil {
                 pillController = MeetingRecordingPillController(viewModel: vm)
@@ -772,6 +917,10 @@ final class MeetingRecordingFlowCoordinator {
             let trigger = pendingTrigger
             let title = pendingTitle
             let calendarEventSnapshot = pendingCalendarEventSnapshot
+            let explicitPreparation = pendingPreparation
+            let selectedCompanyID = manualCompanyIDProvider()
+            let selectedProjectID = manualProjectIDProvider()
+            pendingPreparation = nil
             let meetingTypeID = meetingTypeIDProvider()
             let sourceMode = pendingAudioSourceMode ?? meetingAudioSourceModeProvider()
             let startContext =
@@ -793,12 +942,57 @@ final class MeetingRecordingFlowCoordinator {
             )
             actionTask = Task { @MainActor in
                 do {
+                    await automaticPrep?.preempt()
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    var preparation = explicitPreparation
+                    if preparation == nil, let calendarID = calendarEventSnapshot?.calendarIdentifier,
+                        let eventID = calendarEventSnapshot?.providerEventID, let preparationRepository
+                    {
+                        preparation = try await Task.detached {
+                            try preparationRepository.fetch(key: .init(calendarID: calendarID, eventID: eventID))
+                        }.value
+                    }
+                    let organization = try await resolveRecordingOrganization(
+                        event: calendarEventSnapshot.flatMap(Self.companyMatchingEvent), preparation: preparation,
+                        isCalendarRecording: calendarEventSnapshot != nil,
+                        selectedCompanyID: selectedCompanyID, selectedProjectID: selectedProjectID)
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    activeMeetingStartedAt = Date()
                     try await meetingRecordingService.startRecording(
                         title: title,
                         sourceMode: sourceMode,
                         startContext: startContext,
                         calendarEventSnapshot: calendarEventSnapshot
                     )
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    let ownedRecordingID = await meetingRecordingService.activeSessionID
+                    guard self.ownsPendingStart(generation: gen) else { return }
+                    if let recordingID = ownedRecordingID, let chat = self.panelViewModel?.chatViewModel {
+                        let recordingService = self.meetingRecordingService
+                        chat.configureLiveChatCheckpoint(recordingID: recordingID) { snapshot in
+                            try await recordingService.updateLiveChat(snapshot)
+                        }
+                    }
+                    activeCompanyID = organization.companyID
+                    activeProjectID = organization.projectID
+                    activeEventPreparation = preparation?.context ?? ""
+                    activePreparedRecordingID = ownedRecordingID
+                    if let recordingID = activePreparedRecordingID, let preparationRepository {
+                        let association = RecordingMeetingAssociation(
+                            recordingID: recordingID, preparationID: preparation?.id,
+                            companyID: activeCompanyID, projectID: activeProjectID,
+                            titleSnapshot: title ?? calendarEventSnapshot?.title ?? "Meeting",
+                            contextSnapshot: preparation?.context ?? "",
+                            calendarID: calendarEventSnapshot?.calendarIdentifier,
+                            eventID: calendarEventSnapshot?.providerEventID,
+                            scheduledStartAt: calendarEventSnapshot?.scheduledStartAt,
+                            scheduledEndAt: calendarEventSnapshot?.scheduledEndAt,
+                            projectNameSnapshot: organization.projectName,
+                            companyNameSnapshot: organization.company?.name,
+                            createdAt: activeMeetingStartedAt)
+                        _ = try await Task.detached { try preparationRepository.saveRecordingAssociation(association) }
+                            .value
+                    }
                     await meetingRecordingService.updateMeetingType(meetingTypeID)
                     guard self.ownsPendingStart(generation: gen) else {
                         self.recordIgnoredStartResult(generation: gen, outcome: "success")
@@ -817,6 +1011,39 @@ final class MeetingRecordingFlowCoordinator {
                             self.recordIgnoredStartResult(generation: gen, outcome: "success")
                             return
                         }
+                    }
+                    if let chat = self.panelViewModel?.chatViewModel {
+                        self.configureProjectContext(for: chat)
+                        var generated: MeetingGeneratedPreparation?
+                        if let key = preparation?.key, let projectID = activeProjectID {
+                            generated = await automaticPrep?.validatedPreparation(
+                                key: key, projectID: projectID, before: activeMeetingStartedAt,
+                                excludingRecordingID: ownedRecordingID)
+                        }
+                        guard self.ownsPendingStart(generation: gen) else { return }
+                        if let recordingID = ownedRecordingID {
+                            chat.configureLiveMeetingBoard(
+                                recordingID: recordingID,
+                                title: title ?? calendarEventSnapshot?.title ?? "Current meeting",
+                                preparation: generated)
+                        }
+                    }
+                    if let recordingID = ownedRecordingID, let panel = panelViewModel,
+                        let companyRepository, let projectRepository, preparationRepository != nil
+                    {
+                        let picker = LiveMeetingOrganizationViewModel(
+                            companyRepository: companyRepository, projectRepository: projectRepository,
+                            companyID: activeCompanyID, projectID: activeProjectID
+                        ) { [weak self] companyID, projectID in
+                            guard let self else { throw CancellationError() }
+                            try await self.updateLiveOrganization(
+                                recordingID: recordingID, companyID: companyID, projectID: projectID)
+                        }
+                        panel.organization = picker
+                        panel.chatViewModel.configureLiveOrganizationAvailability { [weak picker] in
+                            picker?.isSaving == true
+                        }
+                        await picker.load()
                     }
                     let activeSpeechPlan = await meetingRecordingService.activeMeetingSpeechPlan
                     guard self.ownsPendingStart(generation: gen) else {
@@ -914,6 +1141,9 @@ final class MeetingRecordingFlowCoordinator {
             }
 
         case .showTranscribingState:
+            panelViewModel?.organization?.beginFinishing()
+            panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+            panelViewModel?.chatViewModel.cancelStreaming()
             onRecordingStopping()
             stopPillPolling()
             stopTranscriptObservation()
@@ -936,6 +1166,8 @@ final class MeetingRecordingFlowCoordinator {
             let liveWordCount = panelViewModel?.wordCount ?? 0
             let liveTranscriptLagged = panelViewModel?.isTranscriptionLagging ?? false
             let notesVM = panelViewModel?.notesViewModel
+            let liveChatVM = panelViewModel?.chatViewModel
+            let organizationVM = panelViewModel?.organization
             let operationContext = currentMeetingOperationContext ?? ObservabilityOperationContext()
             let operationTrigger = currentMeetingTrigger
             currentMeetingOperationContext = operationContext
@@ -999,6 +1231,14 @@ final class MeetingRecordingFlowCoordinator {
                             sessionID: activeSessionID,
                             startedAt: notesCommitStartedAt
                         )
+                        // Always honor End even when a recovery checkpoint fails.
+                        // Stop the audio first, then retain its awaiting lock for retry.
+                        var chatCheckpointError: Error?
+                        do {
+                            try await liveChatVM?.flushLiveChatCheckpoint()
+                        } catch {
+                            chatCheckpointError = error
+                        }
                         let serviceStopStartedAt = Date()
                         let output: MeetingRecordingOutput
                         do {
@@ -1018,6 +1258,10 @@ final class MeetingRecordingFlowCoordinator {
                             throw error
                         }
                         stoppedOutput = output
+                        // End stops audio immediately. Settle any already
+                        // chosen company/project before binding the saved row.
+                        await organizationVM?.finishEditing()
+                        if let chatCheckpointError { throw chatCheckpointError }
                         captureDiagnostics = await meetingRecordingService.captureDiagnostics(for: output.sessionID)
                         appendStopStage(
                             "service_stop",
@@ -1060,7 +1304,13 @@ final class MeetingRecordingFlowCoordinator {
                             sessionID: output.sessionID,
                             startedAt: prepareRowStartedAt
                         )
-                        self.persistLiveAskConversationIfNeeded(transcriptionID: prepared.id)
+                        if let preparationRepository = self.preparationRepository {
+                            let recordingID = output.sessionID
+                            _ = try await Task.detached {
+                                try preparationRepository.bindRecording(recordingID: recordingID, to: prepared.id)
+                            }.value
+                        }
+                        try self.persistLiveAskConversationIfNeeded(transcriptionID: prepared.id)
                         let enqueueStartedAt = Date()
                         await meetingTranscriptionQueue.enqueue(
                             MeetingTranscriptionQueue.Item(
@@ -1342,10 +1592,42 @@ final class MeetingRecordingFlowCoordinator {
     /// repeatedly (the saved-completion path tears the panel down before the pill,
     /// then the pill teardown calls this again as a no-op).
     private func teardownMeetingPanel() {
+        chatGPTPreparationTask?.cancel()
+        chatGPTPreparationTask = nil
+        liveAnswerHotkey?.stop()
+        liveAnswerHotkey = nil
+        panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+        panelViewModel?.chatViewModel.cancelStreaming()
         panelController?.close()
         panelController = nil
         panelViewModel = nil
         pendingLivePanelPresentation = false
+    }
+
+    private func startLiveAnswerHotkey() {
+        liveAnswerHotkey?.stop()
+        liveAnswerHotkey = nil
+        panelViewModel?.chatViewModel.liveAnswerGlobalShortcutAvailable = false
+        panelViewModel?.chatViewModel.liveAnswerGlobalShortcutIncludesControl = false
+        // Native test hosts without an application must not register hotkeys.
+        guard LiveAppIdentity.isLive, NSApp != nil else { return }
+        let manager = LiveAnswerHotkey()
+        manager.onTrigger = { [weak self] requestedAt in
+            guard let self, self.stateMachine.state == .recording else { return }
+            AudioCaptureDiagnostics.appendAsync("live_answer_hotkey outcome=triggered")
+            self.panelViewModel?.selectedTab = .ask
+            self.showMeetingPanel()
+            self.panelViewModel?.chatViewModel.helpMeAnswer(requestedAt: requestedAt)
+        }
+        if manager.start() {
+            liveAnswerHotkey = manager
+            panelViewModel?.chatViewModel.liveAnswerGlobalShortcutAvailable = true
+            panelViewModel?.chatViewModel.liveAnswerGlobalShortcutIncludesControl =
+                manager.registeredChord == .controlOptionCommandSpace
+        }
+        AudioCaptureDiagnostics.appendAsync(
+            "live_answer_hotkey_registration outcome=\(manager.registeredChord == nil ? "unavailable" : "registered") control=\(manager.registeredChord == .controlOptionCommandSpace) status=\(manager.registrationStatus)"
+        )
     }
 
     private func presentStartBusyNoticeOnce() {
@@ -1493,6 +1775,11 @@ final class MeetingRecordingFlowCoordinator {
             pillViewModel.state = .recording
         }
         panelViewModel?.isPaused = serviceIsPaused
+        if serviceIsPaused {
+            panelViewModel?.chatViewModel.stopLiveMeetingMemory()
+        } else if stateMachine.state == .recording {
+            panelViewModel?.chatViewModel.resumeLiveMeetingMemory()
+        }
     }
 
     /// The same recording is still live and the source is still lost.
@@ -1592,6 +1879,8 @@ final class MeetingRecordingFlowCoordinator {
                     Self.makePreviewLines(from: update)
                 }.value
                 guard !Task.isCancelled else { break }
+                panelViewModel?.chatViewModel.liveTranscriptHasEarlierGap = update.hasEarlierPreviewGap
+                panelViewModel?.updateLiveMeetingTimeline(update)
                 panelViewModel?.updatePreviewLines(
                     previewLines,
                     isTranscriptionLagging: update.isTranscriptionLagging
@@ -1872,14 +2161,165 @@ final class MeetingRecordingFlowCoordinator {
         }.value
     }
 
-    private func persistLiveAskConversationIfNeeded(transcriptionID: UUID) {
+    private struct ResolvedRecordingOrganization: Sendable {
+        let company: MeetingCompany?
+        let companyID: UUID?
+        let projectID: UUID?
+        let projectName: String?
+    }
+
+    private func resolveRecordingOrganization(
+        event: CalendarEvent?, preparation: MeetingPreparation?, isCalendarRecording: Bool,
+        selectedCompanyID: UUID?, selectedProjectID: UUID?
+    ) async throws -> ResolvedRecordingOrganization {
+        let companies = companyRepository
+        let projects = projectRepository
+        let internalDomains = await internalCompanyDomainsProvider()
+        return try await Task.detached(priority: .userInitiated) {
+            if let event, let preparation {
+                guard preparation.calendarID == event.preparationCalendarID,
+                    preparation.eventID == event.preparationEventID
+                else { throw MeetingProjectRepositoryError.preparationIdentityChanged }
+            }
+            let intendedProject =
+                preparation != nil ? preparation?.projectID : (isCalendarRecording ? nil : selectedProjectID)
+            let project = try intendedProject.flatMap { try projects?.fetch(id: $0) }
+            var company: MeetingCompany?
+            var companyID: UUID?
+            if let companies {
+                if let event {
+                    // One missing business domain is safe to create locally.
+                    // Mixed-company events remain unresolved while the full
+                    // background sweep discovers their separate folders.
+                    let allowsAutomaticCompany =
+                        preparation == nil
+                        || (preparation?.companySelectionIsExplicit != true && preparation?.companyID == nil
+                            && preparation?.projectID == nil)
+                    if allowsAutomaticCompany, !internalDomains.isEmpty {
+                        let domains = MeetingCompanyDomainMatcher.discoverableDomains(
+                            event: event, internalDomains: internalDomains)
+                        if domains.count == 1, let domain = domains.first {
+                            do {
+                                _ = try companies.ensureCompany(forDomain: domain)
+                            } catch MeetingCompanyRepositoryError.ambiguousCompanyDomain {
+                                // Existing conflicting rules require a choice.
+                            }
+                        }
+                    }
+                    let resolution = MeetingCompanyDomainMatcher.resolve(
+                        event: event, companies: try companies.fetchAll(includeArchived: false),
+                        preparation: preparation, internalDomains: internalDomains)
+                    company = resolution.company
+                } else {
+                    let requestedCompany =
+                        preparation != nil
+                        ? preparation?.companyID : (selectedCompanyID ?? project?.companyID)
+                    company = try requestedCompany.flatMap { try companies.fetch(id: $0) }
+                    if company?.isArchived == true { company = nil }
+                }
+                companyID = company?.id
+            } else {
+                companyID = preparation?.companyID ?? (isCalendarRecording ? nil : selectedCompanyID)
+            }
+            let validProject: UUID?
+            if let project {
+                validProject =
+                    !project.isArchived && (companies == nil || project.companyID == companyID) ? project.id : nil
+            } else {
+                validProject = projects == nil ? intendedProject : nil
+            }
+            return ResolvedRecordingOrganization(
+                company: company, companyID: companyID, projectID: validProject,
+                projectName: validProject == nil ? nil : project?.name)
+        }.value
+    }
+
+    private func updateLiveOrganization(recordingID: UUID, companyID: UUID?, projectID: UUID?) async throws {
+        guard ownsEditableOrganization(recordingID: recordingID), let preparationRepository
+        else { throw CancellationError() }
+        await automaticPrep?.preempt()
+        if let chat = panelViewModel?.chatViewModel { await chat.preemptLiveOrganizationWork() }
+        guard ownsEditableOrganization(recordingID: recordingID) else { throw CancellationError() }
+        let association = try await Task.detached(priority: .userInitiated) {
+            try preparationRepository.updateRecordingOrganization(
+                recordingID: recordingID, companyID: companyID, projectID: projectID)
+        }.value
+        // A late organization save must not configure a subsequent recording.
+        guard activePreparedRecordingID == recordingID else { return }
+        activeCompanyID = association.companyID
+        activeProjectID = association.projectID
+        if stateMachine.state == .recording || stateMachine.state == .starting,
+            let chat = panelViewModel?.chatViewModel
+        {
+            configureProjectContext(for: chat)
+            chat.configureLiveMeetingBoard(recordingID: recordingID, title: association.titleSnapshot)
+        }
+    }
+
+    private func ownsEditableOrganization(recordingID: UUID) -> Bool {
+        guard activePreparedRecordingID == recordingID else { return false }
+        switch stateMachine.state {
+        case .starting, .recording, .stopping: return true
+        case .idle, .checkingPermissions, .finishing: return false
+        }
+    }
+
+    /// Reuse only the selected capture snapshot. No calendar request or model
+    /// call is added to the recording start or foreground Ask path.
+    private nonisolated static func companyMatchingEvent(_ snapshot: MeetingCalendarSnapshot) -> CalendarEvent? {
+        guard snapshot.provider == .google, let calendarID = snapshot.calendarIdentifier,
+            let eventID = snapshot.providerEventID
+        else { return nil }
+        let participant: (MeetingCalendarPerson) -> EventParticipant = { person in
+            EventParticipant(
+                email: person.email, name: person.name,
+                status: person.status.flatMap(EventParticipant.ParticipantStatus.init(rawValue:)) ?? .unknown,
+                kind: person.kind.flatMap(EventParticipant.ParticipantKind.init(rawValue:)))
+        }
+        return CalendarEvent(
+            id: snapshot.eventIdentifier, title: snapshot.title, startTime: snapshot.scheduledStartAt,
+            endTime: snapshot.scheduledEndAt, meetUrl: snapshot.meetingURL,
+            participants: snapshot.attendees.map(participant), organizer: snapshot.organizer.map(participant),
+            calendarIdentifier: calendarID, externalId: snapshot.externalId,
+            syncedAt: snapshot.capturedAt, provider: .google, providerEventID: eventID)
+    }
+
+    private func configureProjectContext(for chat: TranscriptChatViewModel) {
+        guard let projectID = activeProjectID, let repository = projectRepository else {
+            chat.configureLiveProjectContext(eventPreparation: activeEventPreparation)
+            return
+        }
+        let startedAt = activeMeetingStartedAt
+        let recordingID = activePreparedRecordingID
+        let companyID = activeCompanyID
+        let companies = companyRepository
+        chat.configureLiveProjectContext(eventPreparation: activeEventPreparation) {
+            try await Task.detached { () throws -> LiveProjectMeetingSource? in
+                guard let project = try repository.fetch(id: projectID), !project.isArchived,
+                    project.companyID == companyID
+                else { return nil }
+                if let companyID, let companies {
+                    guard let company = try companies.fetch(id: companyID), !company.isArchived else { return nil }
+                }
+                let previous = try repository.latestPreviousMeeting(
+                    projectID: projectID, before: startedAt,
+                    excludingRecordingID: recordingID, excludingTranscriptionID: nil)
+                return LiveProjectMeetingSource(project: project, previous: previous)
+            }.value
+        }
+    }
+
+    private func persistLiveAskConversationIfNeeded(transcriptionID: UUID) throws {
         guard let chatViewModel = panelViewModel?.chatViewModel else { return }
+        chatViewModel.stopLiveMeetingMemory()
         chatViewModel.cancelStreaming()
-        chatViewModel.bindPersistedConversation(
-            transcriptionId: transcriptionID,
-            transcriptionRepo: transcriptionRepo,
-            conversationRepo: conversationRepo
-        )
+        guard
+            chatViewModel.bindPersistedConversation(
+                transcriptionId: transcriptionID,
+                transcriptionRepo: transcriptionRepo,
+                conversationRepo: conversationRepo
+            )
+        else { throw MeetingLiveChatPersistenceError.storageUnavailable }
     }
 
     private func clearMeetingOperationContext() {

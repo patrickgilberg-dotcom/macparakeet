@@ -1,0 +1,56 @@
+{
+  "hardware": "Apple M5",
+  "idleCheck": {
+    "idleSeconds": 180,
+    "model": "gpt-6-luna",
+    "reasoningEffort": "none",
+    "warmupCallCompleted": true
+  },
+  "memoryGB": 16,
+  "notes": [
+    "First sentence timing uses punctuation after 12 characters; inspect stored outputs for usefulness.",
+    "First-process requests follow catalog retrieval and any rejected effort probes; they do not establish untouched network/server cold latency.",
+    "Transport is explicit in each trial and summary. WebSocket reuses one socket after a completed response, with full bounded input on each turn.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem": "Version 26.5.1 (Build 25F80)",
+  "processorCount": 10,
+  "summaries": [
+    {
+      "condition": "unused-warmup-idle-180s",
+      "failures": 0,
+      "medianCompletionMs": 1970.746541628614,
+      "medianFirstSentenceMs": 1721.7947500757873,
+      "medianFirstTextMs": 1634.2528751119971,
+      "model": "gpt-6-luna",
+      "p95CompletionMs": 1970.746541628614,
+      "p95FirstSentenceMs": 1721.7947500757873,
+      "p95FirstTextMs": 1634.2528751119971,
+      "transport": "websocket",
+      "trials": 1
+    }
+  ],
+  "timestamp": "2026-10-28T23:32:15Z",
+  "trials": [
+    {
+      "completed": true,
+      "completionMs": 1970.746541628614,
+      "condition": "unused-warmup-idle-180s",
+      "firstSentenceMs": 1721.7947500757873,
+      "firstTextMs": 1634.2528751119971,
+      "inputCharacters": 2076,
+      "model": "gpt-6-luna",
+      "output": "Yes, a two-week security review could put the pilot timing at risk.\n\n- If useful, we could use the wait to agree on success measures and prepare the test plan, without connecting the account before security approval.",
+      "reasoningEffort": "none",
+      "transport": "websocket"
+    }
+  ],
+  "qualificationSource": "d8d6477875b5",
+  "qualificationConfiguration": "optimized Release",
+  "qualificationNotes": [
+    "Default client idle reuse bound10 seconds; completed activity alone refreshes it.",
+    "The requested180-second unused-warmup test completed once after the client retired its idle socket before pinging or sending model input.",
+    "Core diagnostics confirmed Luna/none/WebSocket and mode idle-expired, with no ping or ping-replacement; one trial does not establish a speed distribution."
+  ]
+}

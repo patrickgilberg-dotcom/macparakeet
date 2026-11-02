@@ -25,7 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     )
     #else
     private lazy var updaterController: SPUStandardUpdaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
+        startingUpdater: LiveAppIdentity.upstreamUpdatesEnabled,
         updaterDelegate: sparkleUpdateGuard,
         userDriverDelegate: nil
     )
@@ -41,11 +41,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var dictationFlowCoordinator: DictationFlowCoordinator?
     private var meetingRecordingFlowCoordinator: MeetingRecordingFlowCoordinator?
     private lazy var meetingURLCommandRouter = MeetingURLCommandRouter(
-        scheme: Bundle.main.bundleIdentifier == AppPaths.developmentBundleIdentifier ? "macparakeet-dev" : "macparakeet",
+        scheme: LiveAppIdentity.meetingURLScheme,
         isEnabled: { UserDefaultsAppRuntimePreferences.meetingURLControlEnabled() },
         execute: { [weak self] command in
             guard let self, !self.onboardingWindowController.isVisible,
-                  !self.isPresentingQuitAlert, self.meetingQuitTask == nil else { return }
+                !self.isPresentingQuitAlert, self.meetingQuitTask == nil
+            else { return }
             self.meetingRecordingFlowCoordinator?.handleURLCommand(command)
         }
     )
@@ -257,7 +258,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     try repository.fetch(id: id)
                 }.value
                 guard let self, self.mainWindowState.selectedItem == .ask,
-                      let transcription else { return }
+                    let transcription
+                else { return }
                 self.transcriptionViewModel.currentTranscription = transcription
                 self.mainWindowState.navigateToTranscription(from: .ask)
             }
@@ -761,11 +763,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 conflictingHotkeys: { [weak self] in
                     guard let self else { return [] }
                     let transforms = (try? env.promptRepo.fetchVisible(category: .transform)) ?? []
-                    return [self.settingsViewModel.hotkeyTrigger, self.settingsViewModel.pushToTalkHotkeyTrigger,
-                            self.settingsViewModel.alternateHandsFreeHotkeyTrigger,
-                            self.settingsViewModel.alternatePushToTalkHotkeyTrigger,
-                            self.settingsViewModel.meetingHotkeyTrigger, self.settingsViewModel.fileTranscriptionHotkeyTrigger,
-                            self.settingsViewModel.youtubeTranscriptionHotkeyTrigger]
+                    return [
+                        self.settingsViewModel.hotkeyTrigger, self.settingsViewModel.pushToTalkHotkeyTrigger,
+                        self.settingsViewModel.alternateHandsFreeHotkeyTrigger,
+                        self.settingsViewModel.alternatePushToTalkHotkeyTrigger,
+                        self.settingsViewModel.meetingHotkeyTrigger,
+                        self.settingsViewModel.fileTranscriptionHotkeyTrigger,
+                        self.settingsViewModel.youtubeTranscriptionHotkeyTrigger,
+                    ]
                         + transforms.compactMap { $0.shortcut?.hotkeyTrigger }
                 }
             )
@@ -986,7 +991,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     name: "meeting recording", trigger: settingsViewModel.meetingHotkeyTrigger))
         }
         if AppFeatures.isVoiceControlAvailable() {
-            reserved.append(TransformShortcutReservedHotkey(name: "Voice Control", trigger: VoiceControlCoordinator.configuredHoldTrigger))
+            reserved.append(
+                TransformShortcutReservedHotkey(
+                    name: "Voice Control", trigger: VoiceControlCoordinator.configuredHoldTrigger))
         }
         return reserved.filter { !$0.trigger.isDisabled }
     }

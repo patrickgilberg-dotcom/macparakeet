@@ -79,11 +79,14 @@ public actor VisionScreenTextReader: ScreenTextReading {
             return []
         }
         guard let plan = Self.capturePlan(window: window, processID: processID) else {
-            Self.note("screen-text: no unique window for pid \(processID) frame \(Self.rect(window)); \(Self.windowList(processID: processID))")
+            Self.note(
+                "screen-text: no unique window for pid \(processID) frame \(Self.rect(window)); \(Self.windowList(processID: processID))"
+            )
             return []
         }
-        guard let image = CGWindowListCreateImage(
-            .null, [.optionIncludingWindow], plan.windowID, [.bestResolution, .boundsIgnoreFraming]),
+        guard
+            let image = CGWindowListCreateImage(
+                .null, [.optionIncludingWindow], plan.windowID, [.bestResolution, .boundsIgnoreFraming]),
             image.width > 0, image.height > 0, image.width <= 12_000, image.height <= 12_000,
             image.width * image.height <= 40_000_000
         else {
@@ -112,7 +115,8 @@ public actor VisionScreenTextReader: ScreenTextReading {
             return []
         }
         let elapsed = started.duration(to: .now)
-        let milliseconds = Int(elapsed.components.seconds) * 1000
+        let milliseconds =
+            Int(elapsed.components.seconds) * 1000
             + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
         Self.note(
             "screen-text: \(blocks.count) blocks in \(milliseconds)ms window \(plan.windowID) exclusions \(plan.exclusions.count)"
@@ -124,7 +128,8 @@ public actor VisionScreenTextReader: ScreenTextReading {
     static func note(_ message: String) {
         guard ProcessInfo.processInfo.environment["MACPARAKEET_NATIVE_VOICE_CONTROL_E2E"] == "1" else { return }
         let line = message + "\n"
-        let url = URL(fileURLWithPath: "/tmp/macparakeet-voice-control-e2e.log")
+        let url = URL(fileURLWithPath: AppPaths.tempDir, isDirectory: true).appendingPathComponent(
+            "voice-control-e2e.log")
         if let data = line.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: url.path), let handle = try? FileHandle(forWritingTo: url) {
                 defer { try? handle.close() }
@@ -142,8 +147,9 @@ public actor VisionScreenTextReader: ScreenTextReading {
     }
 
     private static func windowList(processID: Int32) -> String {
-        guard let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
-            as? [[String: Any]]
+        guard
+            let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]]
         else { return "window list unavailable" }
         let rows = list.compactMap { item -> String? in
             guard (item[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processID,

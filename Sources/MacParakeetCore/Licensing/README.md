@@ -1,5 +1,10 @@
 # Licensing
 
+This personal Live fork keeps retained license credentials in
+`com.patrickgilberg.macparakeet-live.licensing`; upstream credentials are never
+imported. Other credential stores also use the Live namespace. See
+[Live isolation](../../../spec/contracts/live-app-isolation.md).
+
 > Retained purchase-activation plumbing. Currently dormant; **do not delete**.
 
 ## Entry point
@@ -60,8 +65,11 @@ result never locks the current free build.
 launch can take tens of milliseconds. Cache results in callers if
 hot-pathing.
 
-**Credential access must not prompt.** All store operations disable system
-interaction and return errors when authorization is unavailable. Preserve the
+**Credential access is noninteractive by default.** Store operations disable
+system interaction and return errors when authorization is unavailable. The
+Live app has one explicit exception: its ChatGPT Unlock saved connection action
+opts into the standard macOS prompt for its own isolated OAuth item. Both
+policies use the same process-wide interaction lock and restore the prior flag. Preserve the
 service/account namespaces and existing keys. UI status checks use provider
 metadata instead of secret reads. See
 [credential access](../../../spec/contracts/credential-access.md).

@@ -1,0 +1,260 @@
+{
+  "model" : "gpt-6-luna",
+  "notes" : [
+    "Synthetic fixture text matches the existing HTTP benchmark; no meeting data or credentials are saved.",
+    "One OAuth-authenticated socket sends full input on every request, without previous_response_id, generate:false warmup, or service-tier override.",
+    "The first socket request includes handshake latency and is excluded from warm request groups.",
+    "WebSocket then HTTP trials alternate. OS\/server caches and workload can change; this is exploratory, not a latency guarantee.",
+    "First-sentence latency uses the same punctuation proxy as HTTP; inspect the synthetic outputs for usefulness.",
+    "Each socket response has a 90-second hard deadline. A failed socket stops the experiment to avoid mixing residual deltas into another trial.",
+    "Provider timings exclude audio, transcription, hotkeys, and UI rendering."
+  ],
+  "operatingSystem" : "Version 26.5.1 (Build 25F80)",
+  "processorCount" : 10,
+  "reasoningEffort" : "none",
+  "summaries" : [
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 2153.973916778341,
+      "medianFirstSentenceMs" : 1776.1325417086482,
+      "medianFirstTextMs" : 1517.3776666633785,
+      "p95CompletionMs" : 2543.5779583640397,
+      "p95FirstSentenceMs" : 2456.114999949932,
+      "p95FirstTextMs" : 2369.8177083861083,
+      "transport" : "http-sse",
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 0,
+      "medianCompletionMs" : 2238.8096251524985,
+      "medianFirstSentenceMs" : 1846.5108750388026,
+      "medianFirstTextMs" : 1581.6715834662318,
+      "p95CompletionMs" : 2584.260083269328,
+      "p95FirstSentenceMs" : 2388.4107917547226,
+      "p95FirstTextMs" : 2145.8566666115075,
+      "transport" : "http-sse",
+      "trials" : 5
+    },
+    {
+      "condition" : "socket-first-request-includes-handshake",
+      "failures" : 0,
+      "medianCompletionMs" : 2309.8646667785943,
+      "medianFirstSentenceMs" : 2085.5891667306423,
+      "medianFirstTextMs" : 2030.3291666787118,
+      "p95CompletionMs" : 2309.8646667785943,
+      "p95FirstSentenceMs" : 2085.5891667306423,
+      "p95FirstTextMs" : 2030.3291666787118,
+      "transport" : "websocket",
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 1531.3207916915417,
+      "medianFirstSentenceMs" : 1159.9825418088585,
+      "medianFirstTextMs" : 932.4586249422282,
+      "p95CompletionMs" : 1754.461208358407,
+      "p95FirstSentenceMs" : 1546.9951666891575,
+      "p95FirstTextMs" : 1305.0319999456406,
+      "transport" : "websocket",
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 0,
+      "medianCompletionMs" : 1482.0298333652318,
+      "medianFirstSentenceMs" : 1122.5190833210945,
+      "medianFirstTextMs" : 900.7605833467096,
+      "p95CompletionMs" : 3174.6497498825192,
+      "p95FirstSentenceMs" : 2715.0572915561497,
+      "p95FirstTextMs" : 2340.6839582603425,
+      "transport" : "websocket",
+      "trials" : 4
+    }
+  ],
+  "timestamp" : "2026-10-28T20:39:56Z",
+  "trials" : [
+    {
+      "completed" : true,
+      "completionMs" : 2309.8646667785943,
+      "condition" : "socket-first-request-includes-handshake",
+      "firstSentenceMs" : 2085.5891667306423,
+      "firstTextMs" : 2030.3291666787118,
+      "output" : "A two-week security review could affect the pilot timeline, but we can use the wait to finalize the test plan and success measures.\n\n- We’d connect the test account only after the security review is complete; no production rollout is approved.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2584.260083269328,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2388.4107917547226,
+      "firstTextMs" : 2145.8566666115075,
+      "output" : "A two-week security review could affect the pilot timing, but we’d need to confirm the schedule before assessing the risk.\n\n- If the review is still underway, we could use the time to agree on pilot success measures and prepare a read-only test plan, without connecting the account.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1482.0298333652318,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1220.7923750393093,
+      "firstTextMs" : 1086.813208181411,
+      "output" : "A two-week review could affect the pilot timing, but we could use the wait to finalize the test plan and success measures.\n- We’d connect the test account only after security review approval; the pilot timing would depend on that review.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2279.1447499766946,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1944.6722501888871,
+      "firstTextMs" : 1650.847666664049,
+      "output" : "A two-week security review could put the pilot timeline at risk, but we could use that time to finalize the test plan and success measures.\n\n- We’d wait for security approval before connecting the test account; the integration would be read-only.\n- We can assess the timeline at Friday’s decision point; no production rollout is approved.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1480.700499843806,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1054.5462500303984,
+      "firstTextMs" : 819.5214583538473,
+      "output" : "A two-week security review could compress the pilot timeline, but we’d need to confirm that before judging the impact.\n- If permitted, we could use the waiting period to prepare the pilot plan and success measures without connecting the test account.\n- We’d need security approval before any connection; production rollout is not approved.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2238.8096251524985,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1846.5108750388026,
+      "firstTextMs" : 1557.0703749544919,
+      "output" : "A two-week review could compress the six-week pilot, so we’d need to confirm timing before assessing the impact.\n- In the meantime, we could prepare the pilot plan and success measures without connecting the test account.\n- We’d proceed with any connection only after security review and approval.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3174.6497498825192,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2715.0572915561497,
+      "firstTextMs" : 2340.6839582603425,
+      "output" : "The timing could put the pilot at risk; pending security review, we could prepare the pilot plan using no account access. \n- We’d need to confirm the review timeline before assessing any impact on the proposed six-week pilot.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2105.6808333378285,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1802.722416818142,
+      "firstTextMs" : 1581.6715834662318,
+      "output" : "A two-week security review could affect the pilot timeline, but we can use that time to plan and prepare offline.\n- We would not connect the test account until security review is complete.\n- Whether the schedule needs to change would depend on the review outcome and your approval.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1531.2023751903325,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1122.5190833210945,
+      "firstTextMs" : 900.7605833467096,
+      "output" : "A two-week security review could affect the pilot timeline, but we’d need to confirm the impact before drawing that conclusion.\n- In the meantime, we could refine the pilot plan and success measures without connecting the test account.\n- We’d only connect it after security review and approval; no production rollout is approved.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2096.3481250219047,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1810.2334584109485,
+      "firstTextMs" : 1465.9136249683797,
+      "output" : "If security review takes two weeks, the pilot could be at risk, but we could use the time to plan and validate the test approach without connecting the account.\n- We’d need security approval before any integration; the pilot and timeline remain subject to review.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1754.461208358407,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1546.9951666891575,
+      "firstTextMs" : 1305.0319999456406,
+      "output" : "A two-week review could affect the pilot timeline; we could use the time for offline workflow mapping, subject to your approval.\n\n- We’d keep the integration disconnected until security review is complete.\n- We can assess timing at Friday’s decision point; no production rollout is approved.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2543.5779583640397,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 2456.114999949932,
+      "firstTextMs" : 2369.8177083861083,
+      "output" : "A two-week review could affect the pilot timeline; meanwhile, we could map the workflow offline, subject to your approval, without connecting the account.\n\n- The pilot remains a proposal, and the connection would wait for security review and approval.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1283.5489166900516,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1091.633916599676,
+      "firstTextMs" : 759.7461666446179,
+      "output" : "It could affect the pilot timeline; we could use the wait to prepare offline workflow mapping, if you approve the data export.\n- We’d need security review approval before connecting the test account, and Friday’s decision remains pending.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2153.973916778341,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1747.252875007689,
+      "firstTextMs" : 1503.2047915738076,
+      "output" : "A two-week security review could affect the pilot timeline, but we can use the wait for offline workflow mapping if you approve the data export.\n\n- We should confirm the review timeline and revisit the pilot plan at Friday’s decision point; no connection or production rollout would happen before required approvals.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1551.4815833885223,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1159.9825418088585,
+      "firstTextMs" : 932.4586249422282,
+      "output" : "A two-week security review could affect the pilot timeline; meanwhile, we could map the workflow offline if you approve the data export.\n\n- We’d keep the integration disconnected until security review is complete, then reassess timing.\n- The six-week pilot and success criteria remain proposals, not approved commitments.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2078.7912083324045,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1747.240541735664,
+      "firstTextMs" : 1517.3776666633785,
+      "output" : "A two-week security review could affect the pilot timeline; meanwhile, we could prepare offline, subject to your approval.\n\n- We’d avoid connecting the test account until security review is complete.\n- We can confirm the schedule impact at Friday’s decision point.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1531.3207916915417,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1310.4660415556282,
+      "firstTextMs" : 1075.383999850601,
+      "output" : "A two-week security review could affect the pilot timing, but we can use the wait to prepare without connecting the test account.\n- If you approve, we could use the period for offline workflow mapping; the pilot would remain contingent on security clearance.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1944.749541580677,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1776.1325417086482,
+      "firstTextMs" : 1512.286625104025,
+      "output" : "A two-week security review could affect the pilot timeline; we could use the time for offline workflow mapping, subject to your approval.\n- We would not connect the test account until security review is complete.",
+      "transport" : "http-sse"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1413.9926668722183,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1133.9953751303256,
+      "firstTextMs" : 899.064416764304,
+      "output" : "It could affect the pilot timeline, but we could use the wait for offline workflow mapping, if you approve the data export.\n\n- We’d keep the integration unconnected until the security review is complete; no production rollout is approved.",
+      "transport" : "websocket"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2315.59683335945,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1959.230000153184,
+      "firstTextMs" : 1715.6922083813697,
+      "output" : "A two-week security review could affect the pilot timeline; we could use the wait to prepare offline workflow mapping, subject to your approval. \n- We’d connect the test account only after security review is complete. \n- We can assess timing at Friday’s decision point; no production rollout is approved.",
+      "transport" : "http-sse"
+    }
+  ]
+}

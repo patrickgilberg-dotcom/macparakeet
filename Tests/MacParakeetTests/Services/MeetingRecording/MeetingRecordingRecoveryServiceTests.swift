@@ -69,6 +69,159 @@ final class MeetingRecordingRecoveryServiceTests: XCTestCase {
         XCTAssertNil(metadata.captureReport)
     }
 
+    func testRecoveryRestoresCheckpointOnceAndPreservesLaterUserChatEdits() async throws {
+        let fixture = try makeRecoverableSession(notes: "Keep this note")
+        let snapshot = MeetingLiveChatSnapshot(
+            recordingID: fixture.lock.sessionId, conversationID: UUID(), revision: 2,
+            messages: [
+                .init(role: .user, content: "Synthetic question?"),
+                .init(role: .assistant, content: "Completed answer."),
+            ])
+        let checkpointed = fixture.lock.withLiveChat(snapshot)
+        try lockStore.write(checkpointed, folderURL: fixture.folderURL)
+        let chats = MockChatConversationRepository()
+        recoveryService = MeetingRecordingRecoveryService(
+            meetingsRoot: tempRoot, lockFileStore: lockStore, transcriptionService: transcriptionService,
+            transcriptionRepo: transcriptionRepo, meetingArtifactStore: MeetingArtifactStore(),
+            promptResultRepo: promptResultRepo, chatConversationRepo: chats, audioConverter: audioConverter)
+        lockStore.deleteErrorsRemaining = 1
+        // Discovery predates the current checkpoint. Recovery must claim and use the newer lock.
+        do { _ = try await recoveryService.recover(fixture.lock); XCTFail("Expected retained settlement lock") } catch {
+        }
+        let imported = try XCTUnwrap(chats.fetch(id: snapshot.conversationID))
+        XCTAssertEqual(imported.messages, snapshot.messages)
+        let edited: [ChatMessage] = [.init(role: .user, content: "User-edited saved history")]
+        try chats.updateMessages(id: imported.id, messages: edited)
+        let retained = try XCTUnwrap(lockStore.read(folderURL: fixture.folderURL))
+        let recovered = try await recoveryService.recover(retained)
+        XCTAssertEqual(try chats.fetch(id: imported.id)?.messages, edited)
+        XCTAssertEqual(try chats.fetch(id: imported.id)?.transcriptionId, recovered.id)
+        XCTAssertEqual(transcriptionService.recordings.count, 1, "Retry settlement must not transcribe audio again")
+        XCTAssertEqual(recovered.userNotes, "Keep this note")
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
+    func testMissingChatStorageRetainsRecoveryLockUntilSafeRetry() async throws {
+        let fixture = try makeRecoverableSession()
+        let snapshot = MeetingLiveChatSnapshot(
+            recordingID: fixture.lock.sessionId, conversationID: UUID(), revision: 1,
+            messages: [.init(role: .user, content: "Interrupted question")])
+        let checkpointed = fixture.lock.withLiveChat(snapshot)
+        try lockStore.write(checkpointed, folderURL: fixture.folderURL)
+        do {
+            _ = try await recoveryService.recover(checkpointed);
+            XCTFail("Missing chat store settled the protective lock")
+        } catch MeetingLiveChatPersistenceError.storageUnavailable {}
+        let retained = try XCTUnwrap(lockStore.read(folderURL: fixture.folderURL))
+        XCTAssertEqual(retained.liveChat, snapshot)
+        let chats = MockChatConversationRepository()
+        recoveryService = MeetingRecordingRecoveryService(
+            meetingsRoot: tempRoot, lockFileStore: lockStore, transcriptionService: transcriptionService,
+            transcriptionRepo: transcriptionRepo, meetingArtifactStore: MeetingArtifactStore(),
+            promptResultRepo: promptResultRepo, chatConversationRepo: chats, audioConverter: audioConverter)
+        _ = try await recoveryService.recover(retained)
+        XCTAssertEqual(try chats.fetch(id: snapshot.conversationID)?.messages, snapshot.messages)
+        XCTAssertEqual(transcriptionService.recordings.count, 1)
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
+    func testDeletedImportedChatDoesNotResurrectAfterArtifactFailureAndRetry() async throws {
+        let fixture = try makeRecoverableSession(lockState: .awaitingTranscription)
+        let existing = Transcription(
+            fileName: "Synthetic completed meeting",
+            filePath: fixture.folderURL.appendingPathComponent("meeting-playback.m4a").path,
+            rawTranscript: "Synthetic finalized transcript.", status: .completed, sourceType: .meeting)
+        try transcriptionRepo.save(existing)
+        let database = try DatabaseManager()
+        let durableRows = TranscriptionRepository(dbQueue: database.dbQueue)
+        try durableRows.save(existing)
+        let chats = ChatConversationRepository(dbQueue: database.dbQueue)
+        let snapshot = MeetingLiveChatSnapshot(
+            recordingID: fixture.lock.sessionId, conversationID: UUID(), revision: 2,
+            messages: [
+                .init(role: .user, content: "Synthetic question?"),
+                .init(role: .assistant, content: "Completed answer."),
+            ])
+        let checkpointed = fixture.lock.withLiveChat(snapshot)
+        try lockStore.write(checkpointed, folderURL: fixture.folderURL)
+        recoveryService = MeetingRecordingRecoveryService(
+            meetingsRoot: tempRoot, lockFileStore: lockStore, transcriptionService: transcriptionService,
+            transcriptionRepo: transcriptionRepo, meetingArtifactStore: MeetingArtifactStore(),
+            promptResultRepo: promptResultRepo, chatConversationRepo: chats, audioConverter: audioConverter)
+        let blockedManifest = fixture.folderURL.appendingPathComponent("manifest.json")
+        try FileManager.default.createDirectory(at: blockedManifest, withIntermediateDirectories: false)
+        do { _ = try await recoveryService.recover(checkpointed); XCTFail("Expected failed artifact settlement") } catch
+        {}
+        XCTAssertEqual(try chats.fetch(id: snapshot.conversationID)?.messages, snapshot.messages)
+        XCTAssertNotNil(try lockStore.read(folderURL: fixture.folderURL))
+        XCTAssertTrue(try chats.delete(id: snapshot.conversationID))
+        try FileManager.default.removeItem(at: blockedManifest)
+        _ = try await recoveryService.recover(try XCTUnwrap(lockStore.read(folderURL: fixture.folderURL)))
+        XCTAssertNil(try chats.fetch(id: snapshot.conversationID), "Receipt must preserve intentional deletion")
+        XCTAssertTrue(
+            transcriptionService.recordings.isEmpty, "A completed row must not replay STT on settlement retry")
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
+    func testRecoveredAssociationHookReceivesRecordingAndCanonicalRowBeforeLockSettlement() async throws {
+        let probe = RecoveryAssociationHookProbe()
+        let fixture = try makeRecoverableSession(lockState: .awaitingTranscription)
+        // The callback has a separate lifetime from this XCTest instance.
+        let canonicalRepository = transcriptionRepo!
+        let recoveryLocks = lockStore!
+        let folderURL = fixture.folderURL
+        recoveryService = MeetingRecordingRecoveryService(
+            meetingsRoot: tempRoot, lockFileStore: recoveryLocks,
+            transcriptionService: transcriptionService, transcriptionRepo: canonicalRepository,
+            meetingArtifactStore: MeetingArtifactStore(), promptResultRepo: promptResultRepo,
+            audioConverter: audioConverter,
+            onRecovered: { recordingID, transcriptionID in
+                try probe.record(
+                    recordingID: recordingID, transcriptionID: transcriptionID,
+                    canonicalRowCompleted: canonicalRepository.fetch(id: transcriptionID)?.status == .completed,
+                    recoveryLockPresent: recoveryLocks.read(folderURL: folderURL) != nil)
+            })
+
+        let recovered = try await recoveryService.recover(fixture.lock)
+
+        XCTAssertEqual(probe.calls.map(\.recordingID), [fixture.lock.sessionId])
+        XCTAssertEqual(probe.calls.map(\.transcriptionID), [recovered.id])
+        XCTAssertEqual(probe.calls.first?.canonicalRowCompleted, true)
+        XCTAssertEqual(probe.calls.first?.recoveryLockPresent, true)
+        XCTAssertEqual(try meetingRows(in: fixture.folderURL).map(\.id), [recovered.id])
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
+    func testRecoveredAssociationHookFailureKeepsCanonicalRowAndLockForRetry() async throws {
+        let probe = RecoveryAssociationHookProbe(failuresRemaining: 1)
+        try resetRecoveryFixture(onRecovered: { recordingID, transcriptionID in
+            try probe.record(recordingID: recordingID, transcriptionID: transcriptionID)
+        })
+        let fixture = try makeRecoverableSession(lockState: .awaitingTranscription)
+
+        do {
+            _ = try await recoveryService.recover(fixture.lock)
+            XCTFail("A failed project association must leave recovery retryable")
+        } catch RecoveryTestError.associationFailed {
+            // Expected: the canonical row remains durable before association.
+        }
+        let canonical = try XCTUnwrap(try meetingRows(in: fixture.folderURL).first)
+        XCTAssertEqual(canonical.status, .completed)
+        XCTAssertNotNil(try lockStore.read(folderURL: fixture.folderURL))
+        XCTAssertEqual(transcriptionService.recordings.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fixture.folderURL.path))
+        XCTAssertEqual(probe.calls.map(\.transcriptionID), [canonical.id])
+
+        let recovered = try await recoveryService.recover(fixture.lock)
+
+        XCTAssertEqual(recovered.id, canonical.id)
+        XCTAssertEqual(try meetingRows(in: fixture.folderURL).map(\.id), [canonical.id])
+        XCTAssertEqual(transcriptionService.recordings.count, 1, "Association retry must reuse the canonical row")
+        XCTAssertEqual(probe.calls.map(\.recordingID), [fixture.lock.sessionId, fixture.lock.sessionId])
+        XCTAssertEqual(probe.calls.map(\.transcriptionID), [canonical.id, canonical.id])
+        XCTAssertNil(try lockStore.read(folderURL: fixture.folderURL))
+    }
+
     func testRecoverImportedSessionWithoutRowPreservesHistoricalMetadata() async throws {
         let startedAt = Date(timeIntervalSince1970: 1_650_000_000)
         let retentionStartedAt = Date(timeIntervalSince1970: 1_800_000_000)
@@ -1350,7 +1503,9 @@ final class MeetingRecordingRecoveryServiceTests: XCTestCase {
         case completedRowWithLock
     }
 
-    private func resetRecoveryFixture() throws {
+    private func resetRecoveryFixture(
+        onRecovered: (@Sendable (_ recordingID: UUID, _ transcriptionID: UUID) throws -> Void)? = nil
+    ) throws {
         try? FileManager.default.removeItem(at: tempRoot)
         try FileManager.default.createDirectory(at: tempRoot, withIntermediateDirectories: true)
         lockStore = RecoveryRecordingLockFileStore(processChecker: RecoveryProcessChecker(alivePIDs: []))
@@ -1366,7 +1521,8 @@ final class MeetingRecordingRecoveryServiceTests: XCTestCase {
             transcriptionRepo: transcriptionRepo,
             meetingArtifactStore: MeetingArtifactStore(),
             promptResultRepo: promptResultRepo,
-            audioConverter: audioConverter
+            audioConverter: audioConverter,
+            onRecovered: onRecovered
         )
     }
 
@@ -1710,6 +1866,42 @@ private enum RecoveryTestError: Error {
     case lockDeleteFailed
     case mixFailed
     case folderRemovalFailed
+    case associationFailed
+}
+
+private final class RecoveryAssociationHookProbe: @unchecked Sendable {
+    struct Call {
+        let recordingID: UUID
+        let transcriptionID: UUID
+        let canonicalRowCompleted: Bool?
+        let recoveryLockPresent: Bool?
+    }
+
+    private let lock = NSLock()
+    private var recordedCalls: [Call] = []
+    private var failuresRemaining: Int
+
+    init(failuresRemaining: Int = 0) {
+        self.failuresRemaining = failuresRemaining
+    }
+
+    var calls: [Call] { lock.withLock { recordedCalls } }
+
+    func record(
+        recordingID: UUID, transcriptionID: UUID,
+        canonicalRowCompleted: Bool? = nil, recoveryLockPresent: Bool? = nil
+    ) throws {
+        try lock.withLock {
+            recordedCalls.append(
+                Call(
+                    recordingID: recordingID, transcriptionID: transcriptionID,
+                    canonicalRowCompleted: canonicalRowCompleted, recoveryLockPresent: recoveryLockPresent))
+            if failuresRemaining > 0 {
+                failuresRemaining -= 1
+                throw RecoveryTestError.associationFailed
+            }
+        }
+    }
 }
 
 private final class RecoveryRemovalFailingFileManager: FileManager {

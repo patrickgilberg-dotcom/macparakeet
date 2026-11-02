@@ -86,7 +86,7 @@ public protocol ShareCredentialStoring: Sendable {
 /// namespace with licensing or LLM credentials, and it sets no biometric or
 /// application-password access flags.
 public final class ShareCredentialStore: ShareCredentialStoring {
-    private static let defaultService = "com.macparakeet.sharing"
+    private static let defaultService = LiveAppIdentity.keychainService("sharing")
 
     private let store: KeyValueStore
 

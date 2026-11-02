@@ -1,0 +1,172 @@
+{
+  "verifiedAt": "2026-10-28T21:47:57.708050+00:00",
+  "scope": "Content-free local capture/signature verification; no transcript or markdown contents read; no audio playback or export.",
+  "app": {
+    "path": "/Users/patrickgilberg/Applications/MacParakeet Live.app",
+    "bundleIdentifier": "com.patrickgilberg.macparakeet-live",
+    "commit": "514fd8385e51",
+    "strictDeepSignatureVerified": true,
+    "teamIdentifier": "3G3BKNXU3A",
+    "appleDevelopmentAuthority": true,
+    "certificateBasedDesignatedRequirement": true,
+    "designatedRequirementSHA256": "fb8a138711ba236cf8510167aeaff55bbd76fa6d1cebcbb805979df16593c514"
+  },
+  "originalUpstream": {
+    "executableSHA256": "55e7a110c6c952fbeb876cd60e576a605d7a45af5f45b2bb205595769219fc70",
+    "baselineSHA256": "55e7a110c6c952fbeb876cd60e576a605d7a45af5f45b2bb205595769219fc70",
+    "baselineMatched": true
+  },
+  "ffmpeg": {
+    "path": "/Users/patrickgilberg/Applications/MacParakeet Live.app/Contents/Resources/ffmpeg",
+    "version": "ffmpeg version 9.0.2-https://www.martin-riedl.de Copyright (c) 2000-2026 the FFmpeg developers"
+  },
+  "captures": [
+    {
+      "id": "E8252841-3722-42E0-9259-7927E98174CB",
+      "status": "completed",
+      "durationMs": 31577,
+      "sourceMode": "microphone_and_system",
+      "quality": "healthy",
+      "captureReport": {
+        "captureFailed": false,
+        "capturedDurationMs": 31600,
+        "elapsedDurationMs": 31492,
+        "interruptedSources": [],
+        "quality": "healthy",
+        "sourceMode": "microphone_and_system",
+        "sources": [
+          {
+            "coverageRatio": 1,
+            "source": "microphone",
+            "status": "complete",
+            "writtenDurationMs": 31600
+          },
+          {
+            "coverageRatio": 0.996443541216817,
+            "source": "system",
+            "status": "complete",
+            "writtenDurationMs": 31380
+          }
+        ]
+      },
+      "manifestCaptureReportMatchesMetadata": true,
+      "sourceAlignment": {
+        "microphone": {
+          "sampleRate": 48000,
+          "startOffsetMs": 0,
+          "timelineFrameCount": 1516800,
+          "writtenFrameCount": 1516800
+        },
+        "system": {
+          "sampleRate": 48000,
+          "startOffsetMs": 173,
+          "timelineFrameCount": 1506240,
+          "writtenFrameCount": 1506240
+        }
+      },
+      "transcriptFileExistsNonempty": true,
+      "markdownFileExistsNonempty": true,
+      "files": [
+        {
+          "name": "microphone-raw.m4a",
+          "bytes": 269178,
+          "selected": true,
+          "decodeExitCode": 0,
+          "decodedDurationSeconds": 31.6,
+          "nonzeroAudioSamples": true,
+          "maximumPeakDb": -3.024371,
+          "progressCompleted": true,
+          "errorOutputPresent": false
+        },
+        {
+          "name": "system-raw.m4a",
+          "bytes": 264920,
+          "selected": true,
+          "decodeExitCode": 0,
+          "decodedDurationSeconds": 31.38,
+          "nonzeroAudioSamples": true,
+          "maximumPeakDb": -1.593425,
+          "progressCompleted": true,
+          "errorOutputPresent": false
+        },
+        {
+          "name": "meeting-playback.m4a",
+          "bytes": 515372,
+          "selected": true,
+          "decodeExitCode": 0,
+          "decodedDurationSeconds": 31.6,
+          "nonzeroAudioSamples": true,
+          "maximumPeakDb": -1.64783,
+          "progressCompleted": true,
+          "errorOutputPresent": false
+        }
+      ],
+      "allSelectedAudioFilesDecodeNonzero": true
+    },
+    {
+      "id": "DC898E31-477D-46D1-B67E-CA148B413715",
+      "status": "completed",
+      "durationMs": 38620,
+      "sourceMode": "system_only",
+      "quality": "healthy",
+      "captureReport": {
+        "captureFailed": false,
+        "capturedDurationMs": 38620,
+        "elapsedDurationMs": 38605,
+        "interruptedSources": [],
+        "quality": "healthy",
+        "sourceMode": "system_only",
+        "sources": [
+          {
+            "coverageRatio": 1,
+            "source": "system",
+            "status": "complete",
+            "writtenDurationMs": 38620
+          }
+        ]
+      },
+      "manifestCaptureReportMatchesMetadata": true,
+      "sourceAlignment": {
+        "system": {
+          "sampleRate": 48000,
+          "startOffsetMs": 0,
+          "timelineFrameCount": 1853760,
+          "writtenFrameCount": 1853760
+        }
+      },
+      "transcriptFileExistsNonempty": true,
+      "markdownFileExistsNonempty": true,
+      "files": [
+        {
+          "name": "microphone-raw.m4a",
+          "bytes": 0,
+          "selected": false,
+          "decodeSkipped": "Unselected source placeholder; empty file is expected."
+        },
+        {
+          "name": "system-raw.m4a",
+          "bytes": 324861,
+          "selected": true,
+          "decodeExitCode": 0,
+          "decodedDurationSeconds": 38.62,
+          "nonzeroAudioSamples": true,
+          "maximumPeakDb": -1.257818,
+          "progressCompleted": true,
+          "errorOutputPresent": false
+        },
+        {
+          "name": "meeting-playback.m4a",
+          "bytes": 324861,
+          "selected": true,
+          "decodeExitCode": 0,
+          "decodedDurationSeconds": 38.62,
+          "nonzeroAudioSamples": true,
+          "maximumPeakDb": -1.257818,
+          "progressCompleted": true,
+          "errorOutputPresent": false
+        }
+      ],
+      "allSelectedAudioFilesDecodeNonzero": true
+    }
+  ]
+}

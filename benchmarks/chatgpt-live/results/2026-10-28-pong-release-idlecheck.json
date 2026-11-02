@@ -1,0 +1,55 @@
+{
+  "hardware": "Apple M5",
+  "idleCheck": {
+    "idleSeconds": 180,
+    "model": "gpt-6-luna",
+    "reasoningEffort": "none",
+    "warmupCallCompleted": true
+  },
+  "memoryGB": 16,
+  "notes": [
+    "First sentence timing uses punctuation after 12 characters; inspect stored outputs for usefulness.",
+    "First-process requests follow catalog retrieval and any rejected effort probes; they do not establish untouched network/server cold latency.",
+    "Transport is explicit in each trial and summary. WebSocket reuses one socket after a completed response, with full bounded input on each turn.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem": "Version 26.5.1 (Build 25F80)",
+  "processorCount": 10,
+  "summaries": [
+    {
+      "condition": "unused-warmup-idle-180s",
+      "failures": 0,
+      "medianCompletionMs": 4214.8659999947995,
+      "medianFirstSentenceMs": 4011.485541705042,
+      "medianFirstTextMs": 3920.8803332876414,
+      "model": "gpt-6-luna",
+      "p95CompletionMs": 4214.8659999947995,
+      "p95FirstSentenceMs": 4011.485541705042,
+      "p95FirstTextMs": 3920.8803332876414,
+      "transport": "websocket",
+      "trials": 1
+    }
+  ],
+  "timestamp": "2026-10-28T22:59:04Z",
+  "trials": [
+    {
+      "completed": true,
+      "completionMs": 4214.8659999947995,
+      "condition": "unused-warmup-idle-180s",
+      "firstSentenceMs": 4011.485541705042,
+      "firstTextMs": 3920.8803332876414,
+      "inputCharacters": 2076,
+      "model": "gpt-6-luna",
+      "output": "A two-week security review could put the pilot timing at risk.\n\n- We could use the time to plan the pilot and confirm success measures, without connecting the account before review approval.",
+      "reasoningEffort": "none",
+      "transport": "websocket"
+    }
+  ],
+  "qualificationSource": "a4a73f90205a",
+  "qualificationConfiguration": "optimized Release",
+  "qualificationNotes": [
+    "The first synthetic request after an unused production warmUp call and180-second idle completed without replay or a callback trap.",
+    "This is one post-idle trial. It does not prove the original socket remained open or establish warm latency percentiles."
+  ]
+}

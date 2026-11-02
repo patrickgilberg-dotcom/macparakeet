@@ -1,5 +1,10 @@
 import Foundation
 
+public enum CalendarEventProvider: String, Codable, Sendable {
+    case eventKit
+    case google
+}
+
 /// A calendar event fetched from EventKit at poll time.
 ///
 /// MacParakeet does not persist the polling cache, but a meeting recording may
@@ -53,6 +58,30 @@ public struct CalendarEvent: Codable, Sendable, Identifiable {
 
     public var syncedAt: Date
 
+    /// Raw provider IDs remain separate from the cross-calendar display ID.
+    public var provider: CalendarEventProvider
+    public var providerEventID: String?
+    public var providerRecurringEventID: String?
+    public var originalOccurrenceStart: Date?
+    /// Google can distinguish personal participation from merely viewing a
+    /// shared calendar. Nil preserves legacy/EventKit participation policy.
+    public var isUserMeeting: Bool?
+    /// Provider metadata used to choose one copy of a Google occurrence.
+    /// Nil preserves events decoded before primary-calendar selection existed.
+    public var isPrimaryCalendar: Bool?
+
+    /// Preparation belongs to an explicit Google occurrence. Never infer it
+    /// from a title, current start time, or an EventKit recurrence ID.
+    public var preparationCalendarID: String? {
+        guard provider == .google, let calendarIdentifier, !calendarIdentifier.isEmpty else { return nil }
+        return calendarIdentifier
+    }
+
+    public var preparationEventID: String? {
+        guard provider == .google, let providerEventID, !providerEventID.isEmpty else { return nil }
+        return providerEventID
+    }
+
     public init(
         id: String,
         title: String,
@@ -68,7 +97,13 @@ public struct CalendarEvent: Codable, Sendable, Identifiable {
         userStatus: EventParticipant.ParticipantStatus? = nil,
         externalId: String? = nil,
         isRecurring: Bool = false,
-        syncedAt: Date = Date()
+        syncedAt: Date = Date(),
+        provider: CalendarEventProvider = .eventKit,
+        providerEventID: String? = nil,
+        providerRecurringEventID: String? = nil,
+        originalOccurrenceStart: Date? = nil,
+        isUserMeeting: Bool? = nil,
+        isPrimaryCalendar: Bool? = nil
     ) {
         self.id = id
         self.title = title
@@ -85,12 +120,20 @@ public struct CalendarEvent: Codable, Sendable, Identifiable {
         self.externalId = externalId
         self.isRecurring = isRecurring
         self.syncedAt = syncedAt
+        self.provider = provider
+        self.providerEventID = providerEventID
+        self.providerRecurringEventID = providerRecurringEventID
+        self.originalOccurrenceStart = originalOccurrenceStart
+        self.isUserMeeting = isUserMeeting
+        self.isPrimaryCalendar = isPrimaryCalendar
     }
 
     enum CodingKeys: String, CodingKey {
         case id, title, startTime, endTime, location, meetUrl, participants
         case organizer, isAllDay, calendarName, calendarIdentifier, userStatus
         case externalId, isRecurring, syncedAt
+        case provider, providerEventID, providerRecurringEventID, originalOccurrenceStart
+        case isUserMeeting, isPrimaryCalendar
     }
 
     public init(from decoder: Decoder) throws {
@@ -110,6 +153,12 @@ public struct CalendarEvent: Codable, Sendable, Identifiable {
         externalId = try container.decodeIfPresent(String.self, forKey: .externalId)
         isRecurring = try container.decodeIfPresent(Bool.self, forKey: .isRecurring) ?? false
         syncedAt = try container.decodeIfPresent(Date.self, forKey: .syncedAt) ?? Date()
+        provider = try container.decodeIfPresent(CalendarEventProvider.self, forKey: .provider) ?? .eventKit
+        providerEventID = try container.decodeIfPresent(String.self, forKey: .providerEventID)
+        providerRecurringEventID = try container.decodeIfPresent(String.self, forKey: .providerRecurringEventID)
+        originalOccurrenceStart = try container.decodeIfPresent(Date.self, forKey: .originalOccurrenceStart)
+        isUserMeeting = try container.decodeIfPresent(Bool.self, forKey: .isUserMeeting)
+        isPrimaryCalendar = try container.decodeIfPresent(Bool.self, forKey: .isPrimaryCalendar)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -129,6 +178,12 @@ public struct CalendarEvent: Codable, Sendable, Identifiable {
         try container.encodeIfPresent(externalId, forKey: .externalId)
         try container.encode(isRecurring, forKey: .isRecurring)
         try container.encode(syncedAt, forKey: .syncedAt)
+        try container.encode(provider, forKey: .provider)
+        try container.encodeIfPresent(providerEventID, forKey: .providerEventID)
+        try container.encodeIfPresent(providerRecurringEventID, forKey: .providerRecurringEventID)
+        try container.encodeIfPresent(originalOccurrenceStart, forKey: .originalOccurrenceStart)
+        try container.encodeIfPresent(isUserMeeting, forKey: .isUserMeeting)
+        try container.encodeIfPresent(isPrimaryCalendar, forKey: .isPrimaryCalendar)
     }
 }
 

@@ -288,6 +288,40 @@ Repo: `https://github.com/moona3k/oatmeal` (same owner, GPL-3.0).
 3. **Phase 2b — Per-event skip (IMPLEMENTED 2026-09-14):** Persist occurrence (`dedupeKey`) and meeting/series (`eventKey`) skips. Offer series skip only when `isRecurring`. Upcoming + coordinator share `candidates`; CLI annotates without changing membership. Toast ✕ is this occurrence. Effect-boundary: re-evaluate the owning countdown under the full new policy; skip of B must not close A; skip/unskip of A must rearm A without waiting for a fetch. Issue #609. See §11.
 4. **Phase 3 — Refinements (PROPOSED):** Better URL extraction (Phone/FaceTime/generic URLs), `.lateJoinAvailable` UI (separate `lateJoinShownEventIds` set in `MeetingMonitor.evaluate(...)` so dismissed countdowns don't suppress late-join), optional retro-link (match a manually-started recording back to a calendar event), concurrent-event choice when two meetings share a start window, notification Record/Skip actions, menu-bar next event (#875). These reuse Phase 2b identity and `candidates`; they are not part of the #609 skip amendment.
 
+## Personal Live fork amendment — explicit event preparation (2026-10-28)
+
+The personal fork adds an explicitly authorized Google Calendar provider and
+user-authored preparation/project drafts for individually selected upcoming
+events. This extends the original EventKit-only boundary without creating an
+automatic queryable calendar inventory cache. Draft identity is the raw Google
+calendar ID plus event/recurring-instance ID; titles and current scheduled times
+are editable metadata, not identity. Shared-calendar visibility alone never
+authorizes automatic recording of all events in that calendar.
+
+A chosen event's exact title is protected through capture, crash recovery and
+final transcription, independently of generated titles and filesystem names.
+One event-start snapshot remains local recording metadata. The user-authored
+preparation and selected-project reference may enter the separately authorized
+Live Ask context; this does not implicitly upload the full calendar snapshot or
+attendee/organizer data, and none belongs in telemetry.
+
+### Personal Live fork amendment — company organization (2026-11-02)
+
+Companies are independent of projects. An authorized local background sweep
+looks thirty days ahead across included calendars, including shared calendars,
+and creates missing company records from clear business email domains. Existing
+company names can resolve internal follow-up titles when external signals are
+absent; ambiguous meetings remain unresolved. Only company names and domains
+are persisted by discovery, never a calendar inventory. Saved occurrence
+choices remain authoritative and company discovery never selects a project.
+
+The user can start a company-only recording and choose a project during or after
+the meeting. Project selection alone determines latest-prior-meeting evidence;
+there is no company-wide historical substitute. Calendar read permissions,
+recording auto-start attendance policy, authored context, exact event titles and
+local audio boundaries remain unchanged. Company matching invokes no model and
+does not add attendee/organizer data to provider prompts or telemetry.
+
 ## Open Questions
 
 - **Naming in copy**: Settings still uses "Start automatically" / "Notify me". Per-event skip copy is settled: "Don't auto-record this meeting" / "Auto-record again".

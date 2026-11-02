@@ -3,28 +3,40 @@ import Security
 
 public final class KeychainKeyValueStore: KeyValueStore {
     private let service: String
+    private let allowUserInteraction: Bool
     // The file-based Keychain UI switch is process-wide. Serialize our calls so
     // one store cannot restore it while another store is accessing credentials.
     private static let interactionLock = NSLock()
 
     static func withoutUserInteraction<T>(_ operation: () throws -> T) throws -> T {
+        try withUserInteractionAllowed(false, operation)
+    }
+
+    private static func withUserInteractionAllowed<T>(_ allowed: Bool, _ operation: () throws -> T) throws -> T {
         try interactionLock.withLock {
             var previouslyAllowed = DarwinBoolean(false)
             let readStatus = SecKeychainGetUserInteractionAllowed(&previouslyAllowed)
             guard readStatus == errSecSuccess else { throw KeychainError(status: readStatus) }
-            let status = SecKeychainSetUserInteractionAllowed(false)
+            let status = SecKeychainSetUserInteractionAllowed(allowed)
             guard status == errSecSuccess else { throw KeychainError(status: status) }
             defer { SecKeychainSetUserInteractionAllowed(previouslyAllowed.boolValue) }
             return try operation()
         }
     }
 
-    public init(service: String) {
+    /// Interactive access is opt-in for an explicit user action. The same lock
+    /// protects both policies because this legacy Keychain switch is process-wide.
+    public init(service: String, allowUserInteraction: Bool = false) {
         self.service = service
+        self.allowUserInteraction = allowUserInteraction
+    }
+
+    private func withConfiguredUserInteraction<T>(_ operation: () throws -> T) throws -> T {
+        try Self.withUserInteractionAllowed(allowUserInteraction, operation)
     }
 
     public func getString(_ key: String) throws -> String? {
-        try Self.withoutUserInteraction {
+        try withConfiguredUserInteraction {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,
@@ -44,7 +56,7 @@ public final class KeychainKeyValueStore: KeyValueStore {
     }
 
     public func setString(_ value: String, forKey key: String) throws {
-        try Self.withoutUserInteraction {
+        try withConfiguredUserInteraction {
             let data = Data(value.utf8)
             let accessibility = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 
@@ -75,7 +87,7 @@ public final class KeychainKeyValueStore: KeyValueStore {
     }
 
     public func delete(_ key: String) throws {
-        try Self.withoutUserInteraction {
+        try withConfiguredUserInteraction {
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrService as String: service,

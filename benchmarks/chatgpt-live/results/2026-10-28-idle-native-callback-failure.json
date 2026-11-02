@@ -1,0 +1,14 @@
+{
+  "qualificationSource": "ef90261f206f",
+  "configuration": "optimized Release",
+  "scenario": "Production warmUp without inference; wait180 seconds unused; then one synthetic request",
+  "warmupCallCompleted": true,
+  "idleSeconds": 180,
+  "completed": false,
+  "failure": "SWIFT TASK CONTINUATION MISUSE: ping() tried to resume its continuation more than once; NSPOSIXErrorDomain Code53 Software caused connection abort",
+  "notes": [
+    "The native Foundation ping callback settled more than once during stale-connection cancellation. The helper terminated before saving a normal trial report.",
+    "This failure happened in the pre-send health check. No model request replay was attempted. No meeting data was read or sent.",
+    "The separate eleven-trial WebSocket speed run completed successfully; it does not prove idle safety."
+  ]
+}

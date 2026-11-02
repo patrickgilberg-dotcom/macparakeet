@@ -79,6 +79,9 @@ public final class MeetingsWorkspaceViewModel {
     public private(set) var calendarErrorMessage: String?
     public var calendarLookAheadDays = 7
     public var upcomingEventLimit = 4
+    public var planner: LiveMeetingPlannerViewModel?
+    public var onRecordPreparedMeeting: ((CalendarEvent, MeetingPreparation) -> Void)?
+    public var usesGoogleCalendar: Bool { calendarService is GoogleCalendarService }
     /// User-selected type for the next or active meeting. The recording
     /// coordinator snapshots this value onto the durable transcription stub
     /// before enqueue so prompt routing stays deterministic.
@@ -99,6 +102,7 @@ public final class MeetingsWorkspaceViewModel {
     private var hasLoadedPromptLabelPolicies = false
     private var promptLabelPolicyErrorMessage: String?
     private var promptMeetingPolicyErrorMessage: String?
+    @ObservationIgnored nonisolated(unsafe) private var calendarRefreshTask: Task<Void, Never>?
     @ObservationIgnored private var upcomingEventsTask: Task<Void, Never>?
     @ObservationIgnored private var upcomingEventsGeneration = 0
     @ObservationIgnored private var promptPolicyLoadTask: Task<Void, Never>?
@@ -115,7 +119,7 @@ public final class MeetingsWorkspaceViewModel {
         llmSettingsViewModel: LLMSettingsViewModel,
         quickPromptsViewModel: QuickPromptsViewModel? = nil,
         promptsViewModel: PromptsViewModel? = nil,
-        calendarService: any CalendarServicing = CalendarService.shared
+        calendarService: any CalendarServicing = GoogleCalendarService.shared
     ) {
         self.recentMeetingsViewModel = recentMeetingsViewModel
         self.meetingPillViewModel = meetingPillViewModel
@@ -127,6 +131,7 @@ public final class MeetingsWorkspaceViewModel {
     }
 
     deinit {
+        calendarRefreshTask?.cancel()
         upcomingEventsTask?.cancel()
         promptPolicyLoadTask?.cancel()
         promptPolicyMutationTail?.cancel()
@@ -167,6 +172,15 @@ public final class MeetingsWorkspaceViewModel {
         self.promptMeetingPolicyRepository = promptMeetingPolicyRepository
         self.promptLabelPolicyRepository = promptLabelPolicyRepository
         reloadPromptLabelPolicies()
+        if usesGoogleCalendar, calendarRefreshTask == nil {
+            calendarRefreshTask = Task { @MainActor [weak self] in
+                while !Task.isCancelled {
+                    do { try await Task.sleep(for: .seconds(60)) } catch { return }
+                    guard let self, !Task.isCancelled else { return }
+                    await self.refreshUpcomingEvents().value
+                }
+            }
+        }
     }
 
     public func refresh() {
@@ -214,13 +228,18 @@ public final class MeetingsWorkspaceViewModel {
             do {
                 let events = try await calendarService.fetchUpcomingEvents(days: lookAheadDays)
                 guard let self, !Task.isCancelled, self.upcomingEventsGeneration == generation else { return }
-                self.upcomingEvents = Self.collapseRecurringOccurrences(
-                    MeetingMonitor.candidates(
-                        events: events,
-                        config: self.calendarMonitorConfig()
-                    ).map(\.event),
-                    limit: eventLimit
-                )
+                if self.usesGoogleCalendar {
+                    let excluded = self.settingsViewModel.calendarExcludedIdentifiers
+                    self.upcomingEvents = GoogleCalendarOccurrenceSelection.distinct(
+                        events.filter { event in
+                            !event.isAllDay && event.userStatus != .declined
+                                && !excluded.contains(event.calendarIdentifier ?? "")
+                        })
+                } else {
+                    self.upcomingEvents = Self.collapseRecurringOccurrences(
+                        MeetingMonitor.candidates(events: events, config: self.calendarMonitorConfig()).map(\.event),
+                        limit: eventLimit)
+                }
                 self.isLoadingUpcomingEvents = false
             } catch {
                 guard let self, !Task.isCancelled, self.upcomingEventsGeneration == generation else { return }
@@ -563,7 +582,7 @@ public final class MeetingsWorkspaceViewModel {
 
     public var calendarStatus: CalendarStatus {
         guard AppFeatures.calendarEnabled else { return .unavailable }
-        guard settingsViewModel.calendarAutoStartMode != .off else { return .off }
+        guard usesGoogleCalendar || settingsViewModel.calendarAutoStartMode != .off else { return .off }
 
         switch settingsViewModel.calendarPermissionStatus {
         case .notDetermined:
@@ -636,7 +655,7 @@ public final class MeetingsWorkspaceViewModel {
 
     private var shouldFetchCalendarEvents: Bool {
         AppFeatures.calendarEnabled
-            && settingsViewModel.calendarAutoStartMode != .off
+            && (usesGoogleCalendar || settingsViewModel.calendarAutoStartMode != .off)
             && settingsViewModel.calendarPermissionStatus == .granted
     }
 

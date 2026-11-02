@@ -186,3 +186,10 @@ These were merged/resolved but left in `active/`; moved with a ship-evidence not
 - God-file decomposition (`SettingsView` now 3467, `TranscriptResultView` 3112, `SettingsViewModel` now 2568) is real but high-risk with no test net. **Update (2026-06-15):** the `SettingsViewModel` **Engine slice** now has a test-first path — `2026-06-15-settings-engine-characterization-tests` (pin behavior) → `2026-06-15-settings-engine-viewmodel-extraction` (extract-and-delegate), executing the stalled `EngineSettingsViewModel` row of `2026-04-settings-ia-overhaul` §3. The remaining slices (Capture/Dictation/Transcription/Meeting/System) and the two view god-structs stay folded into the IA plan until a net exists. See `2026-06-15-advisor-index.md` for the full architecture findings (incl. the deferred LLM-layer, STTRuntime, and App-layer items).
 
 - [Jev-powered Voice Control](active/2026-09-19-jev-voice-control.md) — PR [#1104](https://github.com/moona3k/macparakeet/pull/1104); Flights-to-results and mic qualification remain.
+
+## Personal fork implementation records
+
+- [Live company discovery and separate projects](completed/2026-11-02-company-project-organization.md) — implemented and signed/installed on `feat/macparakeet-live`; real thirty-day sweep, native controls, repeat discovery and data preservation passed. The [validation report](../docs/macparakeet-live-company-organization-validation.md) distinguishes the full-suite source from later focused/native hardening checks.
+
+- [Live evidence board and automatic project preparation](completed/2026-10-31-live-board-and-meeting-prep.md) — implemented, installed and pushed on `feat/macparakeet-live`; final quiet Prepare/card/quotation acceptance completed after unlock. The [validation report](../docs/macparakeet-live-board-preparation-validation.md) records provider checks, preserved data and full-suite limits.
+- [Immediate live focus and explicit answer refresh](completed/2026-10-30-live-now-focus-and-refresh.md) — completed on `feat/macparakeet-live`. The [qualification report](../docs/macparakeet-live-now-validation.md) records the installed build, physical recording revision and test limits.

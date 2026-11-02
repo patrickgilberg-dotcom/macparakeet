@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import MacParakeetCore
 import MacParakeetViewModels
@@ -12,6 +13,34 @@ private enum MeetingFinalizationRetryBridgeError: LocalizedError {
 
 @MainActor
 final class AppEnvironmentConfigurer {
+    private static func selectCalendarForRecording(events: [CalendarEvent], now: Date = Date())
+        -> MeetingCalendarStartSelection
+    {
+        var candidates: [String: CalendarEvent] = [:]
+        for event in events
+        where !event.isAllDay && event.userStatus != .declined
+            && (event.provider != .google || event.isUserMeeting == true)
+            && event.startTime <= now.addingTimeInterval(300) && event.endTime > now
+        {
+            let identity = (event.externalId ?? event.id) + "|" + String(event.startTime.timeIntervalSince1970)
+            if candidates[identity] == nil { candidates[identity] = event }
+        }
+        let ordered = candidates.values.sorted { $0.startTime < $1.startTime }
+        guard !ordered.isEmpty else { return .unmatched }
+        if ordered.count == 1 { return .event(.init(event: ordered[0], confidence: .probable)) }
+        let choice = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 420, height: 28))
+        choice.addItems(withTitles: ordered.map { $0.title + " · " + ($0.calendarName ?? "Calendar") })
+        let alert = NSAlert()
+        alert.messageText = "Which meeting are you recording?"
+        alert.informativeText =
+            "These calendar events overlap. Choose the meeting whose title and preparation Live should use."
+        alert.accessoryView = choice
+        alert.addButton(withTitle: "Record selected meeting")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return .cancelled }
+        return .event(.init(event: ordered[choice.indexOfSelectedItem], confidence: .confirmed))
+    }
+
     private final class CoordinatorRefs {
         weak var dictation: DictationFlowCoordinator?
         weak var meeting: MeetingRecordingFlowCoordinator?
@@ -101,6 +130,7 @@ final class AppEnvironmentConfigurer {
     }
 
     func configure(environment env: AppEnvironment, callbacks: Callbacks) -> Runtime {
+        let companyRepository = env.meetingCompanyRepo
         Task {
             // Only bootstrap trial if onboarding is already completed (returning user).
             // For new users, trial starts at onboarding completion, not during setup.
@@ -159,6 +189,23 @@ final class AppEnvironmentConfigurer {
             promptMeetingPolicyRepository: env.promptMeetingPolicyRepo,
             promptLabelPolicyRepository: env.promptLabelPolicyRepo
         )
+        meetingsWorkspaceViewModel.planner = LiveMeetingPlannerViewModel(
+            projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
+            companyRepository: env.meetingCompanyRepo,
+            transcriptionRepository: env.transcriptionRepo)
+        if LiveAppIdentity.isLive {
+            meetingsWorkspaceViewModel.planner?.automaticPrep = LiveMeetingPrepViewModel(
+                projectRepository: env.meetingProjectRepo, preparationRepository: env.meetingPreparationRepo,
+                companyRepository: env.meetingCompanyRepo,
+                sessionProvider: { try await ChatGPTLiveClient.shared.liveAnswerSession() })
+        }
+        Task { [weak meetingsWorkspaceViewModel, weak settingsViewModel] in
+            _ = await GoogleCalendarAuth.shared.connection()
+            meetingsWorkspaceViewModel?.planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains(
+                companyRepository: companyRepository)
+            await settingsViewModel?.refreshCalendarAccess()
+            await meetingsWorkspaceViewModel?.refreshUpcomingEvents().value
+        }
         transcriptionViewModel.onMeetingRenamed = { [weak self] rename in
             self?.libraryViewModel.applyMeetingRename(rename)
             self?.meetingsWorkspaceViewModel.recentMeetingsViewModel.applyMeetingRename(rename)
@@ -320,6 +367,40 @@ final class AppEnvironmentConfigurer {
             return true
         }
 
+        if LiveAppIdentity.isLive {
+            let defaults = AppPaths.sharedAppDefaults()
+            let activationKey = "liveMeetingMinutesAutomaticStartDate"
+            let activationDate = defaults.object(forKey: activationKey) as? Date ?? Date()
+            if defaults.object(forKey: activationKey) == nil { defaults.set(activationDate, forKey: activationKey) }
+            let minutesArtifacts = MeetingMinutesArtifactRefresher(
+                transcriptionRepository: env.transcriptionRepo,
+                promptResultRepository: env.promptResultRepo,
+                speakerAttributionReader: env.speakerAttributionReader,
+                artifactStore: env.meetingArtifactStore)
+            let minutesClient = env.liveMinutesClient
+            env.liveMinutes.configure(
+                repository: env.liveMinutesRepository, engine: env.liveMinutesEngine,
+                preferencesProvider: { try await LiveMeetingPreferencesStore.shared.snapshot() },
+                sessionProvider: { try await minutesClient.liveAnswerSession() },
+                activeCaptureProvider: { [weak meetingPill] in
+                    switch meetingPill?.state {
+                    case .starting, .recording, .paused, .completing, .transcribing: return true
+                    case .idle, .completed, .error, nil: return false
+                    }
+                },
+                automaticStartDate: activationDate,
+                artifactRefresh: { id in try await minutesArtifacts.refresh(transcriptionID: id) },
+                onSaved: { [weak self] transcriptionID, _ in
+                    guard let self else { return }
+                    if self.transcriptionViewModel.currentTranscription?.id == transcriptionID {
+                        self.promptResultsViewModel.loadPromptResults(transcriptionId: transcriptionID)
+                    }
+                    self.libraryViewModel.loadTranscriptions()
+                    self.meetingsWorkspaceViewModel.refreshRecentMeetings()
+                })
+            env.liveMinutes.start()
+        }
+
         transcriptionViewModel.onTranscribingChanged = { _ in
             callbacks.onMenuBarIconUpdate()
         }
@@ -383,6 +464,10 @@ final class AppEnvironmentConfigurer {
             conversationRepo: env.chatConversationRepo,
             quickPromptRepo: env.quickPromptRepo,
             configStore: env.llmConfigStore,
+            preparationRepository: env.meetingPreparationRepo,
+            projectRepository: env.meetingProjectRepo,
+            companyRepository: env.meetingCompanyRepo,
+            automaticPrep: meetingsWorkspaceViewModel.planner?.automaticPrep,
             sttManager: env.sttScheduler,
             speechEngineSelectionProvider: { SpeechEngineSelection.liveSpeech() },
             meetingAudioSourceModeProvider: { env.runtimePreferences.meetingAudioSourceMode },
@@ -400,23 +485,41 @@ final class AppEnvironmentConfigurer {
             probableCalendarSnapshotProvider: {
                 calendarCoordinator?.probableSnapshotForManualStart()
             },
+            calendarStartSelectionProvider: { [weak meetingsWorkspaceViewModel] in
+                Self.selectCalendarForRecording(events: meetingsWorkspaceViewModel?.upcomingEvents ?? [])
+            },
+            manualProjectIDProvider: { [weak meetingsWorkspaceViewModel] in
+                meetingsWorkspaceViewModel?.planner?.selectedProjectFilterID
+            },
+            manualCompanyIDProvider: { [weak meetingsWorkspaceViewModel] in
+                meetingsWorkspaceViewModel?.planner?.selectedCompanyFilterID
+            },
+            internalCompanyDomainsProvider: {
+                await Self.googleInternalCompanyDomains(companyRepository: companyRepository)
+            },
             llmService: hasLLMConfig ? env.llmService : nil,
             pillViewModel: meetingPillViewModel,
             meetingRecordingSettlement: env.meetingRecordingSettlement,
             finalizationOwnershipClaimer: env.meetingRecordingLockFileStore,
             onMenuBarIconUpdate: { _ in callbacks.onMenuBarIconUpdate() },
             onTranscriptionReady: { [weak self] transcription in
+                Task { await env.liveMinutes.meetingCompleted(transcriptionID: transcription.id) }
                 self?.handleMeetingTranscriptReady(
                     transcription,
                     preferences: env.runtimePreferences,
+                    runLegacyAutoPrompts: !LiveAppIdentity.isLive
+                        || (try? env.llmConfigStore.loadRouteMetadata(for: .analysis)) != nil,
                     canPresent: true,
                     openMainWindow: callbacks.onOpenMainWindow
                 )
             },
             onQueuedTranscriptionReady: { [weak self] transcription, canPresent in
+                Task { await env.liveMinutes.meetingCompleted(transcriptionID: transcription.id) }
                 self?.handleMeetingTranscriptReady(
                     transcription,
                     preferences: env.runtimePreferences,
+                    runLegacyAutoPrompts: !LiveAppIdentity.isLive
+                        || (try? env.llmConfigStore.loadRouteMetadata(for: .analysis)) != nil,
                     canPresent: canPresent,
                     openMainWindow: callbacks.onOpenMainWindow
                 )
@@ -445,6 +548,9 @@ final class AppEnvironmentConfigurer {
                 coordinatorRefs.dictation?.showIdlePill()
             }
         )
+        meetingsWorkspaceViewModel.onRecordPreparedMeeting = { [weak meetingCoordinator] event, preparation in
+            meetingCoordinator?.startPreparedMeeting(event: event, preparation: preparation)
+        }
         coordinatorRefs.meeting = meetingCoordinator
         liveMeetingCoordinator = meetingCoordinator
         let retryMeetingFinalization: (Transcription) async throws -> Void = {
@@ -541,8 +647,52 @@ final class AppEnvironmentConfigurer {
         // feature flag because calendar integration only makes sense when
         // the user can actually record meetings.
         if AppFeatures.meetingRecordingEnabled {
+            let excludedCalendarIDs: @MainActor @Sendable () -> Set<String> = { [weak settingsViewModel] in
+                settingsViewModel?.calendarExcludedIdentifiers ?? []
+            }
+            if LiveAppIdentity.isLive, let planner = meetingsWorkspaceViewModel.planner {
+                let companyOrganizer = LiveMeetingCompanyDiscoveryViewModel(
+                    companyRepository: env.meetingCompanyRepo,
+                    eventsProvider: {
+                        let events = try await GoogleCalendarService.shared.fetchUpcomingEvents(days: 30)
+                        let excluded = await excludedCalendarIDs()
+                        return events.filter {
+                            $0.calendarIdentifier.map { !excluded.contains($0) } ?? true
+                        }
+                    },
+                    internalDomainsProvider: {
+                        await Self.googleInternalCompanyDomains(companyRepository: companyRepository)
+                    },
+                    sourceIdentityProvider: {
+                        guard let connection = await GoogleCalendarAuth.shared.connection() else { return nil }
+                        let excluded = await excludedCalendarIDs()
+                        let internalDomains = await Self.googleInternalCompanyDomains(
+                            companyRepository: companyRepository)
+                        return MeetingCompanyDomainMatcher.discoverySourceIdentity(
+                            accountID: connection.id, excludedCalendarIDs: excluded, internalDomains: internalDomains)
+                    },
+                    onCompaniesChanged: { [weak planner] in
+                        planner?.internalCompanyDomains = await Self.googleInternalCompanyDomains(
+                            companyRepository: companyRepository)
+                        await planner?.refreshCompanies().value
+                    })
+                planner.companyOrganizer = companyOrganizer
+                companyOrganizer.start()
+            }
+            meetingsWorkspaceViewModel.planner?.automaticPrep?.start(
+                eventsProvider: {
+                    let events = try await GoogleCalendarService.shared.fetchUpcomingEvents(days: 1)
+                    let excluded = await excludedCalendarIDs()
+                    return events.filter { event in
+                        event.calendarIdentifier.map { !excluded.contains($0) } ?? true
+                    }
+                },
+                isBusy: { [weak meetingCoordinator, weak chatViewModel, weak minutes = env.liveMinutes] in
+                    (meetingCoordinator?.isLiveAIWorkActive ?? false)
+                        || (chatViewModel?.isStreaming ?? false) || minutes?.activeJobID != nil
+                })
             let coordinator = MeetingAutoStartCoordinator(
-                calendarService: CalendarService.shared,
+                calendarService: GoogleCalendarService.shared,
                 settingsViewModel: settingsViewModel,
                 isRecordingActive: { [weak meetingCoordinator] in
                     meetingCoordinator?.isMeetingRecordingActive ?? false
@@ -588,6 +738,19 @@ final class AppEnvironmentConfigurer {
         )
     }
 
+    private nonisolated static func googleInternalCompanyDomains(
+        companyRepository: any MeetingCompanyRepositoryProtocol
+    ) async -> Set<String> {
+        guard let connection = await GoogleCalendarAuth.shared.connection(),
+            MeetingCompanyDomainMatcher.domain(fromEmail: connection.email) != nil
+        else { return [] }
+        let companies =
+            (try? await Task.detached(priority: .utility) {
+                try companyRepository.fetchAll(includeArchived: true)
+            }.value) ?? []
+        return MeetingCompanyDomainMatcher.internalDomains(accountEmail: connection.email, companies: companies)
+    }
+
     /// Read presentation preferences before selecting: quiet completion may
     /// refresh this meeting's open detail, but must not replace another one.
     /// The queue awaits TranscriptionService's actor-isolated durable save and
@@ -599,6 +762,7 @@ final class AppEnvironmentConfigurer {
     private func handleMeetingTranscriptReady(
         _ transcription: Transcription,
         preferences: AppRuntimePreferencesProtocol,
+        runLegacyAutoPrompts: Bool,
         canPresent: Bool,
         openMainWindow: () -> Void
     ) {
@@ -606,7 +770,7 @@ final class AppEnvironmentConfigurer {
         transcriptionViewModel.presentCompletedTranscription(
             transcription,
             autoSave: true,
-            runAutoPrompts: true,
+            runAutoPrompts: runLegacyAutoPrompts,
             selectTranscription: shouldOpen
         )
         libraryViewModel.loadTranscriptions()

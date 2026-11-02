@@ -73,18 +73,21 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         commandName: "transcribe",
         abstract: "Transcribe files, folders, Apple Podcasts, podcast searches, or media URLs.",
         discussion: """
-        Telemetry: the root CLI runner emits one privacy-safe `cli_operation` \
-        event per invocation; `transcribe` adds allowlisted input/output metadata \
-        (input_kind, output_format, json). It never includes the path, URL, \
-        transcript, language value, or user content. Disable with \
-        `MACPARAKEET_TELEMETRY=0`, `DO_NOT_TRACK=1`, the persistent \
-        `macparakeet-cli config set telemetry off`, or the GUI Settings toggle. \
-        Auto-disabled in CI (CI/GITHUB_ACTIONS/etc.). See \
-        https://github.com/moona3k/macparakeet/blob/main/docs/telemetry.md.
-        """
+            Telemetry: the root CLI runner emits one privacy-safe `cli_operation` \
+            event per invocation; `transcribe` adds allowlisted input/output metadata \
+            (input_kind, output_format, json). It never includes the path, URL, \
+            transcript, language value, or user content. Disable with \
+            `MACPARAKEET_TELEMETRY=0`, `DO_NOT_TRACK=1`, the persistent \
+            `macparakeet-cli config set telemetry off`, or the GUI Settings toggle. \
+            Auto-disabled in CI (CI/GITHUB_ACTIONS/etc.). See \
+            https://github.com/moona3k/macparakeet/blob/main/docs/telemetry.md.
+            """
     )
 
-    @Argument(help: "One or more audio/video file paths, folders, YouTube URLs, Apple Podcasts URLs, or HTTP(S) media URLs supported by yt-dlp. Multiple inputs (or --output-dir) transcribe in sequence, writing one file each.")
+    @Argument(
+        help:
+            "One or more audio/video file paths, folders, YouTube URLs, Apple Podcasts URLs, or HTTP(S) media URLs supported by yt-dlp. Multiple inputs (or --output-dir) transcribe in sequence, writing one file each."
+    )
     var inputs: [String] = []
 
     @Option(
@@ -93,34 +96,62 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
     )
     var audioTrack: Int?
 
-    @Option(name: .long, help: "Freetext podcast search: find a show + episode on Apple Podcasts and transcribe it. Example: --podcast \"Lex Fridman episode 400\". Episode number/title hints select the episode; otherwise the latest is used. Ignores positional inputs.")
+    @Option(
+        name: .long,
+        help:
+            "Freetext podcast search: find a show + episode on Apple Podcasts and transcribe it. Example: --podcast \"Lex Fridman episode 400\". Episode number/title hints select the episode; otherwise the latest is used. Ignores positional inputs."
+    )
     var podcast: String?
 
-    @Option(name: .long, help: "Directory to write one transcript per input. Implies batch mode; created if missing. When omitted with multiple inputs, the current directory is used.")
+    @Option(
+        name: .long,
+        help:
+            "Directory to write one transcript per input. Implies batch mode; created if missing. When omitted with multiple inputs, the current directory is used."
+    )
     var outputDir: String?
 
-    @Option(name: .shortAndLong, help: "Output format: text, transcript, json, srt, vtt, dapt. srt/vtt emit timed subtitles; dapt emits a structured W3C original transcript. Pair with --output-dir to write one file per input.")
+    @Option(
+        name: .shortAndLong,
+        help:
+            "Output format: text, transcript, json, srt, vtt, dapt. srt/vtt emit timed subtitles; dapt emits a structured W3C original transcript. Pair with --output-dir to write one file per input."
+    )
     var format: TranscribeOutputFormat = .text
 
     @Option(help: "Processing mode: raw, clean, app-default.")
     var mode: TranscribeMode = .appDefault
 
-    @Option(help: "Speech engine: app-default, parakeet, nemotron, whisper, cohere. Parakeet is the local default; app-default follows the saved GUI preference.")
+    @Option(
+        help:
+            "Speech engine: app-default, parakeet, nemotron, whisper, cohere. Parakeet is the local default; app-default follows the saved GUI preference."
+    )
     var engine: TranscribeSpeechEngine = .parakeet
 
-    @Option(help: "Language hint for Nemotron, Whisper, or Cohere, such as ko, en, or en-US. Cohere requires a supported language; Parakeet and the English-only Nemotron build ignore this flag.")
+    @Option(
+        help:
+            "Language hint for Nemotron, Whisper, or Cohere, such as ko, en, or en-US. Cohere requires a supported language; Parakeet and the English-only Nemotron build ignore this flag."
+    )
     var language: String?
 
-    @Option(name: .long, help: "Parakeet build: app-default, v3 (English + supported European languages), v2 (English word timestamps), unified (readable English with word timestamps), orukeet (multilingual preview). app-default follows the saved preference; ignored for Nemotron, Cohere, and Whisper.")
+    @Option(
+        name: .long,
+        help:
+            "Parakeet build: app-default, v3 (English + supported European languages), v2 (English word timestamps), unified (readable English with word timestamps), orukeet (multilingual preview). app-default follows the saved preference; ignored for Nemotron, Cohere, and Whisper."
+    )
     var parakeetModel: TranscribeParakeetModel = .appDefault
 
-    @Option(name: .long, help: "Nemotron Beta build: app-default, multilingual-1120ms, english-1120ms. app-default follows the saved preference; ignored for Parakeet, Cohere, and Whisper. The English build ignores --language.")
+    @Option(
+        name: .long,
+        help:
+            "Nemotron Beta build: app-default, multilingual-1120ms, english-1120ms. app-default follows the saved preference; ignored for Parakeet, Cohere, and Whisper. The English build ignores --language."
+    )
     var nemotronModel: TranscribeNemotronModel = .appDefault
 
     @Option(help: "Downloaded media retention: app-default, keep, delete.")
     var downloadedAudio: DownloadedAudioPolicy = .appDefault
 
-    @Option(name: .customLong("media-audio-quality"), help: "Downloaded media audio quality: app-default, m4a, best-available.")
+    @Option(
+        name: .customLong("media-audio-quality"),
+        help: "Downloaded media audio quality: app-default, m4a, best-available.")
     var mediaAudioQuality: YouTubeAudioQualityOption?
 
     @Option(name: .customLong("youtube-audio-quality"), help: .hidden)
@@ -129,16 +160,32 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
     @Option(help: "Path to SQLite database file (defaults to the app database).")
     var database: String?
 
-    @Option(name: .long, help: "Speaker detection: app-default, on, off. Default: app-default, which follows the saved GUI/CLI preference. Automatic detection supports up to eight speakers; use count constraints for larger groups.")
+    @Option(
+        name: .long,
+        help:
+            "Speaker detection: app-default, on, off. Default: app-default, which follows the saved GUI/CLI preference. Automatic detection supports up to eight speakers; use count constraints for larger groups."
+    )
     var speakerDetection: SpeakerDetectionOption = .appDefault
 
-    @Option(name: .long, help: "Exact speaker count for this run. Mutually exclusive with --speaker-min/--speaker-max; implies speaker detection for app-default.")
+    @Option(
+        name: .long,
+        help:
+            "Exact speaker count for this run. Mutually exclusive with --speaker-min/--speaker-max; implies speaker detection for app-default."
+    )
     var speakerCount: Int?
 
-    @Option(name: .long, help: "Minimum speaker count for this run. Can be combined with --speaker-max; implies speaker detection for app-default.")
+    @Option(
+        name: .long,
+        help:
+            "Minimum speaker count for this run. Can be combined with --speaker-max; implies speaker detection for app-default."
+    )
     var speakerMin: Int?
 
-    @Option(name: .long, help: "Maximum speaker count for this run. Can be combined with --speaker-min; implies speaker detection for app-default.")
+    @Option(
+        name: .long,
+        help:
+            "Maximum speaker count for this run. Can be combined with --speaker-min; implies speaker detection for app-default."
+    )
     var speakerMax: Int?
 
     @Flag(help: "Compatibility alias for --speaker-detection off.")
@@ -147,7 +194,9 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
     @Flag(help: "Run retained entitlement checks before transcribing. Current free builds remain unlocked.")
     var enforceEntitlements: Bool = false
 
-    @Flag(name: .long, help: "Do not save the completed transcription to MacParakeet history. Downloaded media is temporary.")
+    @Flag(
+        name: .long,
+        help: "Do not save the completed transcription to MacParakeet history. Downloaded media is temporary.")
     var noHistory: Bool = false
 
     var cliTelemetryMetadata: CLITelemetry.OperationMetadata {
@@ -165,13 +214,15 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
 
     private var normalizedPodcastQuery: String? {
         guard let trimmed = podcast?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty else { return nil }
+            !trimmed.isEmpty
+        else { return nil }
         return trimmed
     }
 
     func validate() throws {
         if inputs.isEmpty && normalizedPodcastQuery == nil {
-            throw ValidationError("Provide at least one file path, folder, media URL, or --podcast search query to transcribe.")
+            throw ValidationError(
+                "Provide at least one file path, folder, media URL, or --podcast search query to transcribe.")
         }
         if noHistory && downloadedAudio == .keep {
             throw ValidationError("--no-history cannot be combined with --downloaded-audio keep.")
@@ -183,7 +234,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
             throw ValidationError("--audio-track must be at least 1.")
         }
         if audioTrack != nil,
-           normalizedPodcastQuery != nil || inputs.contains(where: Self.isDownloadableURLInput) {
+            normalizedPodcastQuery != nil || inputs.contains(where: Self.isDownloadableURLInput)
+        {
             throw ValidationError("--audio-track is supported only for local files and folders.")
         }
         try Self.validateSpeakerConstraintOptions(
@@ -217,7 +269,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
             return .m4a
         case .appDefault:
             guard let storedQuality,
-                  let quality = YouTubeAudioQuality(rawValue: storedQuality) else {
+                let quality = YouTubeAudioQuality(rawValue: storedQuality)
+            else {
                 return .m4a
             }
             return quality
@@ -238,21 +291,23 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         switch engine {
         case .appDefault:
             let storedPreference = SpeechEnginePreference(rawValue: storedEngine ?? "") ?? .parakeet
-            preference = shouldFallbackCohereAppDefaultToParakeet(
-                requestedEngine: engine,
-                storedEngine: storedEngine,
-                physicalMemoryBytes: physicalMemoryBytes
-            ) ? .parakeet : storedPreference
-            language = switch preference {
-            case .parakeet:
-                nil
-            case .nemotron:
-                explicitLanguage ?? storedNemotronLanguage
-            case .whisper:
-                explicitLanguage ?? storedLanguage
-            case .cohere:
-                explicitLanguage ?? storedCohereLanguage
-            }
+            preference =
+                shouldFallbackCohereAppDefaultToParakeet(
+                    requestedEngine: engine,
+                    storedEngine: storedEngine,
+                    physicalMemoryBytes: physicalMemoryBytes
+                ) ? .parakeet : storedPreference
+            language =
+                switch preference {
+                case .parakeet:
+                    nil
+                case .nemotron:
+                    explicitLanguage ?? storedNemotronLanguage
+                case .whisper:
+                    explicitLanguage ?? storedLanguage
+                case .cohere:
+                    explicitLanguage ?? storedCohereLanguage
+                }
         case .parakeet:
             preference = .parakeet
             language = nil
@@ -275,7 +330,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         physicalMemoryBytes: UInt64 = ProcessInfo.processInfo.physicalMemory
     ) -> Bool {
         guard requestedEngine == .appDefault,
-              SpeechEnginePreference(rawValue: storedEngine ?? "") == .cohere else {
+            SpeechEnginePreference(rawValue: storedEngine ?? "") == .cohere
+        else {
             return false
         }
         let status = SpeechEngineCapabilityRegistry.memoryRequirementStatus(
@@ -303,7 +359,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         let languagePolicy = SpeechEngineCapabilityRegistry.capabilities(for: .cohere).supportedLanguages
         let supportedLanguageCodes = languagePolicy.supportedLanguageCodes ?? []
         guard let normalizedLanguage = SpeechEnginePreference.normalizeCohereLanguage(explicitLanguage),
-              supportedLanguageCodes.contains(normalizedLanguage) else {
+            supportedLanguageCodes.contains(normalizedLanguage)
+        else {
             let supported = supportedLanguageCodes.joined(separator: ", ")
             throw ValidationError(
                 "Invalid value for --language with Cohere: '\(explicitLanguage)'. "
@@ -383,7 +440,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         switch option {
         case .appDefault:
             return ResolvedSpeakerDetection(
-                enabled: constraint != nil || (storedEnabled ?? UserDefaultsAppRuntimePreferences.defaultSpeakerDiarizationEnabled),
+                enabled: constraint != nil
+                    || (storedEnabled ?? UserDefaultsAppRuntimePreferences.defaultSpeakerDiarizationEnabled),
                 constraint: constraint
             )
         case .on:
@@ -493,9 +551,10 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
     static func downloadableURLInput(_ input: String) -> String? {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        guard PodcastURLValidator.isApplePodcastsURL(trimmed)
-            || YouTubeURLValidator.isYouTubeURL(trimmed)
-            || DownloadableMediaURLValidator.isDownloadableMediaURL(trimmed)
+        guard
+            PodcastURLValidator.isApplePodcastsURL(trimmed)
+                || YouTubeURLValidator.isYouTubeURL(trimmed)
+                || DownloadableMediaURLValidator.isDownloadableMediaURL(trimmed)
         else {
             return nil
         }
@@ -522,7 +581,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         do {
             stdoutRedirection = try StandardOutputRedirection()
             guard podcastQuery != nil || !resolvedInputs.isEmpty else {
-                throw ValidationError("No transcribable inputs found — pass a file/URL, or use --podcast \"<search query>\".")
+                throw ValidationError(
+                    "No transcribable inputs found — pass a file/URL, or use --podcast \"<search query>\".")
             }
             try AppPaths.ensureDirectories()
             let dbManager = try DatabaseManager(path: resolvedDatabasePath(database))
@@ -563,7 +623,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
             try Self.validateCohereLanguageOverride(self.language, speechEngine: speechEngine)
             let resolvedSpeakerDetection = Self.resolveSpeakerDetection(
                 self.speakerDetection,
-                storedEnabled: defaults.object(forKey: UserDefaultsAppRuntimePreferences.speakerDiarizationKey) as? Bool,
+                storedEnabled: defaults.object(forKey: UserDefaultsAppRuntimePreferences.speakerDiarizationKey)
+                    as? Bool,
                 noDiarize: self.noDiarize,
                 speakerCount: self.speakerCount,
                 speakerMin: self.speakerMin,
@@ -577,14 +638,16 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
                 self.effectiveMediaAudioQuality,
                 storedQuality: defaults.string(forKey: UserDefaultsAppRuntimePreferences.youtubeAudioQualityKey)
             )
-            let configuredShouldKeepDownloadedAudio: Bool = switch self.downloadedAudio {
-            case .keep:
-                true
-            case .delete:
-                false
-            case .appDefault:
-                defaults.object(forKey: UserDefaultsAppRuntimePreferences.saveTranscriptionAudioKey) as? Bool ?? true
-            }
+            let configuredShouldKeepDownloadedAudio: Bool =
+                switch self.downloadedAudio {
+                case .keep:
+                    true
+                case .delete:
+                    false
+                case .appDefault:
+                    defaults.object(forKey: UserDefaultsAppRuntimePreferences.saveTranscriptionAudioKey) as? Bool
+                        ?? true
+                }
             let shouldKeepDownloadedAudio = self.noHistory ? false : configuredShouldKeepDownloadedAudio
             let sttTranscriber: STTTranscribing
             switch speechEngine.engine {
@@ -728,7 +791,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
                 runResult: runResult,
                 restoreResult: restoreResult,
                 warnOnIgnoredRestoreFailure: { error in
-                    printErr("Warning: failed to restore stdout after transcribe failure: \(error.localizedDescription)")
+                    printErr(
+                        "Warning: failed to restore stdout after transcribe failure: \(error.localizedDescription)")
                 }
             )
             try await emitStdout(emission)
@@ -943,7 +1007,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
     }
 
     static func prepareOutputDir(_ outputDir: String?) throws -> URL {
-        let dir = outputDir.map { URL(fileURLWithPath: expandTilde($0), isDirectory: true) }
+        let dir =
+            outputDir.map { URL(fileURLWithPath: expandTilde($0), isDirectory: true) }
             ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
@@ -1056,8 +1121,9 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         lines.append("")
 
         if let words = t.wordTimestamps, !words.isEmpty,
-           let speakers = t.speakers, !speakers.isEmpty,
-           words.contains(where: { $0.speakerId != nil }) {
+            let speakers = t.speakers, !speakers.isEmpty,
+            words.contains(where: { $0.speakerId != nil })
+        {
             let speakerMap = speakerLabelMap(speakers)
             var lastSpeakerId: String?
             var current = ""
@@ -1091,7 +1157,8 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         let checkoutURLString =
             (Bundle.main.object(forInfoDictionaryKey: "MacParakeetCheckoutURL") as? String)
             ?? ProcessInfo.processInfo.environment["MACPARAKEET_CHECKOUT_URL"]
-        let checkoutURL = checkoutURLString
+        let checkoutURL =
+            checkoutURLString
             .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .flatMap { $0.isEmpty ? nil : $0 }
             .flatMap(URL.init(string:))
@@ -1108,7 +1175,7 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         }()
 
         let config = LicensingConfig(checkoutURL: checkoutURL, expectedVariantID: expectedVariantID)
-        let serviceName = Bundle.main.bundleIdentifier ?? "com.macparakeet"
+        let serviceName = LiveAppIdentity.keychainService("licensing")
         let store = KeychainKeyValueStore(service: serviceName)
         return EntitlementsService(config: config, store: store, api: LemonSqueezyLicenseAPI())
     }
@@ -1125,8 +1192,9 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
         guard !noHistory, format == .text || format == .transcript else { return }
         printErr("")
         printErr("Saved to your library (id \(t.id.uuidString)).")
-        printErr("Turn it into a file: macparakeet-cli export \(t.id.uuidString) --format vtt"
-            + "   (or srt, dapt, txt, markdown, json)")
+        printErr(
+            "Turn it into a file: macparakeet-cli export \(t.id.uuidString) --format vtt"
+                + "   (or srt, dapt, txt, markdown, json)")
     }
 
     private func printText(_ t: Transcription) {
@@ -1145,8 +1213,9 @@ struct TranscribeCommand: AsyncParsableCommand, CLITelemetryMetadataProviding {
 
         // Show transcript with speaker labels at turn changes when available
         if let words = t.wordTimestamps, !words.isEmpty,
-           let speakers = t.speakers, !speakers.isEmpty,
-           words.contains(where: { $0.speakerId != nil }) {
+            let speakers = t.speakers, !speakers.isEmpty,
+            words.contains(where: { $0.speakerId != nil })
+        {
             let speakerMap = Self.speakerLabelMap(speakers)
             var lastSpeakerId: String? = nil
             for w in words {
@@ -1204,7 +1273,8 @@ enum CLIError: Error, LocalizedError {
         case .fileNotFound(let path):
             return "File not found: \(path)"
         case .unsupportedFormat(let ext):
-            return "Unsupported format: .\(ext). Supported: \(AudioFileConverter.supportedExtensions.sorted().joined(separator: ", "))"
+            return
+                "Unsupported format: .\(ext). Supported: \(AudioFileConverter.supportedExtensions.sorted().joined(separator: ", "))"
         }
     }
 }

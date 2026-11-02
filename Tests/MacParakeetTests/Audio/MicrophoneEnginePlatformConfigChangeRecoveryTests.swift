@@ -303,15 +303,17 @@ final class MicrophoneEnginePlatformConfigChangeRecoveryTests: XCTestCase {
                 let live = engine.inputNode.outputFormat(forBus: 0)
                 let differentRate = live.sampleRate == 16_000 ? 48_000.0 : 16_000.0
                 let channels = live.channelCount == 0 ? 1 : live.channelCount
-                guard
-                    let format = AVAudioFormat(
+                let format = try XCTUnwrap(
+                    AVAudioFormat(
                         standardFormatWithSampleRate: differentRate,
                         channels: channels
                     ),
-                    let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32)
-                else { return }
+                    "Could not construct changed format: live_rate=\(live.sampleRate), live_channels=\(live.channelCount)"
+                )
+                let buffer = try XCTUnwrap(
+                    AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32), "Could not allocate changed-format PCM")
                 buffer.frameLength = 32
-                buffer.floatChannelData?[0][0] = 0.001
+                initializeRecoveryTestPCM(buffer, nonZero: true)
                 tapHandler(buffer, AVAudioTime(hostTime: 1))
             }
         )
@@ -1557,7 +1559,7 @@ private func makeLiveInputFormatBuffer(for engine: AVAudioEngine) -> AVAudioPCMB
     let format = engine.inputNode.outputFormat(forBus: 0)
     guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32) else { return nil }
     buffer.frameLength = 32
-    buffer.floatChannelData?[0][0] = 0.001
+    initializeRecoveryTestPCM(buffer, nonZero: true)
     return buffer
 }
 
@@ -1565,8 +1567,19 @@ private func makeRecoveryTestBuffer(nonZero: Bool = true) -> AVAudioPCMBuffer {
     let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1)!
     let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32)!
     buffer.frameLength = 32
+    initializeRecoveryTestPCM(buffer, nonZero: nonZero)
+    return buffer
+}
+
+/// PCM allocation does not promise zero-filled samples. The readiness gate
+/// inspects every exposed sample, so signal and silence fixtures must fully
+/// initialize all channels rather than rely on prior allocator contents.
+private func initializeRecoveryTestPCM(_ buffer: AVAudioPCMBuffer, nonZero: Bool) {
+    for audioBuffer in UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList) {
+        audioBuffer.mData?.initializeMemory(
+            as: UInt8.self, repeating: 0, count: Int(audioBuffer.mDataByteSize))
+    }
     if nonZero {
         buffer.floatChannelData?[0][0] = 0.001
     }
-    return buffer
 }

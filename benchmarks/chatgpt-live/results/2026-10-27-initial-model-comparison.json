@@ -1,0 +1,803 @@
+{
+  "notes" : [
+    "First sentence timing uses punctuation after 20 characters; inspect stored outputs for usefulness.",
+    "First-process requests are labeled cold; this does not reset the server's cache or OS network cache.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem" : "Version 26.5.1 (Build 25F80)",
+  "processorCount" : 10,
+  "summaries" : [
+    {
+      "condition" : "capability-probe-low",
+      "failures" : 0,
+      "medianCompletionMs" : 10070.384250022471,
+      "medianFirstSentenceMs" : 5933.788666734472,
+      "medianFirstTextMs" : 4487.025041598827,
+      "model" : "gpt-6-astra",
+      "p95CompletionMs" : 10070.384250022471,
+      "p95FirstSentenceMs" : 5933.788666734472,
+      "p95FirstTextMs" : 4487.025041598827,
+      "trials" : 1
+    },
+    {
+      "condition" : "capability-probe-minimal",
+      "failures" : 1,
+      "model" : "gpt-6-astra",
+      "trials" : 1
+    },
+    {
+      "condition" : "capability-probe-none",
+      "failures" : 1,
+      "model" : "gpt-6-astra",
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 7091.380208265036,
+      "medianFirstSentenceMs" : 4002.2366249468178,
+      "medianFirstTextMs" : 3077.498124912381,
+      "model" : "gpt-6-astra",
+      "p95CompletionMs" : 7899.488958297297,
+      "p95FirstSentenceMs" : 4468.804124975577,
+      "p95FirstTextMs" : 3284.9921248853207,
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 1,
+      "medianCompletionMs" : 7947.148708393797,
+      "medianFirstSentenceMs" : 4513.980166753754,
+      "medianFirstTextMs" : 3163.2446667645127,
+      "model" : "gpt-6-astra",
+      "p95CompletionMs" : 13664.602500153705,
+      "p95FirstSentenceMs" : 12196.568583371118,
+      "p95FirstTextMs" : 11606.798791792244,
+      "trials" : 5
+    },
+    {
+      "condition" : "capability-probe-none",
+      "failures" : 0,
+      "medianCompletionMs" : 2811.2939584534615,
+      "medianFirstSentenceMs" : 2553.5527917090803,
+      "medianFirstTextMs" : 2459.5389168243855,
+      "model" : "gpt-6-luna",
+      "p95CompletionMs" : 2811.2939584534615,
+      "p95FirstSentenceMs" : 2553.5527917090803,
+      "p95FirstTextMs" : 2459.5389168243855,
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 2939.2253749538213,
+      "medianFirstSentenceMs" : 2529.340375214815,
+      "medianFirstTextMs" : 2058.8287918362767,
+      "model" : "gpt-6-luna",
+      "p95CompletionMs" : 3747.8976666461676,
+      "p95FirstSentenceMs" : 3292.9412918165326,
+      "p95FirstTextMs" : 2999.5730416849256,
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 1,
+      "medianCompletionMs" : 2351.436625001952,
+      "medianFirstSentenceMs" : 1890.6901250593364,
+      "medianFirstTextMs" : 1458.6090417578816,
+      "model" : "gpt-6-luna",
+      "p95CompletionMs" : 2866.133708273992,
+      "p95FirstSentenceMs" : 2553.303124848753,
+      "p95FirstTextMs" : 2448.1447499711066,
+      "trials" : 5
+    },
+    {
+      "condition" : "capability-probe-none",
+      "failures" : 0,
+      "medianCompletionMs" : 2375.3167500253767,
+      "medianFirstSentenceMs" : 1958.6883750744164,
+      "medianFirstTextMs" : 1445.7754583563656,
+      "model" : "gpt-6-sol",
+      "p95CompletionMs" : 2375.3167500253767,
+      "p95FirstSentenceMs" : 1958.6883750744164,
+      "p95FirstTextMs" : 1445.7754583563656,
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 3583.262624917552,
+      "medianFirstSentenceMs" : 3246.3370417244732,
+      "medianFirstTextMs" : 2837.440541712567,
+      "model" : "gpt-6-sol",
+      "p95CompletionMs" : 3903.122666524723,
+      "p95FirstSentenceMs" : 3590.5064998660237,
+      "p95FirstTextMs" : 3193.922291509807,
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 0,
+      "medianCompletionMs" : 4030.1830417010933,
+      "medianFirstSentenceMs" : 3394.4884999655187,
+      "medianFirstTextMs" : 2875.617374898866,
+      "model" : "gpt-6-sol",
+      "p95CompletionMs" : 6476.930333301425,
+      "p95FirstSentenceMs" : 5715.849749976769,
+      "p95FirstTextMs" : 4902.832958148792,
+      "trials" : 5
+    },
+    {
+      "condition" : "capability-probe-low",
+      "failures" : 0,
+      "medianCompletionMs" : 8960.244458168745,
+      "medianFirstSentenceMs" : 5984.397083288059,
+      "medianFirstTextMs" : 4977.124458178878,
+      "model" : "gpt-6.1-sol",
+      "p95CompletionMs" : 8960.244458168745,
+      "p95FirstSentenceMs" : 5984.397083288059,
+      "p95FirstTextMs" : 4977.124458178878,
+      "trials" : 1
+    },
+    {
+      "condition" : "capability-probe-minimal",
+      "failures" : 1,
+      "model" : "gpt-6.1-sol",
+      "trials" : 1
+    },
+    {
+      "condition" : "first-inference-this-process-capability-probe-none",
+      "failures" : 1,
+      "model" : "gpt-6.1-sol",
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 6110.9917499125,
+      "medianFirstSentenceMs" : 4658.57541654259,
+      "medianFirstTextMs" : 3601.1246249545366,
+      "model" : "gpt-6.1-sol",
+      "p95CompletionMs" : 6382.799916667864,
+      "p95FirstSentenceMs" : 4851.058583240956,
+      "p95FirstTextMs" : 4041.7030416429043,
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 0,
+      "medianCompletionMs" : 6417.675791541114,
+      "medianFirstSentenceMs" : 4292.135499883443,
+      "medianFirstTextMs" : 3400.18945815973,
+      "model" : "gpt-6.1-sol",
+      "p95CompletionMs" : 7757.08704162389,
+      "p95FirstSentenceMs" : 5772.866750136018,
+      "p95FirstTextMs" : 5000.365250045434,
+      "trials" : 5
+    },
+    {
+      "condition" : "capability-probe-none",
+      "failures" : 0,
+      "medianCompletionMs" : 2599.7210417408496,
+      "medianFirstSentenceMs" : 2088.3539167698473,
+      "medianFirstTextMs" : 2048.6856251955032,
+      "model" : "gpt-6.1-terra",
+      "p95CompletionMs" : 2599.7210417408496,
+      "p95FirstSentenceMs" : 2088.3539167698473,
+      "p95FirstTextMs" : 2048.6856251955032,
+      "trials" : 1
+    },
+    {
+      "condition" : "warm-long-meeting",
+      "failures" : 0,
+      "medianCompletionMs" : 3501.21183344163,
+      "medianFirstSentenceMs" : 3087.308791698888,
+      "medianFirstTextMs" : 2702.6675001252443,
+      "model" : "gpt-6.1-terra",
+      "p95CompletionMs" : 3674.6053334791213,
+      "p95FirstSentenceMs" : 3116.145708365366,
+      "p95FirstTextMs" : 2950.275458395481,
+      "trials" : 5
+    },
+    {
+      "condition" : "warm-recent",
+      "failures" : 0,
+      "medianCompletionMs" : 3145.2516249846667,
+      "medianFirstSentenceMs" : 2470.3662917017937,
+      "medianFirstTextMs" : 1898.2543335296214,
+      "model" : "gpt-6.1-terra",
+      "p95CompletionMs" : 3503.217749996111,
+      "p95FirstSentenceMs" : 3014.2629998736084,
+      "p95FirstTextMs" : 2590.8807083033025,
+      "trials" : 5
+    }
+  ],
+  "timestamp" : "2026-10-28T02:42:45Z",
+  "trials" : [
+    {
+      "completed" : false,
+      "completionMs" : 640.3979999013245,
+      "condition" : "first-inference-this-process-capability-probe-none",
+      "error" : "ChatGPT request failed (HTTP 400, unsupported_value).",
+      "model" : "gpt-6.1-sol",
+      "output" : "",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : false,
+      "completionMs" : 730.8806665241718,
+      "condition" : "capability-probe-minimal",
+      "error" : "ChatGPT request failed (HTTP 400, unsupported_value).",
+      "model" : "gpt-6.1-sol",
+      "output" : "",
+      "reasoningEffort" : "minimal"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 8960.244458168745,
+      "condition" : "capability-probe-low",
+      "firstSentenceMs" : 5984.397083288059,
+      "firstTextMs" : 4977.124458178878,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the timeline at risk, but we can use that time to prepare without connecting the account.”\n\n- We’d need to confirm whether the six-week pilot starts before or after security approval to assess the impact.\n- In the meantime, we can propose aligning on the response-time baseline, how we’ll measure the 20% reduction, and how we’ll assess quality; any eventual integration remains read-only, with no production rollout approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6417.675791541114,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 4250.328999944031,
+      "firstTextMs" : 3297.9689999483526,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could affect the pilot timeline, but we can use that time to prepare without connecting to the test account.”\n\n- We haven’t confirmed the pilot start date, so I can’t yet say whether the review would shorten the six-week pilot or shift its start.\n- In the meantime, we can align on how to measure the 20% reduction in median response time and define the quality criteria; integration remains read-only, and no production rollout is approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7387.641708133742,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 5233.422708231956,
+      "firstTextMs" : 4338.979416526854,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the pilot timeline at risk, but we can use that time to prepare without connecting the test account.”\n\n- Confirm the baseline and measurement plan for the 20% median response-time reduction, and agree on how we’ll verify quality is maintained.\n- Clarify whether the six weeks includes security review or starts after approval; that timing isn’t yet specified. The integration remains read-only, and no production rollout is approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7757.08704162389,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 5772.866750136018,
+      "firstTextMs" : 5000.365250045434,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the timeline at risk, but we can use that time to prepare the pilot without connecting the test account.”\n\n- Confirm the response-time baseline and how we’ll measure the 20% reduction while maintaining quality.\n- Clarify whether the six weeks includes security review or starts after approval; that timing isn’t yet defined. Integration will remain read-only, and no production rollout is approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 5436.543416697532,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 3508.412333438173,
+      "firstTextMs" : 2777.487458428368,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the pilot timeline at risk, but we can use that time to prepare without connecting the test account.”\n\n- Confirm the review requirements and plan the read-only integration; we won’t connect until security review is complete.\n- Agree how we’ll measure the 20% reduction in median response time and define the quality criteria. We still need to confirm whether the six weeks includes the review; no production rollout is approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6263.696041656658,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 4292.135499883443,
+      "firstTextMs" : 3400.18945815973,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the timeline at risk, but we can use that time to prepare the pilot without connecting the test account.”\n\n- Confirm whether the six-week pilot starts before or after security approval; that timing isn’t specified yet.\n- In the meantime, agree on the response-time baseline and quality measures, and prepare for a read-only integration once security clears it—without any production rollout.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 4664.664458250627,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3230.1158749032766,
+      "firstTextMs" : 2450.539000099525,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the six-week pilot timeline at risk, but we could use that time for offline workflow mapping if you approve use of your data export.”\n\n- “We won’t connect the test account until the security review is complete; integration will be read-only.”\n- “We haven’t established whether the six weeks includes the review period, so that’s something to clarify at Friday’s decision, along with the pending budget.”",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6112.5164167024195,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 4669.953583274037,
+      "firstTextMs" : 4009.02433344163,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the pilot timeline at risk, but we could use the meantime for offline workflow mapping with your data export, if you approve.”\n\n- We won’t connect the test account before the security review; integration will be read-only.\n- The schedule impact isn’t confirmed because the pilot start date hasn’t been specified; Friday’s decision is an opportunity to clarify timing.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6382.799916667864,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 4851.058583240956,
+      "firstTextMs" : 4041.7030416429043,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the six-week pilot timeline at risk; in the meantime, we could map workflows offline using your data export, subject to your approval.”\n\n- “We won’t connect the read-only integration until the security review is complete.”\n- “At Friday’s decision, we can assess the timeline against our target: 20% lower median response time with no quality regression.”",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6110.9917499125,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 4658.57541654259,
+      "firstTextMs" : 3601.1246249545366,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the six-week pilot timeline at risk; in the meantime, we could map workflows offline using your data export, subject to your approval.”\n\n- We won’t connect the test account until the security review is complete; integration will be read-only.\n- The schedule impact isn’t confirmed. At Friday’s decision, we can assess timing against the target of 20% lower median response time with no quality regression.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 5013.49866669625,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3567.5978334620595,
+      "firstTextMs" : 3019.1433751024306,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the six-week pilot timeline at risk, but we could use that time for offline workflow mapping if you approve use of your data export.”\n\n- We won’t connect the test account until the security review is complete; the integration will be read-only.\n- We don’t yet have a confirmed security timeline. At Friday’s decision, we can assess the impact against the target of 20% lower median response time with no quality regression.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : false,
+      "completionMs" : 875.9374583605677,
+      "condition" : "capability-probe-none",
+      "error" : "ChatGPT request failed (HTTP 400, unsupported_value).",
+      "model" : "gpt-6-astra",
+      "output" : "",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : false,
+      "completionMs" : 818.9759999513626,
+      "condition" : "capability-probe-minimal",
+      "error" : "ChatGPT request failed (HTTP 400, unsupported_value).",
+      "model" : "gpt-6-astra",
+      "output" : "",
+      "reasoningEffort" : "minimal"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 10070.384250022471,
+      "condition" : "capability-probe-low",
+      "firstSentenceMs" : 5933.788666734472,
+      "firstTextMs" : 4487.025041598827,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the six-week pilot at risk; I’d confirm the timing and use the meantime to prepare without connecting.”\n\n- We haven’t established whether the six weeks includes security review, so the schedule impact is still unclear.\n- While waiting, I’d propose agreeing on the response-time baseline and quality measures for the 20% improvement target; connection would remain read-only and wait for security review, with no production rollout approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7238.532291725278,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 3371.3351250626147,
+      "firstTextMs" : 2077.603083336726,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the timing at risk, but we’d use that time to prepare without connecting the account.”\n\n- We haven’t confirmed whether the six-week clock starts before or after security approval, so I’d clarify that before committing to a schedule.\n- In the meantime, I’d propose aligning on the response-time baseline and how we’ll measure quality, so we’re ready to assess the 20% improvement target; the integration remains read-only, with no production rollout approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7947.148708393797,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 4513.980166753754,
+      "firstTextMs" : 3163.2446667645127,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the pilot timeline at risk, so I’d confirm the schedule and use the meantime to prepare without connecting.”\n\n- We haven’t established whether the six weeks includes security review; we need approval before connecting the test account, even though integration is read-only.\n- While waiting, I’d propose agreeing on the response-time baseline, how we’ll measure the 20% reduction, and how we’ll check that quality is maintained. No production rollout is approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : false,
+      "completionMs" : 2208.5928332526237,
+      "condition" : "warm-recent",
+      "error" : "ChatGPT could not complete the response (server_is_overloaded).",
+      "model" : "gpt-6-astra",
+      "output" : "",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 8057.2155001573265,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 6054.6111250296235,
+      "firstTextMs" : 3329.0565833449364,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the timing at risk, but we don’t yet have enough schedule detail to know; meanwhile, I’d propose aligning on measurement and preparing the pilot without connecting.”\n\n- Confirm how we’ll measure the 20% reduction in median response time and what maintaining quality means.\n- Keep the connection gated on security approval and read-only; the proposal remains a six-week pilot, with no production rollout approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 13664.602500153705,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 12196.568583371118,
+      "firstTextMs" : 11606.798791792244,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the pilot timeline at risk, but we can use that time to prepare without connecting the test account.”\n\n- We haven’t established whether the six weeks includes security review, so we should confirm that before committing to dates.\n- Meanwhile, we can agree on the response-time baseline and quality measures for the 20% improvement target; integration stays read-only, and no production rollout is approved.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6459.8369165323675,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 4002.2366249468178,
+      "firstTextMs" : 3106.7002916242927,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the pilot timeline at risk; in the meantime, we could map workflows offline using your data export, subject to your approval.”\n\n- “We won’t connect the test account until the security review is complete, and integration will be read-only.”\n- “We haven’t established whether the six weeks includes the review period; Friday’s decision is an opportunity to clarify timing while keeping the target of 20% lower median response time with no quality regression.”",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6837.475541746244,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3150.2673749346286,
+      "firstTextMs" : 2020.795916672796,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put pressure on the six-week pilot, but we could use the meantime for offline workflow mapping if you approve the data export.”\n\n- “We won’t connect the test account before the security review; the integration will be read-only.”\n- “The schedule impact depends on the pilot start date, which isn’t specified yet; Friday’s decision is an opportunity to clarify timing against our target of 20% lower median response time with no quality regression.”",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7899.488958297297,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 4468.804124975577,
+      "firstTextMs" : 3077.498124912381,
+      "model" : "gpt-6-astra",
+      "output" : "“A two-week security review could put the six-week pilot timeline at risk, but we could use that time for offline workflow mapping if you approve the data export.”\n\n- “We won’t connect the test account before the security review; integration will be read-only.”\n- “We haven’t established how much schedule flexibility we have, so Friday’s decision should address timing against our target: 20% lower median response time with no quality regression.”",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7698.058374924585,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 4363.400416681543,
+      "firstTextMs" : 3284.9921248853207,
+      "model" : "gpt-6-astra",
+      "output" : "A two-week security review could put the pilot timeline at risk, but we could use the wait for offline workflow mapping if you approve the data export.\n\n- We won’t connect the test account before the security review; integration will be read-only.\n- The impact on the six-week pilot depends on its start date, which isn’t specified; Friday’s decision is an opportunity to clarify timing against the 20% response-time improvement target with no quality regression.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 7091.380208265036,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3809.608291601762,
+      "firstTextMs" : 2959.932583384216,
+      "model" : "gpt-6-astra",
+      "output" : "A two-week security review could put the six-week pilot timeline at risk, but we could use the wait for offline workflow mapping if you approve the data export.\n\n- We won’t connect the test account until the security review is complete; integration will be read-only.\n- We haven’t established how much delay the schedule can absorb, so Friday’s decision should address timing against the goal of 20% lower median response time with no quality regression.",
+      "reasoningEffort" : "low"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2599.7210417408496,
+      "condition" : "capability-probe-none",
+      "firstSentenceMs" : 2088.3539167698473,
+      "firstTextMs" : 2048.6856251955032,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the pilot at risk if it delays the start of the six-week period, but we don’t yet have enough scheduling detail to say for sure.\n\n- In the meantime, we can prepare for the read-only integration and align on how to measure the 20% reduction in median response time while maintaining quality.\n- We’ll complete the security review before connecting the test account; no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3145.2516249846667,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2280.953208450228,
+      "firstTextMs" : 1864.7042918018997,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the pilot at risk, but we don’t yet have enough information to say how it would affect the schedule.\n\n- We need the security review before connecting the test account; the integration would be read-only.\n- In the meantime, we can clarify the review timeline and plan how to measure the pilot’s goal: a 20% reduction in median response time while maintaining quality.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3503.217749996111,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 3014.2629998736084,
+      "firstTextMs" : 2590.8807083033025,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the six-week pilot at risk, depending on when the pilot starts, and we shouldn’t connect the test account until the review is complete.\n\n- The pilot start date isn’t specified, so we can’t yet say whether the review would affect its timeline.\n- In the meantime, we can clarify the security review requirements and plan how to measure a 20% reduction in median response time while maintaining quality. The proposed integration is read-only, and no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3217.374333413318,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2560.4496251326054,
+      "firstTextMs" : 2049.6634584851563,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the pilot at risk, but we don’t yet know the impact on the schedule; in the meantime, we can prepare without connecting the test account.\n\n- The review must happen before we connect, even though the integration is read-only.\n- We can use the time to align on measuring success: a 20% reduction in median response time while maintaining quality. Production rollout is not approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2731.631875038147,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2470.3662917017937,
+      "firstTextMs" : 1898.2543335296214,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the six-week pilot at risk, depending on when the pilot starts; in the meantime, we should complete the review before connecting the test account.\n\n- The pilot aims to reduce median response time by 20% while maintaining quality.\n- The proposed integration is read-only, and no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2585.993083193898,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2022.6644165813923,
+      "firstTextMs" : 1601.187541615218,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the six-week pilot at risk, depending on when the pilot clock starts, and we’d wait for the review before connecting the test account.\n\n- The pilot start date and whether security review time counts toward the six weeks haven’t been established.\n- In the meantime, we can align on the success criteria: reduce median response time by 20% while maintaining quality. The integration is read-only, and no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3674.6053334791213,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3087.308791698888,
+      "firstTextMs" : 2702.6675001252443,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could affect the pilot’s timing, but we can’t yet say whether it puts the pilot at risk.\n\n- We need the security review before connecting the test account, even for read-only integration; the pilot’s start date isn’t specified.\n- In the meantime, we could map workflows offline using your data export, subject to your approval.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3501.21183344163,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3095.5411666072905,
+      "firstTextMs" : 2950.275458395481,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could put the six-week pilot at risk, depending on when the pilot starts; that timing hasn’t been specified.\n\n- We can’t connect the test account until the security review is complete.\n- In the meantime, we could map workflows offline using your data export, subject to your approval.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3610.423333477229,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3116.145708365366,
+      "firstTextMs" : 2865.8630000427365,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could affect the pilot’s timing, though we haven’t established the schedule or whether it would put the pilot at risk.\n\n- We need the security review before connecting the test account; the integration would be read-only.\n- In the meantime, we could map workflows offline using your data export, if you approve its use.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2352.457624860108,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1932.1449582930654,
+      "firstTextMs" : 1408.6937915999442,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could affect the pilot’s timing, but I don’t yet have enough information to say whether it puts the pilot at risk.\n\n- We can’t connect the test account until the security review is complete.\n- In the meantime, we could map the workflow offline using your data export, subject to your approval.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3483.075416646898,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3035.6449999380857,
+      "firstTextMs" : 2494.0164166036993,
+      "model" : "gpt-6.1-terra",
+      "output" : "A two-week security review could affect the pilot’s timing, but we don’t yet know enough to say whether it would put the pilot at risk.\n\n- We can’t connect the test account until the security review is complete; the proposed integration is read-only.\n- In the meantime, we could map the workflow offline using your data export, subject to your approval.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2375.3167500253767,
+      "condition" : "capability-probe-none",
+      "firstSentenceMs" : 1958.6883750744164,
+      "firstTextMs" : 1445.7754583563656,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could put the six-week pilot at risk, so I’d use that time to prepare the pilot and agree on a start date once the review is complete.\n\n- We won’t connect the test account before security approval; the integration is read-only.\n- The pilot’s goal remains a 20% reduction in median response time while maintaining quality.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3733.8940831832588,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 3244.7934166993946,
+      "firstTextMs" : 2875.617374898866,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could put the six-week pilot at risk, so I’d confirm the timeline and use the meantime to prepare everything that doesn’t require access.\n\n- We won’t connect the test account until the security review is complete, even though the integration is read-only.\n- I’d keep the pilot focused on reducing median response time by 20% while maintaining quality; no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 4030.1830417010933,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 3394.4884999655187,
+      "firstTextMs" : 2697.078375145793,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could put the six-week pilot timeline at risk, so I’d use that time to prepare the pilot and confirm the schedule once the review is complete.\n\n- We won’t connect the test account before the security review, even though the integration is read-only.\n- The pilot will measure whether median response time drops by 20% while quality is maintained; no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 6476.930333301425,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 5715.849749976769,
+      "firstTextMs" : 4902.832958148792,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could put the six-week pilot at risk, so we’d use that time to prepare the pilot and confirm the schedule once the review is complete.\n\n- We would not connect the test account before security approval; the integration is read-only.\n- We’d keep the pilot focused on reducing median response time by 20% while maintaining quality.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 5310.181791661307,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 4848.193499958143,
+      "firstTextMs" : 4299.506000010297,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could put the six-week pilot at risk, so we’d use that time to prepare the pilot without connecting the test account.\n\n- We’d confirm how we’ll measure the 20% reduction in median response time while maintaining quality.\n- We won’t connect the read-only integration until the security review is complete; no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3197.1987083088607,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2658.7073751725256,
+      "firstTextMs" : 1913.7785418424755,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could put the six-week pilot timeline at risk, so we’d use that time to prepare the pilot and confirm whether the schedule needs to shift.\n\n- We won’t connect the test account until the security review is complete; the integration is read-only.\n- We can plan how to measure the 20% response-time reduction while maintaining quality. No production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3014.8299583233893,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 2518.798833247274,
+      "firstTextMs" : 2124.35383326374,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could affect the pilot schedule, but we can use that time for offline workflow mapping if you approve the data export.\n\n- We won’t connect the test account before the security review.\n- We’d need to confirm whether the six-week pilot timeline can still hold.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3517.9731668904424,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3246.3370417244732,
+      "firstTextMs" : 2843.089916743338,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could delay the connection, but we can use that time for offline workflow mapping if you approve the data export.\n\n- We won’t connect the test account before the security review.\n- The impact on the six-week pilot timeline isn’t clear yet; the next decision is Friday.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3762.441874947399,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3429.816999938339,
+      "firstTextMs" : 2621.6799998655915,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could affect the pilot timeline; we can use that time for offline workflow mapping if you approve a data export, but we won’t connect until the review is complete.\n\n- Friday’s decision is the next chance to assess the timeline.\n- The six-week pilot aims for 20% lower median response time with no quality regression.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3583.262624917552,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3225.2315001096576,
+      "firstTextMs" : 2837.440541712567,
+      "model" : "gpt-6-sol",
+      "output" : "A two-week security review could affect the pilot timeline, but we can use that time for offline workflow mapping if you approve the data export.\n\n- We won’t connect the test account before the security review.\n- We haven’t agreed on a revised pilot start date; the next decision is Friday.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3903.122666524723,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3590.5064998660237,
+      "firstTextMs" : 3193.922291509807,
+      "model" : "gpt-6-sol",
+      "output" : "Yes, a two-week security review could put the six-week pilot timeline at risk; we can use the meantime to map workflows offline if you approve use of the data export.\n\n- We won’t connect the test account until the security review is complete.\n- The next decision is Friday; no production rollout has been approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2811.2939584534615,
+      "condition" : "capability-probe-none",
+      "firstSentenceMs" : 2553.5527917090803,
+      "firstTextMs" : 2459.5389168243855,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review could put the six-week pilot at risk, depending on when it clears. In the meantime, we can use non-sensitive sample data to plan the workflow and success measures, without connecting to your account or touching production.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2531.8778750952333,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2028.432208346203,
+      "firstTextMs" : 1636.8162084836513,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review could put the pilot schedule at risk, depending on when it’s completed; we haven’t confirmed the pilot start date or review timeline. In the meantime, we can prepare the pilot plan and success measures, and review the test environment details without connecting to it. We’ll wait for security approval before any integration.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2866.133708273992,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 2553.303124848753,
+      "firstTextMs" : 2448.1447499711066,
+      "model" : "gpt-6-luna",
+      "output" : "Yes, a two-week security review could put the six-week pilot at risk, depending on when it’s completed. In the meantime, we can prepare the pilot plan and success measures, but we won’t connect the test account until security approves it.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 1801.2934583239257,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1422.5899165030569,
+      "firstTextMs" : 1177.0087082404643,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review wouldn’t automatically put the pilot at risk, but it would leave less time for the six-week pilot. In the meantime, we can prepare the pilot plan and success measures; we won’t connect the test account until security approves it.\n\n- We’ll track median response time against the 20% reduction target while maintaining quality.\n- The integration is read-only, and no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2351.436625001952,
+      "condition" : "warm-recent",
+      "firstSentenceMs" : 1890.6901250593364,
+      "firstTextMs" : 1458.6090417578816,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review wouldn’t necessarily put the pilot at risk, but it could delay the start; we’d use that time to prepare the pilot plan and success measures without connecting to the test account.\n\n- We’d only connect after security review, and the integration would be read-only.\n- We’d track the six-week pilot against the goal of reducing median response time by 20% while maintaining quality; no production rollout is approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : false,
+      "completionMs" : 5592.612500069663,
+      "condition" : "warm-recent",
+      "error" : "ChatGPT request failed (HTTP 503, subscription_sharing_user_unavailable).",
+      "model" : "gpt-6-luna",
+      "output" : "",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 3747.8976666461676,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 3292.9412918165326,
+      "firstTextMs" : 2999.5730416849256,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review could put the six-week pilot timeline at risk, so we should confirm the review schedule before committing to a start date.\n\nIn the meantime, we can map the workflow offline; using your data export would require your approval. The test account is expected next Monday, but we won’t connect it until security review is complete.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2939.2253749538213,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 2637.6843333709985,
+      "firstTextMs" : 2278.5324999131262,
+      "model" : "gpt-6-luna",
+      "output" : "Two weeks of security review could put the six-week pilot at risk, depending on when it starts and clears; we should confirm the timing at Friday’s decision. In the meantime, we can map the workflow offline, using your data export only if you approve it, and prepare the read-only setup without connecting the test account.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2179.323249962181,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1871.032375143841,
+      "firstTextMs" : 1530.949416803196,
+      "model" : "gpt-6-luna",
+      "output" : "A two-week security review could put the six-week pilot timeline at risk; meanwhile, we can map the workflow offline, and use your data export only if you approve it.\n\n- The test account is expected next Monday, but we won’t connect until the security review is complete.\n- The pilot start date and any timeline adjustment aren’t confirmed; we’ll revisit the plan at Friday’s decision point.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2090.554000111297,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 1737.5513333827257,
+      "firstTextMs" : 1541.2617500405759,
+      "model" : "gpt-6-luna",
+      "output" : "“It could put the six-week pilot timeline at risk, since we need the security review completed before connecting the test account. In the meantime, if you approve sharing the data export, we can use it for offline workflow mapping without connecting to your systems.”\n\nThe export is not yet approved, and no production rollout has been approved.",
+      "reasoningEffort" : "none"
+    },
+    {
+      "completed" : true,
+      "completionMs" : 2942.8403333295137,
+      "condition" : "warm-long-meeting",
+      "firstSentenceMs" : 2529.340375214815,
+      "firstTextMs" : 2058.8287918362767,
+      "model" : "gpt-6-luna",
+      "output" : "“Two weeks of security review could put the six-week pilot at risk, but we can use the time to map the workflow offline—without connecting the test account—if you approve the data export.”\n\n- We’d start the security review before any connection; the integration would remain read-only.\n- The pilot start date and export approval are not yet confirmed.",
+      "reasoningEffort" : "none"
+    }
+  ]
+}

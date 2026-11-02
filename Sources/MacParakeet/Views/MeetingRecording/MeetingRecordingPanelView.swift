@@ -17,6 +17,14 @@ struct MeetingRecordingPanelView: View {
         VStack(spacing: 0) {
             header
             Divider()
+            if viewModel.showsOrganizationControls || viewModel.organization != nil {
+                LiveMeetingOrganizationSlot(viewModel: viewModel.organization)
+                Divider()
+            }
+            if let preparation = viewModel.chatViewModel.generatedMeetingPreparation {
+                LivePreparedMeetingCard(preparation: preparation)
+                Divider()
+            }
             tabBar
             Divider()
             paneContent
@@ -52,6 +60,8 @@ struct MeetingRecordingPanelView: View {
                 viewModel: viewModel.chatViewModel,
                 quickPromptsViewModel: viewModel.quickPromptsViewModel
             )
+        case .board:
+            liveBoardContent
         }
     }
 
@@ -64,6 +74,7 @@ struct MeetingRecordingPanelView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.sm)
         .padding(.vertical, 4)
+        .accessibilityIdentifier("live-meeting-tabs")
     }
 
     private func tabButton(_ tab: MeetingRecordingPanelViewModel.LivePanelTab) -> some View {
@@ -73,6 +84,7 @@ struct MeetingRecordingPanelView: View {
             case .notes: return 1
             case .transcript: return 2
             case .ask: return 3
+            case .board: return 4
             }
         }()
         let shortcut = KeyEquivalent(Character("\(shortcutNumber)"))
@@ -121,6 +133,47 @@ struct MeetingRecordingPanelView: View {
         .accessibilityLabel(tab.title)
         .accessibilityAddTraits(isActive ? .isSelected : [])
         .accessibilityHint(isStreaming ? "Responding" : "Switches to the \(tab.title) tab")
+    }
+
+    private var liveBoardContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Decisions & follow-ups").font(.headline)
+                Spacer()
+                if viewModel.chatViewModel.isRefreshingLiveBoard {
+                    ProgressView().controlSize(.small)
+                }
+                Button("Refresh") { viewModel.chatViewModel.refreshLiveBoard() }
+                    .parakeetAction(.secondary)
+                    .disabled(
+                        viewModel.chatViewModel.isRefreshingLiveBoard || viewModel.chatViewModel.isStreaming
+                            || viewModel.isPaused)
+            }
+            Text("Checked with the three-minute updates. Ask always gets priority.")
+                .font(.caption).foregroundStyle(.secondary)
+            if let status = viewModel.chatViewModel.liveBoardSourceStatus {
+                Text(status).font(.caption).foregroundStyle(.secondary)
+            }
+            if viewModel.chatViewModel.liveBoardIsStale {
+                Text("The conversation or your notes have changed since this board was checked.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let error = viewModel.chatViewModel.liveBoardError {
+                Text(error).font(.caption).foregroundStyle(.secondary)
+            }
+            if let board = viewModel.chatViewModel.liveBoard {
+                MeetingEvidenceBoardView(snapshot: board)
+            } else {
+                Spacer()
+                Text(
+                    "Decisions, actions and open questions will appear here with their sources. You can refresh at any time."
+                )
+                .font(.callout).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                Spacer()
+            }
+        }
+        .padding(14)
     }
 
     private func tabTooltip(title: String, badge: String?, isStreaming: Bool, shortcut: String) -> String {

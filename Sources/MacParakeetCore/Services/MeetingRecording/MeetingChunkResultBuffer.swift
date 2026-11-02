@@ -1,7 +1,7 @@
 import Foundation
 
 struct MeetingChunkResultBuffer {
-    typealias ChunkResult = (chunk: AudioChunker.AudioChunk, result: STTResult)
+    typealias ChunkResult = (sequence: Int, chunk: AudioChunker.AudioChunk, result: STTResult)
 
     private var nextExpectedSequence: [AudioSource: Int] = [:]
     private var bufferedResults: [AudioSource: [Int: ChunkResult]] = [:]
@@ -19,7 +19,7 @@ struct MeetingChunkResultBuffer {
         chunk: AudioChunker.AudioChunk,
         result: STTResult
     ) -> [ChunkResult] {
-        bufferedResults[source, default: [:]][sequence] = (chunk, result)
+        bufferedResults[source, default: [:]][sequence] = (sequence, chunk, result)
         return drain(source: source)
     }
 

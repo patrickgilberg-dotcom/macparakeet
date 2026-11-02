@@ -41,6 +41,9 @@ public struct MeetingCaptureFailureSignal: Sendable, Equatable {
 }
 
 public protocol MeetingRecordingServiceProtocol: Sendable {
+    /// Flush the current live-preview tail without stopping durable capture.
+    /// Returns only after all preview work captured by the barrier has settled.
+    func prepareLiveAnswerTranscript() async throws -> MeetingTranscriptUpdate?
     /// `title` lets callers (e.g., the calendar auto-start path) pre-name
     /// the recording. `nil` or whitespace-only falls back to the default
     /// "Meeting <date>" label.
@@ -74,6 +77,9 @@ public protocol MeetingRecordingServiceProtocol: Sendable {
     /// (completion-path deletion is owned by `MeetingRecordingSettlement`) —
     /// so notes-saves cannot race with state-transition writes.
     func updateNotes(_ notes: String) async
+    /// Session/revision-bound durable live chat. Production writes through this
+    /// actor's lock mirror so chat, notes and capture-state updates cannot clobber.
+    func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws
     /// Persist the active recording's primary type to its crash-recovery lock.
     func updateMeetingType(_ meetingTypeId: UUID?) async
     var isRecording: Bool { get async }
@@ -102,6 +108,10 @@ public protocol MeetingRecordingServiceProtocol: Sendable {
 }
 
 public extension MeetingRecordingServiceProtocol {
+    func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws {
+        throw MeetingLiveChatPersistenceError.storageUnavailable
+    }
+    func prepareLiveAnswerTranscript() async throws -> MeetingTranscriptUpdate? { nil }
     func captureDiagnostics(for sessionID: UUID) async -> MeetingCaptureDiagnostics? { nil }
 
     func updateMeetingType(_ meetingTypeId: UUID?) async {}
@@ -157,6 +167,117 @@ typealias MeetingCleanedMicrophoneReadinessScheduling =
     ) -> MeetingCleanedMicrophoneReadiness
 
 public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
+    public enum LiveAnswerTranscriptError: LocalizedError, Sendable {
+        case unavailable
+        case catchingUp
+        case sessionChanged
+
+        public var errorDescription: String? {
+            switch self {
+            case .unavailable:
+                return
+                    "Live transcription is unavailable. Enable live transcription before asking about the latest spoken question."
+            case .catchingUp:
+                return "The latest audio could not be transcribed in time. Try again when the transcript catches up."
+            case .sessionChanged: return "The meeting changed or stopped while preparing this answer."
+            }
+        }
+    }
+
+    private var liveAnswerFlushInProgress = false
+    private var liveAnswerPreviewBarrierActive = false
+    private var livePreviewFreshness = LivePreviewFreshness()
+
+    public func prepareLiveAnswerTranscript() async throws -> MeetingTranscriptUpdate? {
+        guard let session = currentSession, session.supportsLiveChunkTranscription,
+            !captureFailed
+        else { throw LiveAnswerTranscriptError.unavailable }
+        guard !liveAnswerFlushInProgress else { throw LiveAnswerTranscriptError.catchingUp }
+        liveAnswerFlushInProgress = true
+        defer {
+            liveAnswerFlushInProgress = false
+            liveAnswerPreviewBarrierActive = false
+            if !previewIngress.isEmpty { startPreviewDrainIfNeeded() }
+        }
+        let startedAt = ContinuousClock.now
+        let timeout: Duration = .seconds(8)
+        let failures = captureHealthMetrics.transcriptionFailures + captureHealthMetrics.backpressureDrops
+        let ingressDrops = previewIngress.droppedBatchCount
+        let requestedHostTime = audioHostTimeNow()
+        let activeSources = [AudioSource.microphone, .system].filter {
+            sourceStartupStates[$0] == .ready
+                && !interruptedSources.contains($0)
+        }
+
+        // Let continuous capture deliver the block crossing the hotkey's host
+        // timestamp before flushing. A preview-only barrier cannot see audio
+        // still queued in the capture stream. Paused capture has no pending words.
+        while !paused
+            && activeSources.contains(where: {
+                (sourceCaptureMetrics[$0]?.lastHostTime ?? 0) < requestedHostTime
+            })
+        {
+            try Task.checkCancellation()
+            guard startedAt.duration(to: .now) < timeout else { throw LiveAnswerTranscriptError.catchingUp }
+            guard currentSession?.id == session.id, settlementSessionID == nil else {
+                throw LiveAnswerTranscriptError.sessionChanged
+            }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        // Do not stop capture, touch the durable writer or reset sample counters.
+        // A deadline leaves recording intact and declines to answer stale context.
+        while previewDrainActive || !previewIngress.isEmpty {
+            try Task.checkCancellation()
+            guard startedAt.duration(to: .now) < timeout else { throw LiveAnswerTranscriptError.catchingUp }
+            guard currentSession?.id == session.id, settlementSessionID == nil else {
+                throw LiveAnswerTranscriptError.sessionChanged
+            }
+            if !previewDrainActive { startPreviewDrainIfNeeded() }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        // The VAD chunker is reentrant across awaits and requires one caller.
+        // Pause only preview ingest while the explicit flush owns it; durable
+        // capture continues and new preview samples queue behind this barrier.
+        liveAnswerPreviewBarrierActive = true
+        let pairs = await captureOrchestrator.flushPendingPairs(micConditioner: micConditioner)
+        guard currentSession?.id == session.id, settlementSessionID == nil else {
+            throw LiveAnswerTranscriptError.sessionChanged
+        }
+        await handleCaptureOrchestratorOutput(pairs, flushed: true)
+        let chunks = await captureOrchestrator.flushChunkersForLiveAnswer()
+        guard currentSession?.id == session.id, settlementSessionID == nil else {
+            throw LiveAnswerTranscriptError.sessionChanged
+        }
+        await handleCaptureOrchestratorOutput(CaptureOrchestratorOutput(chunks: chunks), flushed: true)
+        liveAnswerPreviewBarrierActive = false
+        if !previewIngress.isEmpty { startPreviewDrainIfNeeded() }
+        let remaining = timeout - startedAt.duration(to: .now)
+        guard remaining > .zero,
+            try await liveChunkTranscriber.waitForCurrentTasksToDrain(timeout: remaining)
+        else {
+            throw LiveAnswerTranscriptError.catchingUp
+        }
+        try Task.checkCancellation()
+        guard currentSession?.id == session.id, settlementSessionID == nil else {
+            throw LiveAnswerTranscriptError.sessionChanged
+        }
+        guard failures == captureHealthMetrics.transcriptionFailures + captureHealthMetrics.backpressureDrops,
+            ingressDrops == previewIngress.droppedBatchCount,
+            livePreviewFreshness.canAnswerLatestQuestion
+        else {
+            throw LiveAnswerTranscriptError.catchingUp
+        }
+        AudioCaptureDiagnostics.appendAsync(
+            "meeting_live_answer_flush elapsed_ms=\(String(format: "%.1f", LiveAnswerTiming.milliseconds(startedAt.duration(to: .now)))) outcome=ready"
+        )
+        let update = transcriptAssembler.currentUpdate
+        return MeetingTranscriptUpdate(
+            words: update.words, speakers: update.speakers,
+            isTranscriptionLagging: update.isTranscriptionLagging,
+            hasEarlierPreviewGap: livePreviewFreshness.hasEarlierGap
+        )
+    }
     private struct SourceCaptureMetrics: Sendable {
         var firstHostTime: UInt64?
         var lastHostTime: UInt64?
@@ -188,6 +309,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     private struct Session: Sendable {
         let id: UUID
         let displayName: String
+        let titleOverride: String?
         let startedAt: Date
         let folderURL: URL
         let chunkFolderURL: URL
@@ -291,6 +413,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     /// typed (which we preserve as `nil` rather than empty so downstream
     /// `Transcription.userNotes` is `nil` for non-notepad recordings).
     private var currentNotes: String?
+    private var stoppedLiveChatCheckpoint: (id: UUID, folderURL: URL)?
     private var currentMeetingTypeId: UUID?
     /// In-memory mirror of the session's `recording.lock` content. Held so
     /// `updateNotes` can persist notes by mutating + atomic-writing in one
@@ -701,9 +824,12 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
             liveCapabilities: liveSpeechEngineCapabilities,
             liveTranscriptionEnabled: isLiveTranscriptionEnabled()
         )
+        let titleOverride = Transcription.protectedTitleOverride(
+            from: title, calendarEventSnapshot: calendarEventSnapshot)
         let session = Session(
             id: sessionID,
-            displayName: Self.resolveDisplayName(title: title, fallbackDate: now),
+            displayName: titleOverride ?? Self.resolveDisplayName(title: nil, fallbackDate: now),
+            titleOverride: titleOverride,
             startedAt: now,
             folderURL: folderURL,
             chunkFolderURL: chunkFolderURL,
@@ -727,10 +853,12 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
                 speechEngine: session.speechPlan.final,
                 startContext: session.startContext,
                 calendarEventSnapshot: session.calendarEventSnapshot,
+                titleOverride: session.titleOverride,
                 folderURL: session.folderURL
             )
             try lockFileStore.write(initialLock, folderURL: session.folderURL)
             currentLockFile = initialLock
+            stoppedLiveChatCheckpoint = nil
 
             let events = await audioCaptureService.events
             try await validateStartStillCurrent(session)
@@ -741,6 +869,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
             micConditioner = micConditionerFactory()
             micConditioner.reset()
             transcriptAssembler.reset()
+            livePreviewFreshness = LivePreviewFreshness()
             isTranscriptionLagging = false
             captureFailed = false
             captureFailureSignaledSessionIDs.remove(session.id)
@@ -1211,6 +1340,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
                 speechEngine: session.speechPlan.final,
                 startContext: session.startContext,
                 calendarEventSnapshot: session.calendarEventSnapshot,
+                titleOverride: session.titleOverride,
                 folderURL: session.folderURL
             ))
             .withNotes(finalNotes)
@@ -1263,7 +1393,8 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
             startContext: session.startContext,
             userNotes: finalNotes,
             calendarEventSnapshot: session.calendarEventSnapshot,
-            meetingTypeId: finalMeetingTypeId
+            meetingTypeId: finalMeetingTypeId,
+            titleOverride: session.titleOverride
         )
 
         let cleanupStartedAt = Date()
@@ -1292,8 +1423,42 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
         AudioCaptureDiagnostics.append(
             echoSuppressionSummaryLine(session: session)
         )
+        stoppedLiveChatCheckpoint = (session.id, session.folderURL)
         cleanupState()
         return output
+    }
+
+    public func updateLiveChat(_ snapshot: MeetingLiveChatSnapshot) async throws {
+        let current: MeetingRecordingLockFile
+        let folder: URL
+        if let session = currentSession {
+            guard session.id == snapshot.recordingID, let lock = currentLockFile,
+                lock.sessionId == snapshot.recordingID
+            else { throw MeetingLiveChatPersistenceError.recordingChanged }
+            current = lock
+            folder = session.folderURL
+        } else {
+            // End always stops audio, even if a checkpoint failed. Permit an
+            // explicit local-save retry only while our stopped lock still
+            // exists and no replacement session/recovery has taken ownership.
+            guard let stopped = stoppedLiveChatCheckpoint, stopped.id == snapshot.recordingID else {
+                throw MeetingLiveChatPersistenceError.recordingChanged
+            }
+            try lockFileStore.updateLiveChatIfOwnedAwaiting(
+                snapshot, folderURL: stopped.folderURL, ownerPID: ProcessInfo.processInfo.processIdentifier)
+            return
+        }
+        guard snapshot.isValid else { throw MeetingLiveChatPersistenceError.invalidSnapshot }
+        if let previous = current.liveChat {
+            guard snapshot.revision >= previous.revision else { throw MeetingLiveChatPersistenceError.outdatedSnapshot }
+            if snapshot.revision == previous.revision {
+                guard snapshot == previous else { throw MeetingLiveChatPersistenceError.outdatedSnapshot }
+                return
+            }
+        }
+        let updated = current.withLiveChat(snapshot)
+        try lockFileStore.write(updated, folderURL: folder)
+        currentLockFile = updated
     }
 
     public func updateNotes(_ notes: String) async {
@@ -1840,6 +2005,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     /// A refused preview copy is already in the source file. Tell the panel
     /// once per drop streak so a stalled live transcript does not look current.
     private func notePreviewIngressDrop(source: AudioSource) {
+        livePreviewFreshness.recordIngressLoss(source: source)
         if previewIngress.droppedBatchCount == 1 || previewIngress.droppedBatchCount.isMultiple(of: 50) {
             AudioCaptureDiagnostics.append(
                 "meeting_preview_ingress_dropped session=\(currentSession?.id.uuidString ?? "nil") source=\(source.rawValue) dropped_batches=\(previewIngress.droppedBatchCount) dropped_bytes=\(previewIngress.droppedBytes) retained_bytes=\(previewIngress.retainedBytes)"
@@ -1855,7 +2021,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     }
 
     private func startPreviewDrainIfNeeded() {
-        guard !previewDrainActive else { return }
+        guard !previewDrainActive, !liveAnswerPreviewBarrierActive else { return }
         previewDrainActive = true
         // Detached so Stop's capture-drain timeout cannot cancel preview work
         // that already has a durable copy. `finishPreviewIngress` waits for it.
@@ -1881,6 +2047,22 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
                 hostTime: batch.hostTime
             )
         }
+        // Empty ingress does not mean empty chunkers: they can still retain
+        // pre-gap speech below their normal emission threshold. Retire that
+        // speech before fixing the frontier, so a later Ask cannot assign it a
+        // fresh sequence and falsely clear the loss. This drain remains the
+        // single preview caller; native capture keeps writing and queuing.
+        if !livePreviewFreshness.pendingIngressMarkers.isEmpty {
+            let pairs = await captureOrchestrator.flushPendingPairs(micConditioner: micConditioner)
+            await handleCaptureOrchestratorOutput(pairs, flushed: true)
+            let tails = await captureOrchestrator.flushChunkersForLiveAnswer()
+            await handleCaptureOrchestratorOutput(CaptureOrchestratorOutput(chunks: tails), flushed: true)
+        }
+        // Already-enqueued and chunker-held speech is now behind this frontier.
+        for (source, revision) in livePreviewFreshness.pendingIngressMarkers {
+            await liveChunkTranscriber.markPreviewLoss(source: source)
+            livePreviewFreshness.acknowledgeIngressFrontier(source: source, revision: revision)
+        }
         previewDrainActive = false
         previewDrainTask = nil
         if !previewIngress.isEmpty {
@@ -1892,6 +2074,9 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
     /// and then deleted, so drop it. The batch already in flight has left the
     /// queue; wait for that one so it cannot touch the next session.
     private func discardPreviewIngress() async {
+        while liveAnswerPreviewBarrierActive {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         let droppedBefore = previewIngress.droppedBatchCount
         previewIngress.discardPending()
         if previewIngress.droppedBatchCount != droppedBefore {
@@ -1910,12 +2095,20 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
         previewIngress.retainedBytes
     }
 
+    /// Observation seam for deterministic preview-loss/catch-up checks.
+    func liveAnswerPreviewLossIsUnresolved() -> Bool {
+        !livePreviewFreshness.canAnswerLatestQuestion
+    }
+
     /// After the capture stream has been fully written, finish the preview
     /// tail when it is small. A large backlog is preview-only debt; dropping
     /// it keeps Stop from replaying that debt through VAD. The byte cap is
     /// the bound: Stop waits out at most that tail plus the one in-flight
     /// batch, and it waits so the drain is idle before the next session.
     private func finishPreviewIngress() async {
+        while liveAnswerPreviewBarrierActive {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         if previewIngress.retainedBytes > MeetingPreviewIngressQueue.stopDrainByteLimit {
             let droppedBefore = previewIngress.droppedBatchCount
             previewIngress.discardPending()
@@ -2008,12 +2201,24 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
         switch event {
         case .orderedResults(let readyResults):
             for ready in readyResults {
+                let hasSpeech =
+                    LiveAnswerTiming.containsMeaningfulText(ready.result.text)
+                    || ready.result.words.contains { LiveAnswerTiming.containsMeaningfulText($0.word) }
+                livePreviewFreshness.receive(
+                    source: ready.source, enqueueSequence: ready.enqueueSequence, hasSpeech: hasSpeech
+                )
                 let update = transcriptAssembler.apply(
                     result: ready.result,
                     chunk: ready.chunk,
                     source: ready.source
                 )
                 yieldTranscriptUpdate(update)
+                if let session = currentSession {
+                    let timelineMs = activeRecordingSeconds(startedAt: session.startedAt, asOf: wallClockNow()) * 1_000
+                    AudioCaptureDiagnostics.appendAsync(
+                        "meeting_transcript_committed source=\(ready.source.rawValue) audio_end_ms=\(ready.chunk.endMs) preview_audio_end_age_ms=\(String(format: "%.1f", max(0, timelineMs - Double(ready.chunk.endMs)))) clock=active_recording_timeline"
+                    )
+                }
             }
         case .backpressureDrop:
             captureHealthMetrics.backpressureDrops += 1
@@ -2022,6 +2227,8 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
         case .transcriptionFailed(let message):
             captureHealthMetrics.transcriptionFailures += 1
             logger.error("Meeting chunk transcription failed: \(message, privacy: .public)")
+        case .previewLoss(let source, let nextEnqueueSequence):
+            livePreviewFreshness.recordLoss(source: source, nextEnqueueSequence: nextEnqueueSequence)
         }
     }
 
@@ -2642,6 +2849,7 @@ public actor MeetingRecordingService: MeetingRecordingServiceProtocol {
         syncLagWarningActive = false
         lastLoggedSyncLagBucketMs = nil
         transcriptAssembler.reset()
+        livePreviewFreshness = LivePreviewFreshness()
         previewIngress = MeetingPreviewIngressQueue(
             maxRetainedBytes: previewIngressMaxRetainedBytes
         )

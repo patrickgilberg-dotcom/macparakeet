@@ -1,5 +1,6 @@
 import Foundation
 import Sparkle
+import MacParakeetCore
 
 /// Gates Sparkle update checks against two conditions where letting an update
 /// proceed would lose user data or be wrong:
@@ -27,6 +28,7 @@ import Sparkle
 @MainActor
 final class SparkleUpdateGuard: NSObject {
     enum BlockReason: Equatable {
+        case personalFork
         case devBuild(version: String?)
         case meetingRecordingActive
     }
@@ -51,7 +53,10 @@ final class SparkleUpdateGuard: NSObject {
         return false
     }
 
-    static func blockReason(appVersion: String?, isMeetingRecordingActive: Bool) -> BlockReason? {
+    static func blockReason(
+        appVersion: String?, isMeetingRecordingActive: Bool, upstreamUpdatesEnabled: Bool = true
+    ) -> BlockReason? {
+        guard upstreamUpdatesEnabled else { return .personalFork }
         if isDevBuildVersion(appVersion) {
             return .devBuild(version: appVersion)
         }
@@ -62,6 +67,7 @@ final class SparkleUpdateGuard: NSObject {
     }
 
     private func currentBlockReason() -> BlockReason? {
+        guard LiveAppIdentity.upstreamUpdatesEnabled else { return .personalFork }
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
         if Self.isDevBuildVersion(appVersion) {
             return .devBuild(version: appVersion)
@@ -73,12 +79,15 @@ final class SparkleUpdateGuard: NSObject {
     }
 
     private static func error(for reason: BlockReason) -> NSError {
-        let message: String = switch reason {
-        case .devBuild(let version):
-            "Dev builds skip update checks (version: \(version ?? "<missing>"))."
-        case .meetingRecordingActive:
-            "Update checks are paused while a meeting recording is active. Stop the recording and try again."
-        }
+        let message: String =
+            switch reason {
+            case .personalFork:
+                "MacParakeet Live is a personal fork. Upstream updates are disabled to preserve this app and its separate data."
+            case .devBuild(let version):
+                "Dev builds skip update checks (version: \(version ?? "<missing>"))."
+            case .meetingRecordingActive:
+                "Update checks are paused while a meeting recording is active. Stop the recording and try again."
+            }
         return NSError(
             domain: "com.macparakeet.update-guard",
             code: reason.errorCode,
@@ -108,6 +117,7 @@ extension SparkleUpdateGuard: SPUUpdaterDelegate {
 private extension SparkleUpdateGuard.BlockReason {
     var errorCode: Int {
         switch self {
+        case .personalFork: return 3
         case .devBuild: return 1
         case .meetingRecordingActive: return 2
         }

@@ -51,6 +51,7 @@ Stable lock fields:
 - `finalizationLeaseId`
 - `speechEngine`
 - `notes`
+- `liveChat`
 - `audioRetentionStartedAt`
 - `titleOverride`
 
@@ -63,6 +64,34 @@ Stable states:
 `notes` is a backward-compatible additive field. Missing values decode to safe
 defaults, and malformed `notes` does not block recovery of the structural lock
 metadata.
+
+`liveChat` is an optional, backward-compatible local checkpoint. It contains the
+recording UUID, stable unsaved conversation UUID, monotonic revision, dates and
+accepted chat messages. A question is checkpointed before provider dispatch;
+assistant content is eligible only after provider terminal completion. Streaming
+partial text never becomes a recovered successful answer, and recovery never
+replays a provider request. Missing or malformed optional chat data does not
+make the structural audio lock unreadable.
+
+The recording service merges chat, notes and state through one actor-owned lock
+mirror. A stale recording or revision cannot overwrite a newer checkpoint.
+Cancellation synchronously appends any necessary rollback to the same write
+chain before End flushes it. A local chat-write failure remains visible and can
+retry local saving without repeating inference. End still stops audio on a
+failed flush, then retains the awaiting-transcription lock instead of publishing
+and settling an incompletely saved meeting.
+
+Recovery imports a valid checkpoint into the chat repository before artifact
+settlement. The stable conversation ID is inserted only when absent in one
+database transaction; an existing conversation, including explicit user edits
+or an empty message list, wins. A content-free import receipt in the same
+transaction survives explicit deletion, preventing an unsettled lock from
+resurrecting a chat the user removed. The receipt stores only conversation and
+transcription UUIDs plus its creation date; it contains no messages or calendar
+content. A mismatched meeting binding or unavailable chat
+store fails safely with the lock and source intact. Retrying a completed-row
+recovery does not repeat STT or overwrite edited chat. This checkpoint is local
+user data, not provider conversation storage.
 
 `audioRetentionStartedAt` and `titleOverride` are backward-compatible optional
 import metadata. Missing-row recovery uses `startedAt` for historical chronology,

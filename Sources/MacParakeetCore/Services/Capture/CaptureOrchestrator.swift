@@ -77,6 +77,17 @@ actor CaptureOrchestrator {
         return chunks
     }
 
+    func flushChunkersForLiveAnswer() async -> [CaptureOrchestratorChunk] {
+        var chunks: [CaptureOrchestratorChunk] = []
+        if let microphone = await microphoneChunker.flushForLiveAnswer() {
+            chunks.append(CaptureOrchestratorChunk(source: .microphone, chunk: microphone))
+        }
+        if let system = await systemChunker.flushForLiveAnswer() {
+            chunks.append(CaptureOrchestratorChunk(source: .system, chunk: system))
+        }
+        return chunks
+    }
+
     private func processPairs(
         _ pairs: [MeetingAudioPair],
         micConditioner: any MicConditioning
@@ -105,7 +116,8 @@ actor CaptureOrchestrator {
                 // samples it is holding first so they cannot land behind
                 // this pair's zeros out of order.
                 let heldSamples = micConditioner.flush()
-                micSamples = heldSamples.isEmpty
+                micSamples =
+                    heldSamples.isEmpty
                     ? pair.microphoneSamples
                     : heldSamples + pair.microphoneSamples
             }

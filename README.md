@@ -1,3 +1,5 @@
+> **MacParakeet Live — personal fork.** This branch preserves MacParakeet's local recording, transcription and notes, adds its own official Continue with ChatGPT authorization and a native direct streaming Live Ask path, and uses a separate app identity and data. See [Live build/install instructions](docs/macparakeet-live-build.md), [subscription contract](spec/contracts/chatgpt-plan-usage.md), and [live answer contract](spec/contracts/live-answer.md). Upstream updates are disabled. The original project documentation follows below.
+
 <p align="center">
   <img src="Assets/AppIcon-1024x1024.png" width="128" height="128" alt="MacParakeet app icon">
 </p>

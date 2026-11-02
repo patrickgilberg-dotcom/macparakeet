@@ -28,12 +28,14 @@ public final class MeetingRecordingPanelViewModel {
         case notes
         case transcript
         case ask
+        case board
 
         public var title: String {
             switch self {
             case .notes: return "Notes"
             case .transcript: return "Transcript"
             case .ask: return "Ask"
+            case .board: return "Board"
             }
         }
     }
@@ -68,6 +70,9 @@ public final class MeetingRecordingPanelViewModel {
     public let chatViewModel: TranscriptChatViewModel = TranscriptChatViewModel()
     public let notesViewModel: MeetingNotesViewModel = MeetingNotesViewModel()
     public let quickPromptsViewModel: QuickPromptsViewModel = QuickPromptsViewModel()
+    public var organization: LiveMeetingOrganizationViewModel?
+    /// Reserves the organization rows before their recording-scoped model is available.
+    public var showsOrganizationControls = false
     public private(set) var meetingTypes: [MeetingType] = []
     public private(set) var activeMeetingTypeID: UUID?
     public var onStop: (() -> Void)?
@@ -78,6 +83,9 @@ public final class MeetingRecordingPanelViewModel {
 
     private var copiedResetTask: Task<Void, Never>?
     private var previewLineWordCounts: [Int] = []
+    private var liveTimelineWords: [WordTimestamp] = []
+    private var liveTimelineSpeakers: [SpeakerInfo] = []
+    private var hasLiveTimeline = false
     private let transcriptAIContextModeProvider: @MainActor () -> TranscriptAIContextMode
 
     public init(
@@ -163,6 +171,33 @@ public final class MeetingRecordingPanelViewModel {
         chatViewModel.updateTranscriptText(chatTranscript)
     }
 
+    /// Numeric timing remains available even when plain Ask context hides the
+    /// transcript's display timestamps. Refresh after every preview/barrier update.
+    public func updateLiveMeetingTimeline(_ update: MeetingTranscriptUpdate) {
+        liveTimelineWords = update.words
+        liveTimelineSpeakers = update.speakers
+        hasLiveTimeline = true
+        chatViewModel.refreshLiveAnswerFreshness()
+    }
+
+    public var liveMeetingFocusSource: LiveMeetingFocusSource? {
+        guard hasLiveTimeline else { return nil }
+        let seconds = max(0, elapsedSeconds)
+        let elapsedMs = seconds > Int.max / 1_000 ? Int.max : seconds * 1_000
+        return LiveMeetingFocusTranscript.project(
+            words: liveTimelineWords, speakers: liveTimelineSpeakers, elapsedMs: elapsedMs,
+            includeTimestamps: transcriptAIContextModeProvider() == .richTranscript)
+    }
+
+    public var liveMeetingNowSnapshot: LiveMeetingNowSnapshot? {
+        guard hasLiveTimeline else { return nil }
+        let seconds = max(0, elapsedSeconds)
+        let elapsedMs = seconds > Int.max / 1_000 ? Int.max : seconds * 1_000
+        return LiveMeetingNowTranscript.project(
+            words: liveTimelineWords, speakers: liveTimelineSpeakers, elapsedMs: elapsedMs,
+            includeTimestamps: transcriptAIContextModeProvider() == .richTranscript)
+    }
+
     public var transcriptText: String {
         previewLines.map { "[\($0.timestamp)] \($0.speakerLabel): \($0.text)" }.joined(separator: "\n")
     }
@@ -197,6 +232,9 @@ public final class MeetingRecordingPanelViewModel {
         canToggleMicrophoneMute = false
         previewLines = []
         previewLineWordCounts = []
+        liveTimelineWords = []
+        liveTimelineSpeakers = []
+        hasLiveTimeline = false
         wordCount = 0
         isTranscriptionLagging = false
         liveTranscriptStatus = .listening
@@ -207,6 +245,8 @@ public final class MeetingRecordingPanelViewModel {
         meetingTypes = []
         activeMeetingTypeID = nil
         onMeetingTypeChange = nil
+        organization = nil
+        showsOrganizationControls = false
         notesViewModel.reset()
         chatViewModel.loadTranscript("", transcriptionId: nil)
     }
@@ -465,6 +505,9 @@ public final class MeetingRecordingPanelViewModel {
         switch tab {
         case .notes, .transcript, .ask:
             return nil
+        case .board:
+            let count = chatViewModel.liveBoard?.items.count ?? 0
+            return count > 0 ? String(count) : nil
         }
     }
 

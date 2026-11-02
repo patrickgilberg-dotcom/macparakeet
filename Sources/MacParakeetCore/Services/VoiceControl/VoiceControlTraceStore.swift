@@ -76,7 +76,8 @@ public actor VoiceControlTraceStore: VoiceControlTraceSink {
     }
     /// Stable path agents can open without knowing the app-state override.
     public static var agentPointerDirectory: URL {
-        URL(fileURLWithPath: "/tmp/macparakeet-voice-control", isDirectory: true)
+        URL(fileURLWithPath: AppPaths.tempDir, isDirectory: true).appendingPathComponent(
+            "voice-control", isDirectory: true)
     }
 
     public nonisolated let directory: URL
@@ -257,7 +258,9 @@ public actor VoiceControlTraceStore: VoiceControlTraceSink {
         let path = url.path
         if lstat(path, &info) != 0 {
             guard errno == ENOENT else { return false }
-            guard (try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)) != nil else { return false }
+            guard (try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)) != nil else {
+                return false
+            }
             guard lstat(path, &info) == 0 else { return false }
         }
         guard info.st_uid == getuid(), (info.st_mode & S_IFMT) == S_IFDIR else { return false }

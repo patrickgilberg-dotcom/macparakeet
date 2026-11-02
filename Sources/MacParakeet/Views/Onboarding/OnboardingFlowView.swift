@@ -142,7 +142,7 @@ struct OnboardingFlowView: View {
                     MeditativeMerkabaView(size: 28, revolutionDuration: 6.0, tintColor: DesignSystem.Colors.accent)
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("MacParakeet")
+                        Text(LiveAppIdentity.displayName)
                             .font(DesignSystem.Typography.sectionTitle)
                         Text("First-time setup")
                             .font(DesignSystem.Typography.caption)
@@ -515,7 +515,7 @@ struct OnboardingFlowView: View {
                 icon: "mic.fill",
                 title: "Hear you while you dictate",
                 detail:
-                    "MacParakeet uses the microphone for dictation and meeting recording. Skip this if you only transcribe files.",
+                    "MacParakeet Live uses the microphone for dictation and meeting recording. Skip this if you only transcribe files.",
                 tag: "Optional",
                 granted: viewModel.micStatus == .granted
             ) {
@@ -534,7 +534,9 @@ struct OnboardingFlowView: View {
                 }
             } footnote: {
                 if viewModel.micStatus == .denied {
-                    Text("Microphone access is off. Turn on MacParakeet in System Settings, or continue without it.")
+                    Text(
+                        "Microphone access is off. Turn on MacParakeet Live in System Settings, or continue without it."
+                    )
                 }
             }
 
@@ -542,7 +544,7 @@ struct OnboardingFlowView: View {
                 icon: "keyboard.fill",
                 title: "Use your dictation key and type into any app",
                 detail:
-                    "Lets MacParakeet notice your dictation key from any app and paste your words where the cursor is.",
+                    "Lets MacParakeet Live notice your dictation key from any app and paste your words where the cursor is.",
                 tag: "Required",
                 granted: viewModel.accessibilityGranted
             ) {
@@ -551,7 +553,9 @@ struct OnboardingFlowView: View {
                 }
             } footnote: {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("macOS opens Privacy & Security. Turn on MacParakeet there, and this page updates by itself.")
+                    Text(
+                        "macOS opens Privacy & Security. Turn on MacParakeet Live there, and this page updates by itself."
+                    )
                     Button("Open System Settings") {
                         openPrivacySettings(anchor: "Privacy_Accessibility")
                     }
@@ -562,8 +566,10 @@ struct OnboardingFlowView: View {
             HStack(spacing: 8) {
                 Image(systemName: "lock.shield")
                     .foregroundStyle(DesignSystem.Colors.accent)
-                Text("MacParakeet does not ask for screen recording, meeting audio, or your calendar during setup.")
-                    .foregroundStyle(.secondary)
+                Text(
+                    "MacParakeet Live does not ask for screen recording, meeting audio, or your calendar during setup."
+                )
+                .foregroundStyle(.secondary)
             }
             .font(DesignSystem.Typography.caption)
             .padding(.top, 4)
@@ -673,7 +679,7 @@ struct OnboardingFlowView: View {
                     )
                     doneLine(
                         icon: "menubar.rectangle",
-                        text: "MacParakeet stays in your menu bar. Settings and your dictation history live there."
+                        text: "MacParakeet Live stays in your menu bar. Settings and your dictation history live there."
                     )
                 }
                 .padding(DesignSystem.Spacing.md)
@@ -768,9 +774,10 @@ struct OnboardingFlowView: View {
 
     private var title: String {
         switch viewModel.step {
-        case .welcome: return "Welcome to MacParakeet"
+        case .welcome: return "Welcome to MacParakeet Live"
         case .permissions:
-            return allPermissionsGranted ? "Thanks for trusting MacParakeet" : "Give MacParakeet two permissions"
+            return allPermissionsGranted
+                ? "Thanks for trusting MacParakeet Live" : "Give MacParakeet Live two permissions"
         case .practice:
             return viewModel.practicePhase == .hotkey ? "Try your dictation key" : "Now say something"
         case .done: return "All Set"
@@ -787,7 +794,7 @@ struct OnboardingFlowView: View {
                 : "macOS asks for each one. You stay on this page while it does."
         case .practice:
             if viewModel.practicePhase == .hotkey {
-                return "Press the real key. It lights up in the card when MacParakeet hears it."
+                return "Press the real key. It lights up in the card when MacParakeet Live hears it."
             }
             return "Use the key you just tried. Your words land in the box below."
         case .done:

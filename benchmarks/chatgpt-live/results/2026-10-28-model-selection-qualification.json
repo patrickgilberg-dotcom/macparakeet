@@ -1,0 +1,98 @@
+{
+  "hardware": "Apple M5",
+  "memoryGB": 16,
+  "notes": [
+    "First sentence timing uses punctuation after 12 characters; inspect stored outputs for usefulness.",
+    "First-process requests follow catalog retrieval and any rejected effort probes; they do not establish untouched network/server cold latency.",
+    "Transport is explicit in each trial and summary. WebSocket reuses one socket after a completed response, with full bounded input on each turn.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem": "Version 26.5.1 (Build 25F80)",
+  "processorCount": 10,
+  "summaries": [
+    {
+      "condition": "first-inference-this-process-capability-probe-none",
+      "failures": 0,
+      "medianCompletionMs": 3090.546916704625,
+      "medianFirstSentenceMs": 2682.0613748859614,
+      "medianFirstTextMs": 2552.1802082657814,
+      "model": "gpt-6-luna",
+      "p95CompletionMs": 3090.546916704625,
+      "p95FirstSentenceMs": 2682.0613748859614,
+      "p95FirstTextMs": 2552.1802082657814,
+      "transport": "websocket",
+      "trials": 1
+    },
+    {
+      "condition": "warm-long-meeting",
+      "failures": 0,
+      "medianCompletionMs": 1469.0745833795518,
+      "medianFirstSentenceMs": 1353.8911251816899,
+      "medianFirstTextMs": 1129.9601250793785,
+      "model": "gpt-6-luna",
+      "p95CompletionMs": 1469.0745833795518,
+      "p95FirstSentenceMs": 1353.8911251816899,
+      "p95FirstTextMs": 1129.9601250793785,
+      "transport": "websocket",
+      "trials": 1
+    },
+    {
+      "condition": "warm-recent",
+      "failures": 0,
+      "medianCompletionMs": 1294.1127084195614,
+      "medianFirstSentenceMs": 1058.6755834519863,
+      "medianFirstTextMs": 814.3615417648107,
+      "model": "gpt-6-luna",
+      "p95CompletionMs": 1294.1127084195614,
+      "p95FirstSentenceMs": 1058.6755834519863,
+      "p95FirstTextMs": 814.3615417648107,
+      "transport": "websocket",
+      "trials": 1
+    }
+  ],
+  "timestamp": "2026-10-28T22:27:57Z",
+  "trials": [
+    {
+      "completed": true,
+      "completionMs": 3090.546916704625,
+      "condition": "first-inference-this-process-capability-probe-none",
+      "firstSentenceMs": 2682.0613748859614,
+      "firstTextMs": 2552.1802082657814,
+      "inputCharacters": 2076,
+      "model": "gpt-6-luna",
+      "output": "A two-week review could put the pilot timing at risk.\n\n- If useful, we could use the wait to finalize the pilot plan and success measures, without connecting the test account.\n- We\u2019d need security approval before any connection; no production rollout is approved.",
+      "reasoningEffort": "none",
+      "transport": "websocket"
+    },
+    {
+      "completed": true,
+      "completionMs": 1294.1127084195614,
+      "condition": "warm-recent",
+      "firstSentenceMs": 1058.6755834519863,
+      "firstTextMs": 814.3615417648107,
+      "inputCharacters": 2076,
+      "model": "gpt-6-luna",
+      "output": "A two-week review could affect the pilot timing, but not necessarily its viability.\n- We could use the wait to prepare the pilot plan and success measures.\n- We\u2019d need security approval before connecting the test account; Friday\u2019s decision may clarify timing.",
+      "reasoningEffort": "none",
+      "transport": "websocket"
+    },
+    {
+      "completed": true,
+      "completionMs": 1469.0745833795518,
+      "condition": "warm-long-meeting",
+      "firstSentenceMs": 1353.8911251816899,
+      "firstTextMs": 1129.9601250793785,
+      "inputCharacters": 14463,
+      "model": "gpt-6-luna",
+      "output": "A two-week security review could delay the pilot, depending on its start date.\n- If approved, we could use the time for offline workflow mapping, subject to your approval of any data export.",
+      "reasoningEffort": "none",
+      "transport": "websocket"
+    }
+  ],
+  "qualificationSource": "b4ab4ac8e969",
+  "qualificationNotes": [
+    "An explicit model benchmark restored the measured gpt-6-luna / none pair through the production selection API; the saved preferences pair was independently read back.",
+    "These three successful synthetic trials are supplementary selection evidence and are not mixed into the five-trial final comparison."
+  ]
+}

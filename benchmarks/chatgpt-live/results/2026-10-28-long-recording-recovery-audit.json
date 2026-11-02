@@ -1,0 +1,66 @@
+{
+  "baselineSourceCommit": "3a42ddac",
+  "focusedExisting": {
+    "selectedTests": 142,
+    "failures": 0,
+    "seconds": 14.089,
+    "scope": "138 standard cases, two opt-in crash journeys, two helper entries",
+    "ffmpeg": "explicit installed bundled helper via MACPARAKEET_FFMPEG_PATH",
+    "skipBuild": true
+  },
+  "acceleratedWriter": {
+    "status": "passed after test-harness fixes, using parent-compiled current focused binary",
+    "simulatedSeconds": 7200,
+    "acceptedFrames": 345600000,
+    "decodedSampleCount": 345600000,
+    "sampleRate": 48000,
+    "rmsDB": -23.008456,
+    "sourceBytes": 34939359,
+    "qualification": "Accelerated generated 48kHz PCM; valid readable-fragment wait, independent one-hour copy and full strict FFmpeg decode, then own writer child SIGKILL and two-hour strict full decode. Accepted/decoded sample counts and finite RMS asserted. Not a two-hour wall-clock hardware soak.",
+    "suiteEntries": 2,
+    "substantiveTests": 1,
+    "failures": 0,
+    "testSeconds": 20.607,
+    "wallSeconds": 20.5914295,
+    "decodedSeconds": 7200.0,
+    "oneHourCheckpointContainerSeconds": 3599.956,
+    "oneHourStrictFullDecodePassed": true
+  },
+  "priorHarnessFailures": [
+    "Immediate accelerated checkpoint observed queued AAC lag, invalidating an assumption that accepted PCM had already reached durable fragments.",
+    "Direct AVAudioFile reading unfinished fragmented media raised nilError; production FFmpeg decode replaced it.",
+    "Foundation Process.waitUntilExit hung after decoder exit; sample retained and only verified own xctest was terminated."
+  ],
+  "twoHourDiskEstimatesBytes": {
+    "combinedTwoRawAAC": 115200000,
+    "stereoPlaybackAAC": 115200000,
+    "eachFloat32Mono16kScratchOrWAV": 460800000,
+    "twoSourceAECScratch": 921600000,
+    "qualification": "Code-derived nominal bitrate/sample counts, not a measured peak; overlap/copies/OS/model needs require extra headroom."
+  },
+  "sourceFindings": [
+    "No fixed capture-duration cap found.",
+    "Capture sources use 48kHz mono AAC64kbps with one-second fragmented M4A.",
+    "Derived AEC cleaning skips inputs over four hours, preserving raw fallback.",
+    "No proactive free-disk monitor or reservation found.",
+    "Raw capture event AsyncStream is unbounded.",
+    "No explicit sleep-prevention assertion found in reviewed capture path.",
+    "Failed finalization/artifact/association/lock cleanup retains recoverability; retention protects any recording.lock."
+  ],
+  "notProven": [
+    "Real-time multi-hour hardware capture, clock/drift and sustained RAM behavior.",
+    "Sleep, power loss, disk exhaustion or arbitrary device/OS failure cannot be guaranteed lossless.",
+    "Full two-hour local STT/diarization/LLM pipeline latency or transcript completeness.",
+    "One-second fragment interval alone is not a one-second worst-case loss guarantee."
+  ],
+  "ownChanges": [
+    "Tests/MacParakeetTests/Audio/MeetingLongWriterDurabilityTests.swift"
+  ],
+  "syntheticMediaCleanup": "All own test processes finished. Exact failed-harness media folder manually removed after PID exit; successful runs auto-cleaned. Reports/logs and stack sample retained; no user recordings inspected or modified.",
+  "remainingOwnSyntheticFolders": [],
+  "notes": [
+    "Source writer behavior is unchanged by the live-chat persistence repair. Final integrated qualification records the installed revision separately.",
+    "Earlier failed harness attempts are retained in the local audit; the final strengthened test passed.",
+    "This report contains no private calendar names, account identifiers, credentials, transcripts or audio."
+  ]
+}

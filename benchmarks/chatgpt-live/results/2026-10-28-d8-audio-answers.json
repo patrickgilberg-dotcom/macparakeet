@@ -1,0 +1,562 @@
+{
+  "schema_version": 1,
+  "verified_at_utc": "2026-10-28T23:43:20.207675+00:00",
+  "production_source": "d8d6477875b5",
+  "scope": "Content-free structured diagnostic and controlled-fixture playback metadata only. No transcript, prompt, custom question, answer, notes or audio contents read or exported.",
+  "process_id": 72752,
+  "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+  "capture_id": "E6C84F56-7AEA-4AFC-85C1-2C02D42F5431",
+  "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+  "trials": [
+    {
+      "ordinal": 1,
+      "request_id": "7BB04F92-C2C0-4493-A85E-6968D74CB32D",
+      "input_route": "controlled-fixture-help-button",
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 645.8,
+        "hotkey_to_request_ms": 646.2,
+        "request_to_first_text_ms": 1733.6,
+        "first_text_ms": 2379.8,
+        "first_sentence_ms": 2480.3,
+        "completion_ms": 2508.0
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:38:35.491Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "7BB04F92-C2C0-4493-A85E-6968D74CB32D",
+          "outcome": "completed",
+          "transcript_ready_ms": "645.8",
+          "hotkey_to_request_ms": "646.2",
+          "request_to_first_text_ms": "1733.6",
+          "first_text_ms": "2379.8",
+          "first_sentence_ms": "2480.3",
+          "completion_ms": "2508.0",
+          "process_id": "72752",
+          "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+          "uptime_ns": "1922655988792000",
+          "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:36:23.749Z",
+          "event": "chatgpt_ws_connection",
+          "fields": {
+            "mode": "fresh",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922524246407791"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:38:33.617Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "536.8",
+            "outcome": "ready",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922654114626750",
+            "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+            "consumer": "meeting"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:38:33.645Z",
+          "event": "chatgpt_live_request",
+          "fields": {
+            "model": "gpt-6-luna",
+            "effort": "none",
+            "transport": "websocket",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922654142397958"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:38:33.652Z",
+          "event": "chatgpt_ws_connection",
+          "fields": {
+            "mode": "idle-expired",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922654149615041"
+          }
+        }
+      ],
+      "fixture_playback_records": [
+        {
+          "boundary": "AVAudioPlayer playback-end proxy, not independent acoustic speech end",
+          "event": "playback_started",
+          "fixture_id": 2,
+          "schema_version": 1,
+          "success": true,
+          "trial_id": "8C1A8D95-F5CE-431C-A0F8-2F63D2E5E57E",
+          "uptime_ns": 1922644670781291,
+          "wall_time_unix_ns": 1793230704173406208,
+          "wall_time_utc": "2026-10-28T23:38:24.173Z"
+        },
+        {
+          "boundary": "AVAudioPlayer playback-end proxy, not independent acoustic speech end",
+          "event": "playback_finished",
+          "fixture_id": 2,
+          "schema_version": 1,
+          "success": true,
+          "trial_id": "8C1A8D95-F5CE-431C-A0F8-2F63D2E5E57E",
+          "uptime_ns": 1922653001193041,
+          "wall_time_unix_ns": 1793230712503849984,
+          "wall_time_utc": "2026-10-28T23:38:32.504Z"
+        }
+      ],
+      "playback_end_proxy_analysis": {
+        "trial_id": "8C1A8D95-F5CE-431C-A0F8-2F63D2E5E57E",
+        "end_uptime_ns": 1922653001193041,
+        "approx_invocation_uptime_ns": 1922653480792000,
+        "approx_playback_end_to_invocation_ms": 479.598959,
+        "approx_playback_end_to_request_handoff_ms": 1125.798959,
+        "approx_playback_end_to_first_text_ms": 2859.398959,
+        "approx_playback_end_to_first_sentence_ms": 2959.898959,
+        "playback_end_to_terminal_log_ms": 2987.598959,
+        "derivation": "Invocation/stage clocks are derived from terminal log uptime minus completion duration plus each stage duration; logging/rounding overhead remains. Playback completion is not independent acoustic speech end."
+      }
+    },
+    {
+      "ordinal": 2,
+      "request_id": "179A745E-052B-4F99-92A1-EEE437D90431",
+      "input_route": "custom-question-cancelled-before-text",
+      "outcome": "cancelled",
+      "metrics_ms": {
+        "transcript_ready_ms": 441.5,
+        "hotkey_to_request_ms": 442.1,
+        "request_to_first_text_ms": null,
+        "first_text_ms": null,
+        "first_sentence_ms": null,
+        "completion_ms": null
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:40:21.211Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "179A745E-052B-4F99-92A1-EEE437D90431",
+          "outcome": "cancelled",
+          "transcript_ready_ms": "441.5",
+          "hotkey_to_request_ms": "442.1",
+          "request_to_first_text_ms": "none",
+          "first_text_ms": "none",
+          "first_sentence_ms": "none",
+          "completion_ms": "none",
+          "process_id": "72752",
+          "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+          "uptime_ns": "1922761707638750",
+          "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:40:20.771Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "328.6",
+            "outcome": "ready",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922761267886583",
+            "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+            "consumer": "meeting"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:40:20.816Z",
+          "event": "chatgpt_live_request",
+          "fields": {
+            "model": "gpt-6-luna",
+            "effort": "none",
+            "transport": "websocket",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922761313404541"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:40:20.826Z",
+          "event": "chatgpt_ws_connection",
+          "fields": {
+            "mode": "idle-expired",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922761322738000"
+          }
+        }
+      ]
+    },
+    {
+      "ordinal": 3,
+      "request_id": "C22E965F-D837-4EF3-865E-07420C40875D",
+      "input_route": "custom-question-recovery",
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 315.6,
+        "hotkey_to_request_ms": 316.1,
+        "request_to_first_text_ms": 3138.5,
+        "first_text_ms": 3454.6,
+        "first_sentence_ms": 4139.9,
+        "completion_ms": 4190.0
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:41:30.148Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "C22E965F-D837-4EF3-865E-07420C40875D",
+          "outcome": "completed",
+          "transcript_ready_ms": "315.6",
+          "hotkey_to_request_ms": "316.1",
+          "request_to_first_text_ms": "3138.5",
+          "first_text_ms": "3454.6",
+          "first_sentence_ms": "4139.9",
+          "completion_ms": "4190.0",
+          "process_id": "72752",
+          "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+          "uptime_ns": "1922830644475250",
+          "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:41:26.273Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "251.2",
+            "outcome": "ready",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922826769436708",
+            "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+            "consumer": "meeting"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:41:26.289Z",
+          "event": "chatgpt_live_request",
+          "fields": {
+            "model": "gpt-6-luna",
+            "effort": "none",
+            "transport": "websocket",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922826785502083"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:41:26.294Z",
+          "event": "chatgpt_ws_connection",
+          "fields": {
+            "mode": "fresh",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922826790690291"
+          }
+        }
+      ]
+    },
+    {
+      "ordinal": 4,
+      "request_id": "2A35D0AF-CE34-4E64-81D6-8AF6AAA82FC9",
+      "input_route": "rapid-follow-up",
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 346.2,
+        "hotkey_to_request_ms": 346.3,
+        "request_to_first_text_ms": 1046.8,
+        "first_text_ms": 1393.1,
+        "first_sentence_ms": 1509.2,
+        "completion_ms": 1558.7
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:41:32.377Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "2A35D0AF-CE34-4E64-81D6-8AF6AAA82FC9",
+          "outcome": "completed",
+          "transcript_ready_ms": "346.2",
+          "hotkey_to_request_ms": "346.3",
+          "request_to_first_text_ms": "1046.8",
+          "first_text_ms": "1393.1",
+          "first_sentence_ms": "1509.2",
+          "completion_ms": "1558.7",
+          "process_id": "72752",
+          "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+          "uptime_ns": "1922832873967958",
+          "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:41:31.164Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "288.9",
+            "outcome": "ready",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922831660955375",
+            "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+            "consumer": "meeting"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:41:31.183Z",
+          "event": "chatgpt_live_request",
+          "fields": {
+            "model": "gpt-6-luna",
+            "effort": "none",
+            "transport": "websocket",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922831679781666"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:41:31.192Z",
+          "event": "chatgpt_ws_connection",
+          "fields": {
+            "mode": "reused",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922831688750083"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:41:31.256Z",
+          "event": "chatgpt_ws_ping",
+          "fields": {
+            "result": "pong",
+            "duration_ms": "64",
+            "process_id": "72752",
+            "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+            "uptime_ns": "1922831753063583"
+          }
+        }
+      ]
+    }
+  ],
+  "completed_only_summary": {
+    "transcript_ready_ms": {
+      "n": 3,
+      "median_ms": 346.2,
+      "nearest_rank_p95_ms": 645.8
+    },
+    "hotkey_to_request_ms": {
+      "n": 3,
+      "median_ms": 346.3,
+      "nearest_rank_p95_ms": 646.2
+    },
+    "request_to_first_text_ms": {
+      "n": 3,
+      "median_ms": 1733.6,
+      "nearest_rank_p95_ms": 3138.5
+    },
+    "first_text_ms": {
+      "n": 3,
+      "median_ms": 2379.8,
+      "nearest_rank_p95_ms": 3454.6
+    },
+    "first_sentence_ms": {
+      "n": 3,
+      "median_ms": 2480.3,
+      "nearest_rank_p95_ms": 4139.9
+    },
+    "completion_ms": {
+      "n": 3,
+      "median_ms": 2508.0,
+      "nearest_rank_p95_ms": 4190.0
+    }
+  },
+  "total_outcomes": {
+    "completed": 3,
+    "cancelled_before_text": 1,
+    "failed": 0
+  },
+  "resolved_request_records": [
+    {
+      "timestamp": "2026-10-28T23:38:33.645Z",
+      "event": "chatgpt_live_request",
+      "fields": {
+        "model": "gpt-6-luna",
+        "effort": "none",
+        "transport": "websocket",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922654142397958"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:40:20.816Z",
+      "event": "chatgpt_live_request",
+      "fields": {
+        "model": "gpt-6-luna",
+        "effort": "none",
+        "transport": "websocket",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922761313404541"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:41:26.289Z",
+      "event": "chatgpt_live_request",
+      "fields": {
+        "model": "gpt-6-luna",
+        "effort": "none",
+        "transport": "websocket",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922826785502083"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:41:31.183Z",
+      "event": "chatgpt_live_request",
+      "fields": {
+        "model": "gpt-6-luna",
+        "effort": "none",
+        "transport": "websocket",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922831679781666"
+      }
+    }
+  ],
+  "connection_and_ping_records": [
+    {
+      "timestamp": "2026-10-28T23:36:23.749Z",
+      "event": "chatgpt_ws_connection",
+      "fields": {
+        "mode": "fresh",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922524246407791"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:38:33.652Z",
+      "event": "chatgpt_ws_connection",
+      "fields": {
+        "mode": "idle-expired",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922654149615041"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:40:20.826Z",
+      "event": "chatgpt_ws_connection",
+      "fields": {
+        "mode": "idle-expired",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922761322738000"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:41:26.294Z",
+      "event": "chatgpt_ws_connection",
+      "fields": {
+        "mode": "fresh",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922826790690291"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:41:31.192Z",
+      "event": "chatgpt_ws_connection",
+      "fields": {
+        "mode": "reused",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922831688750083"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:41:31.256Z",
+      "event": "chatgpt_ws_ping",
+      "fields": {
+        "result": "pong",
+        "duration_ms": "64",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922831753063583"
+      }
+    }
+  ],
+  "capture_metric_records": [
+    {
+      "timestamp": "2026-10-28T23:36:47.623Z",
+      "event": "meeting_recording_started",
+      "fields": {
+        "session": "E6C84F56-7AEA-4AFC-85C1-2C02D42F5431",
+        "source_mode": "Optional(MacParakeetCore.MeetingAudioSourceMode.microphoneAndSystem)",
+        "requested_mic_mode": "raw",
+        "effective_mic_mode": "raw",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922548121045916",
+        "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:42:10.679Z",
+      "event": "meeting_recording_stopping",
+      "fields": {
+        "session": "E6C84F56-7AEA-4AFC-85C1-2C02D42F5431",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922871175936250",
+        "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:42:15.438Z",
+      "event": "meeting_recording_stopped",
+      "fields": {
+        "session": "E6C84F56-7AEA-4AFC-85C1-2C02D42F5431",
+        "duration_s": "323.177",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922875934588166",
+        "workflow_id": "3977E649-5614-4FA5-A9BA-D1B1BE901B13",
+        "consumer": "meeting"
+      }
+    }
+  ],
+  "shortcut_registration_records": [
+    {
+      "timestamp": "2026-10-28T23:36:23.063Z",
+      "event": "live_answer_hotkey_registration",
+      "fields": {
+        "outcome": "registered",
+        "control": "false",
+        "status": "0",
+        "process_id": "72752",
+        "process_session": "05808469-2356-4249-bdb7-b0295b7e4f04",
+        "uptime_ns": "1922523561184125"
+      }
+    }
+  ],
+  "limitations": [
+    "All four outcomes are retained. The cancelled request has no first text/sentence or successful completion and is excluded from completed latency summaries, never counted as zero latency.",
+    "The three completed trials differ in trigger, context, history, timing and connection mode. n=3 p95 is the maximum. These are exploratory native results, not a controlled before/after distribution.",
+    "The fixture2 button comparison with a4 uses the same playback clip but different prior conversation context/history. Do not attribute all measured difference to the idle policy.",
+    "Playback completion is a proxy; first sentence is a punctuation/newline proxy after 12 characters. Independent acoustic speech-end and exact screen-pixel timing are not measured.",
+    "No new physical global-shortcut test was performed in this d8 capture; prior a4 global proof is separate.",
+    "One rapid follow-up reached the sentence proxy within 2s of invocation; none reached first text within 1s. These samples do not establish speed guarantees."
+  ]
+}

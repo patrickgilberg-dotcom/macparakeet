@@ -1,0 +1,191 @@
+{
+  "asks": [
+    {
+      "answer": {
+        "completed": true,
+        "completionMs": 1380.0306667108089,
+        "firstSentenceMs": 1222.8560000658035,
+        "firstTextMs": 1081.4837084617466,
+        "output": "The corrected proposed cap is $38,000, but Friday\u2019s launch isn\u2019t approved.\n- The cap is not final; security approval is required before the test account connects."
+      },
+      "checks": {
+        "all_source_ranges_covered": true,
+        "answer_mentions_corrected_cap": true,
+        "answer_mentions_route_owner_when_asked": true,
+        "answer_preserves_launch_uncertainty_when_asked": true,
+        "cached_prepare_made_no_summary_call": true,
+        "combined_context_retains_corrected_cap": true,
+        "combined_context_retains_early_unrelated_route": true,
+        "raw_tail_contains_latest_customer_question": true,
+        "summary_retains_corrected_cap": true,
+        "summary_retains_early_unrelated_route": true
+      },
+      "coverage": {
+        "allSourceProcessed": true,
+        "coveredCharacters": 21201,
+        "mode": "allEarlierSummarized",
+        "overlapCharacters": 7762,
+        "rawCharacters": 12000,
+        "summarizedCharacters": 16963,
+        "totalCharacters": 21201
+      },
+      "exactExcerpts": "uts. This discussion adds no decision or commitment.\n[00:28] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:29] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:30] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:31] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:00] Facilitator: We are reviewing a proposed six-week support pilot.\n[01:15] Maya: The proposed cap is $45,000; it is not final.\n[01:20] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:21] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:22] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:23] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:24] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:25] Team: We compared intake \n[\u2026]\nssion adds no decision or commitment.\n[03:26] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:27] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:28] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:29] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:30] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:31] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[04:00] Facilitator: We are reviewing a proposed six-week support pilot.\n[04:20] Maya: Correction: the pilot budget ceiling is $38,000, replacing $45,000. Use the corrected figure.\n[04:20] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[04:21] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[04:22] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n",
+      "preparationMs": 8.108666632324457,
+      "question": "Help me answer the customer's latest question about the corrected cap and Friday production launch.",
+      "recentCharacters": 12000,
+      "requestCharacters": 16991,
+      "summary": "- The team is reviewing a **proposed six-week support pilot**; no approval or commitment is recorded.\n- Maya corrected the proposed budget ceiling to **$38,000**, replacing the previously stated **$45,000**. The amount is not recorded as final or approved.\n- Hana said emergency escalation route **AMBER-17** belongs to **Hana Lin** and is unrelated to the pilot budget.\n- Liam said security review must be approved before the test account connects. **No production launch is approved.**\n- Intake routing and report layouts were compared; the discussion added no decision or commitment.",
+      "summaryCallsDuringPreparation": 0
+    },
+    {
+      "answer": {
+        "completed": true,
+        "completionMs": 1355.876708170399,
+        "firstSentenceMs": 1181.8797083105892,
+        "firstTextMs": 1051.924374885857,
+        "output": "Hana Lin owns AMBER-17, and the corrected proposed cap is $38,000.\n- The cap replaces $45,000 and is not recorded as approved."
+      },
+      "checks": {
+        "all_source_ranges_covered": true,
+        "answer_mentions_corrected_cap": true,
+        "answer_mentions_route_owner_when_asked": true,
+        "answer_preserves_launch_uncertainty_when_asked": true,
+        "cached_prepare_made_no_summary_call": true,
+        "combined_context_retains_corrected_cap": true,
+        "combined_context_retains_early_unrelated_route": true,
+        "raw_tail_contains_latest_customer_question": true,
+        "summary_retains_corrected_cap": true,
+        "summary_retains_early_unrelated_route": true
+      },
+      "coverage": {
+        "allSourceProcessed": true,
+        "coveredCharacters": 21201,
+        "mode": "allEarlierSummarized",
+        "overlapCharacters": 7762,
+        "rawCharacters": 12000,
+        "summarizedCharacters": 16963,
+        "totalCharacters": 21201
+      },
+      "exactExcerpts": "[00:00] Facilitator: We are reviewing a proposed six-week support pilot.\n[00:10] Hana: Emergency escalation route AMBER-17 belongs to Hana Lin; it is unrelated to the pilot budget.\n[00:20] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:21] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:22] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:23] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:24] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:25] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:26] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:27] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:28] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[00:29] Team: We compared intake routi\n[\u2026]\n layouts. This discussion adds no decision or commitment.\n[01:24] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:25] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:26] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:27] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:28] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:29] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:30] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[01:31] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[02:00] Facilitator: We are reviewing a proposed six-week support pilot.\n[02:20] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[02:21] Team: We compared intake routing and report layouts. This discussion adds no dec\n[\u2026]\nssion adds no decision or commitment.\n[03:26] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:27] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:28] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:29] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:30] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[03:31] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[04:00] Facilitator: We are reviewing a proposed six-week support pilot.\n[04:20] Maya: Correction: the pilot budget ceiling is $38,000, replacing $45,000. Use the corrected figure.\n[04:20] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[04:21] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[04:22] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n\n[\u2026]\nn or commitment.\n[05:27] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[05:28] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[05:29] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[05:30] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[05:31] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[06:00] Facilitator: We are reviewing a proposed six-week support pilot.\n[06:20] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[06:21] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[06:22] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[06:23] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[06:24] Team: We compared intake routing and report layouts. This discussion adds no decision or commitment.\n[06:25] Team: We com",
+      "preparationMs": 8.871083380654454,
+      "question": "Who owns emergency route AMBER-17, and what was the corrected pilot budget ceiling?",
+      "recentCharacters": 12000,
+      "requestCharacters": 19646,
+      "summary": "- The team is reviewing a **proposed six-week support pilot**; no approval or commitment is recorded.\n- Maya corrected the proposed budget ceiling to **$38,000**, replacing the previously stated **$45,000**. The amount is not recorded as final or approved.\n- Hana said emergency escalation route **AMBER-17** belongs to **Hana Lin** and is unrelated to the pilot budget.\n- Liam said security review must be approved before the test account connects. **No production launch is approved.**\n- Intake routing and report layouts were compared; the discussion added no decision or commitment.",
+      "summaryCallsDuringPreparation": 0
+    }
+  ],
+  "executionConditions": [
+    "Optimized Apple Silicon Release helper, persistently signed with the existing approved benchmark identity.",
+    "No test, build, audio playback or capture run was active during this qualification. Installed Live was idle in Library.",
+    "Model discovery precedes measured updates. Four periodic snapshots run consecutively; they simulate 3/6/9/12-minute source coverage rather than three-minute wall-clock idle gaps.",
+    "Final two Asks use the 15-minute synthetic snapshot, existing summary cache and production pinned session. These are provider/context timings, excluding ASR, physical hotkey and display rendering.",
+    "Two warm answers and four back-to-back summary updates are a small sample; these are individual observations, not median/p95 or latency guarantees."
+  ],
+  "fixtureMinutes": 15,
+  "model": "gpt-6-luna",
+  "notes": [
+    "All source, summaries and answers are synthetic; no meeting database, audio or transcript is read.",
+    "Periodic snapshots at 3/6/9/12 minutes are simulated sequentially with no wall-clock sleep; Ask uses the final 15-minute snapshot.",
+    "Coverage means every source range is represented by processed summary or raw text, not that a lossy summary retains every fact.",
+    "Grounding checks are lexical review aids. Inspect stored synthetic outputs; they are not a general accuracy score.",
+    "Summary preparation and final answer timing are separate. These include provider/session checks, not capture, recognition or UI rendering.",
+    "The pinned production session finishes normally only after a completed provider response; failed/partial streams are never retried here."
+  ],
+  "periodicUpdates": [
+    {
+      "coverage": {
+        "allSourceProcessed": true,
+        "coveredCharacters": 4311,
+        "mode": "allEarlierSummarized",
+        "overlapCharacters": 0,
+        "rawCharacters": 0,
+        "summarizedCharacters": 4311,
+        "totalCharacters": 4311
+      },
+      "durationMs": 2401.4199583325535,
+      "summaryCalls": 1,
+      "throughMinute": 3,
+      "transcriptCharacters": 4311
+    },
+    {
+      "coverage": {
+        "allSourceProcessed": true,
+        "coveredCharacters": 8562,
+        "mode": "allEarlierSummarized",
+        "overlapCharacters": 0,
+        "rawCharacters": 0,
+        "summarizedCharacters": 8562,
+        "totalCharacters": 8562
+      },
+      "durationMs": 1733.2894999999553,
+      "summaryCalls": 1,
+      "throughMinute": 6,
+      "transcriptCharacters": 8562
+    },
+    {
+      "coverage": {
+        "allSourceProcessed": true,
+        "coveredCharacters": 12820,
+        "mode": "allEarlierSummarized",
+        "overlapCharacters": 0,
+        "rawCharacters": 0,
+        "summarizedCharacters": 12820,
+        "totalCharacters": 12820
+      },
+      "durationMs": 1657.535124802962,
+      "summaryCalls": 1,
+      "throughMinute": 9,
+      "transcriptCharacters": 12820
+    },
+    {
+      "coverage": {
+        "allSourceProcessed": true,
+        "coveredCharacters": 16963,
+        "mode": "allEarlierSummarized",
+        "overlapCharacters": 0,
+        "rawCharacters": 0,
+        "summarizedCharacters": 16963,
+        "totalCharacters": 16963
+      },
+      "durationMs": 1954.8079166561365,
+      "summaryCalls": 1,
+      "throughMinute": 12,
+      "transcriptCharacters": 16963
+    }
+  ],
+  "reasoningEffort": "none",
+  "sourceRevision": "b0afb122e5b4",
+  "summaryCalls": [
+    {
+      "completed": true,
+      "completionMs": 2395.1435417402536,
+      "firstSentenceMs": 2212.7162916585803,
+      "firstTextMs": 1751.6417915467173,
+      "output": "- The team is reviewing a **proposed six-week support pilot**; no approval or commitment is recorded.\n- Maya said the proposed cap is **$45,000** and is **not final**.\n- Hana said emergency escalation route **AMBER-17** belongs to **Hana Lin** and is unrelated to the pilot budget.\n- The team compared intake routing and report layouts; this discussion added no decision or commitment."
+    },
+    {
+      "completed": true,
+      "completionMs": 1725.6469165440649,
+      "firstSentenceMs": 1275.2473750151694,
+      "firstTextMs": 1179.3912916909903,
+      "output": "- The team is reviewing a **proposed six-week support pilot**; no approval or commitment is recorded.\n- Maya corrected the proposed budget ceiling to **$38,000**, replacing the previously stated **$45,000**. The amount is not recorded as final or approved.\n- Hana said emergency escalation route **AMBER-17** belongs to **Hana Lin** and is unrelated to the pilot budget.\n- The team compared intake routing and report layouts; this discussion added no decision or commitment."
+    },
+    {
+      "completed": true,
+      "completionMs": 1647.8695417754352,
+      "firstSentenceMs": 1042.3886249773204,
+      "firstTextMs": 945.2130417339504,
+      "output": "- The team is reviewing a **proposed six-week support pilot**; no approval or commitment is recorded.\n- Maya corrected the proposed budget ceiling to **$38,000**, replacing the previously stated **$45,000**. The amount is not recorded as final or approved.\n- Hana said emergency escalation route **AMBER-17** belongs to **Hana Lin** and is unrelated to the pilot budget.\n- Liam said security review must be approved before the test account connects. **No production launch is approved.**\n- The team compared intake routing and report layouts; this discussion added no decision or commitment."
+    },
+    {
+      "completed": true,
+      "completionMs": 1944.2859999835491,
+      "firstSentenceMs": 1385.0752499420196,
+      "firstTextMs": 1254.3105415534228,
+      "output": "- The team is reviewing a **proposed six-week support pilot**; no approval or commitment is recorded.\n- Maya corrected the proposed budget ceiling to **$38,000**, replacing the previously stated **$45,000**. The amount is not recorded as final or approved.\n- Hana said emergency escalation route **AMBER-17** belongs to **Hana Lin** and is unrelated to the pilot budget.\n- Liam said security review must be approved before the test account connects. **No production launch is approved.**\n- Intake routing and report layouts were compared; the discussion added no decision or commitment."
+    }
+  ],
+  "timestamp": "2026-10-29T02:10:46Z",
+  "transport": "websocket"
+}

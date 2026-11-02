@@ -156,7 +156,7 @@ struct OnboardingPracticeStepView: View {
 
     private var keyInstruction: String {
         guard viewModel.accessibilityGranted else {
-            return "The key can't reach MacParakeet without hotkey access. Go Back to Permissions to allow it."
+            return "The key can't reach MacParakeet Live without hotkey access. Go Back to Permissions to allow it."
         }
         guard hasAnyKey else {
             return "Pick a key for dictation, then press it here."

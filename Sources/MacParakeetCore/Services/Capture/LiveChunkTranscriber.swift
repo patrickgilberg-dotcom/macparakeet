@@ -11,6 +11,7 @@ actor LiveChunkTranscriber {
 
     struct OrderedResult: Sendable {
         let source: AudioSource
+        let enqueueSequence: Int
         let chunk: AudioChunker.AudioChunk
         let result: STTResult
     }
@@ -19,6 +20,7 @@ actor LiveChunkTranscriber {
         case orderedResults([OrderedResult])
         case backpressureDrop
         case transcriptionFailed(String)
+        case previewLoss(source: AudioSource, nextEnqueueSequence: Int)
     }
 
     typealias EventHandler = @Sendable (Event) async -> Void
@@ -39,6 +41,11 @@ actor LiveChunkTranscriber {
 
     init(sttTranscriber: STTTranscribing) {
         self.sttTranscriber = sttTranscriber
+    }
+
+    /// Freeze the frontier after a loss: work already enqueued cannot clear it.
+    func markPreviewLoss(source: AudioSource) async {
+        await emit(.previewLoss(source: source, nextEnqueueSequence: nextChunkSequence[source] ?? 0))
     }
 
     func startSession(
@@ -111,6 +118,19 @@ actor LiveChunkTranscriber {
         return true
     }
 
+    /// A live-answer barrier waits only for work already enqueued. New speech
+    /// keeps recording and must not extend an explicit request indefinitely.
+    func waitForCurrentTasksToDrain(timeout: Duration) async throws -> Bool {
+        let ids = Set(pendingChunkTasks.map(\.id))
+        let startedAt = ContinuousClock.now
+        while pendingChunkTasks.contains(where: { ids.contains($0.id) }) {
+            try Task.checkCancellation()
+            guard startedAt.duration(to: .now) < timeout else { return false }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        return true
+    }
+
     func cancelPendingTasks(waitForCancellation: Bool) async {
         let tasks = pendingChunkTasks.map(\.task)
         pendingChunkTasks = []
@@ -130,6 +150,13 @@ actor LiveChunkTranscriber {
         source: AudioSource,
         context: SessionContext
     ) async throws -> STTResult {
+        let recognitionStarted = ContinuousClock.now
+        defer {
+            let elapsed = LiveAnswerTiming.milliseconds(recognitionStarted.duration(to: .now))
+            AudioCaptureDiagnostics.appendAsync(
+                "meeting_live_recognition source=\(source.rawValue) audio_start_ms=\(chunk.startMs) audio_end_ms=\(chunk.endMs) recognition_ms=\(String(format: "%.1f", elapsed))"
+            )
+        }
         let chunkURL = context.chunkFolderURL
             .appendingPathComponent("\(source.rawValue)-\(chunk.startMs)-\(chunk.endMs).wav")
         try writeChunkAudio(samples: chunk.samples, to: chunkURL)
@@ -216,7 +243,7 @@ actor LiveChunkTranscriber {
         guard !readyResults.isEmpty else { return }
 
         let ordered = readyResults.map {
-            OrderedResult(source: source, chunk: $0.chunk, result: $0.result)
+            OrderedResult(source: source, enqueueSequence: $0.sequence, chunk: $0.chunk, result: $0.result)
         }
         await emit(.orderedResults(ordered))
     }
@@ -229,10 +256,12 @@ actor LiveChunkTranscriber {
         logger.info(
             "meeting_live_chunk_cancelled source=\(source.rawValue, privacy: .public) seq=\(sequence)"
         )
+        await markPreviewLoss(source: source)
+        guard sessionContext?.id == sessionID else { return }
         let readyResults = chunkResultBuffer.receiveFailure(sequence: sequence, source: source)
         guard !readyResults.isEmpty else { return }
         let ordered = readyResults.map {
-            OrderedResult(source: source, chunk: $0.chunk, result: $0.result)
+            OrderedResult(source: source, enqueueSequence: $0.sequence, chunk: $0.chunk, result: $0.result)
         }
         await emit(.orderedResults(ordered))
     }
@@ -252,6 +281,9 @@ actor LiveChunkTranscriber {
                 false
             }
 
+        await markPreviewLoss(source: source)
+        guard sessionContext?.id == sessionID else { return }
+
         if droppedByBackpressure {
             logger.notice(
                 "meeting_live_chunk_backpressure_drop source=\(source.rawValue, privacy: .public) seq=\(sequence)"
@@ -264,10 +296,11 @@ actor LiveChunkTranscriber {
             await emit(.transcriptionFailed(error.localizedDescription))
         }
 
+        guard sessionContext?.id == sessionID else { return }
         let readyResults = chunkResultBuffer.receiveFailure(sequence: sequence, source: source)
         guard !readyResults.isEmpty else { return }
         let ordered = readyResults.map {
-            OrderedResult(source: source, chunk: $0.chunk, result: $0.result)
+            OrderedResult(source: source, enqueueSequence: $0.sequence, chunk: $0.chunk, result: $0.result)
         }
         await emit(.orderedResults(ordered))
     }

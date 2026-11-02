@@ -1,0 +1,111 @@
+{
+  "verifiedAt": "2026-10-28T23:20:22.192372+00:00",
+  "scope": "Content-free finalized capture qualification. Transcript, notes, questions, answers and audio contents were not inspected or played/exported. Audio decoded only to null with aggregate signal metrics; database returned role counts only.",
+  "appCommit": "a4a73f90205a",
+  "captureID": "9DA86E5A-6AA4-4C2D-BDC3-5995ABEC7001",
+  "transcriptionID": "0E58FAA5-53C6-48FF-99A4-627502DE2A59",
+  "status": "completed",
+  "durationMs": 668331,
+  "sourceMode": "microphone_and_system",
+  "quality": "healthy",
+  "captureReport": {
+    "captureFailed": false,
+    "capturedDurationMs": 668354,
+    "elapsedDurationMs": 668242,
+    "interruptedSources": [],
+    "quality": "healthy",
+    "sourceMode": "microphone_and_system",
+    "sources": [
+      {
+        "coverageRatio": 1,
+        "source": "microphone",
+        "status": "complete",
+        "writtenDurationMs": 668300
+      },
+      {
+        "coverageRatio": 0.9998473606866973,
+        "source": "system",
+        "status": "complete",
+        "writtenDurationMs": 668140
+      }
+    ]
+  },
+  "manifestCaptureReportMatchesMetadata": true,
+  "sourceAlignment": {
+    "microphone": {
+      "sampleRate": 48000,
+      "startOffsetMs": 0,
+      "timelineFrameCount": 32078400,
+      "writtenFrameCount": 32078400
+    },
+    "system": {
+      "sampleRate": 48000,
+      "startOffsetMs": 214,
+      "timelineFrameCount": 32070720,
+      "writtenFrameCount": 32070720
+    }
+  },
+  "lockFilesPresent": [],
+  "durableFiles": {
+    "manifest.json": {
+      "exists": true,
+      "bytes": 3247
+    },
+    "meeting-recording-metadata.json": {
+      "exists": true,
+      "bytes": 1507
+    },
+    "transcript.json": {
+      "exists": true,
+      "bytes": 92775
+    },
+    "meeting.md": {
+      "exists": true,
+      "bytes": 4971
+    }
+  },
+  "audioFiles": [
+    {
+      "name": "microphone-raw.m4a",
+      "bytes": 5640456,
+      "selected": true,
+      "decodeExitCode": 0,
+      "decodedDurationSeconds": 668.3,
+      "nonzeroAudioSamples": true,
+      "maximumPeakDb": 4.444162,
+      "progressCompleted": true,
+      "errorOutputPresent": false
+    },
+    {
+      "name": "system-raw.m4a",
+      "bytes": 506241,
+      "selected": true,
+      "decodeExitCode": 0,
+      "decodedDurationSeconds": 668.14,
+      "nonzeroAudioSamples": true,
+      "maximumPeakDb": -4.31808,
+      "progressCompleted": true,
+      "errorOutputPresent": false
+    },
+    {
+      "name": "meeting-playback.m4a",
+      "bytes": 10822218,
+      "selected": true,
+      "decodeExitCode": 0,
+      "decodedDurationSeconds": 668.354,
+      "nonzeroAudioSamples": true,
+      "maximumPeakDb": -0.450189,
+      "progressCompleted": true,
+      "errorOutputPresent": false
+    }
+  ],
+  "allSelectedAudioFilesDecodeNonzero": true,
+  "savedChatCounts": {
+    "conversationCount": 1,
+    "messageCount": 10,
+    "userMessages": 5,
+    "assistantMessages": 5,
+    "otherRoleMessages": 0,
+    "expectedFivePairs": true
+  }
+}

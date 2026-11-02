@@ -109,7 +109,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false)
-        w.title = "Welcome to MacParakeet"
+        w.title = "Welcome to \(LiveAppIdentity.displayName)"
         w.isReleasedWhenClosed = false
         w.center()
         w.contentView = hosting
@@ -125,7 +125,7 @@ final class OnboardingWindowController: NSObject, NSWindowDelegate {
             alert.alertStyle = .warning
             alert.messageText = "Setup is not finished"
             alert.informativeText =
-                "MacParakeet needs its permissions and the local speech model before dictation is reliable."
+                "MacParakeet Live needs its permissions and the local speech model before dictation is reliable."
             alert.addButton(withTitle: "Continue Setup")
             alert.addButton(withTitle: "Exit Setup")
 

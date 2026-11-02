@@ -101,9 +101,10 @@ public final class LLMConfigStore: LLMConfigStoreProtocol, @unchecked Sendable {
     private let keychain: KeyValueStore
     private let synchronizePreferences: @Sendable (String) -> Bool
 
-    /// App, dev app and CLI deliberately share this preferences domain and lock,
-    /// independent of the dev app's isolated database/audio directory.
-    public convenience init(keychain: KeyValueStore = KeychainKeyValueStore(service: "com.macparakeet.llm")) {
+    /// This fork's app and CLI share a domain and lock isolated from upstream.
+    public convenience init(
+        keychain: KeyValueStore = KeychainKeyValueStore(service: LiveAppIdentity.keychainService("llm"))
+    ) {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         self.init(
             preferencesDomain: AppPaths.preferencesSuiteName,
@@ -116,7 +117,7 @@ public final class LLMConfigStore: LLMConfigStoreProtocol, @unchecked Sendable {
     /// from accidentally routing tests or helpers into production preferences.
     public convenience init(
         preferencesDomain: String, lockURL: URL,
-        keychain: KeyValueStore = KeychainKeyValueStore(service: "com.macparakeet.llm")
+        keychain: KeyValueStore = KeychainKeyValueStore(service: LiveAppIdentity.keychainService("llm"))
     ) {
         self.init(
             preferencesDomain: preferencesDomain, lockURL: lockURL, keychain: keychain,

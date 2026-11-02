@@ -1,7 +1,7 @@
 import Foundation
 
 public final class VoiceControlCredentialStore {
-    private let store = KeychainKeyValueStore(service: "com.macparakeet.voice-control.jev")
+    private let store = KeychainKeyValueStore(service: LiveAppIdentity.keychainService("voice-control.jev"))
     public init() {}
     public func loadAPIKey() throws -> String? { try store.getString("apiKey") }
     public func saveAPIKey(_ value: String) throws {

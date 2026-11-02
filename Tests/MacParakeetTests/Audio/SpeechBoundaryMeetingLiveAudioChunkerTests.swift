@@ -5,9 +5,39 @@ import XCTest
 /// driven by a scripted fake VAD so no FluidAudio models are loaded.
 final class SpeechBoundaryMeetingLiveAudioChunkerTests: XCTestCase {
     private let window = 4_096
-    private let minChunkSamples = 32_000   // 2.0s
+    private let minChunkSamples = 32_000  // 2.0s
     private let maxChunkSamples = 160_000  // 10.0s
-    private let flushMinSamples = 8_000    // 0.5s
+    private let flushMinSamples = 8_000  // 0.5s
+
+    func testLiveAnswerFlushMidSpeechPreservesContinuationUntilSpeechEnd() async {
+        let vad = FakeMeetingVAD(events: [
+            1: .speechStart,
+            11: .speechEnd(sampleIndex: 45_056),
+        ])
+        let chunker = SpeechBoundaryMeetingLiveAudioChunker(vad: vad)
+        _ = await feed(chunker, windows: 3)
+        let questionTail = await chunker.flushForLiveAnswer()
+        XCTAssertEqual(questionTail?.endMs, 768)
+        let continuation = await feed(chunker, windows: 8)
+        XCTAssertEqual(continuation.count, 1)
+        XCTAssertEqual(continuation.first?.startMs, 768)
+        XCTAssertEqual(continuation.first?.endMs, 2_816)
+        XCTAssertEqual(continuation.first?.samples.count, 32_768)
+    }
+
+    func testLiveAnswerFlushKeepsUnclassifiedSubWindowTailAndContinuesTimeline() async {
+        let chunker = SpeechBoundaryMeetingLiveAudioChunker(vad: FakeMeetingVAD())
+        _ = await chunker.addSamples([Float](repeating: 0.25, count: 4_000))
+        let first = await chunker.flushForLiveAnswer()
+        XCTAssertEqual(first?.samples.count, 4_000)
+        XCTAssertEqual(first?.startMs, 0)
+        XCTAssertEqual(first?.endMs, 250)
+        _ = await chunker.addSamples([Float](repeating: 0.25, count: 8_000))
+        let next = await chunker.flushForLiveAnswer()
+        XCTAssertEqual(next?.samples.count, 8_000)
+        XCTAssertEqual(next?.startMs, 250)
+        XCTAssertEqual(next?.endMs, 750)
+    }
 
     // MARK: - speech-end emits
 
@@ -258,7 +288,8 @@ final class SpeechBoundaryMeetingLiveAudioChunkerTests: XCTestCase {
 
         XCTAssertEqual(chunks.count, 1, "only the single force-emit should be emitted")
         let diag = await chunker.diagnostics
-        XCTAssertEqual(diag.forceEmits, 1, "a stale end must not leave the speech flag set (which would force-emit silence)")
+        XCTAssertEqual(
+            diag.forceEmits, 1, "a stale end must not leave the speech flag set (which would force-emit silence)")
         XCTAssertGreaterThanOrEqual(diag.droppedSilenceWindows, 1, "post-speech silence should be dropped")
     }
 

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2026-10-28T22:58:22.636830+00:00",
+  "qualificationSource": "a4a73f90205a",
+  "configuration": "optimized Xcode Release",
+  "verification": "Installed native app Accessibility observation",
+  "chatGPTPlanEnabled": true,
+  "model": "gpt-6-luna",
+  "reasoningEffort": "none",
+  "permissionsGranted": [
+    "microphone",
+    "accessibility",
+    "screen-and-system-audio"
+  ],
+  "settingsConnectionTest": {
+    "completed": true,
+    "displayedFirstTextMs": 1801,
+    "displayedFirstSentenceMs": 2043,
+    "trials": 1,
+    "context": "synthetic benchmark fixture"
+  },
+  "notes": [
+    "Displayed timings are integer milliseconds from one native Settings test, not median/p95 or speech-to-answer timing.",
+    "No recording or playback was started. No incidental meeting transcript or audio was inspected or sent.",
+    "Saved model+effort pair remained unchanged after native settings navigation/reload. Physical global-shortcut delivery remains unverified."
+  ]
+}

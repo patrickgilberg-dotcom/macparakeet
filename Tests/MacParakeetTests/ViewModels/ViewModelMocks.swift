@@ -1641,6 +1641,7 @@ final class MockPromptResultRepository: PromptResultRepositoryProtocol, @uncheck
 // MARK: - MockChatConversationRepository
 
 final class MockChatConversationRepository: ChatConversationRepositoryProtocol, @unchecked Sendable {
+    var saveError: Error?
     var conversations: [ChatConversation] = []
     var saveCalls: [ChatConversation] = []
     var deleteCalls: [UUID] = []
@@ -1651,6 +1652,7 @@ final class MockChatConversationRepository: ChatConversationRepositoryProtocol, 
     var deleteAllError: Error?
 
     func save(_ conversation: ChatConversation) throws {
+        if let saveError { throw saveError }
         saveCalls.append(conversation)
         if let idx = conversations.firstIndex(where: { $0.id == conversation.id }) {
             conversations[idx] = conversation

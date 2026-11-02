@@ -1,0 +1,47 @@
+{
+  "hardware": "Apple M5",
+  "idleCheck": {
+    "error": "The operation couldn\u2019t be completed. Socket is not connected",
+    "idleSeconds": 180,
+    "model": "gpt-6.1-sol",
+    "reasoningEffort": "provider-default",
+    "warmupCallCompleted": true
+  },
+  "memoryGB": 16,
+  "notes": [
+    "First sentence timing uses punctuation after 12 characters; inspect stored outputs for usefulness.",
+    "First-process requests follow catalog retrieval and any rejected effort probes; they do not establish untouched network/server cold latency.",
+    "Transport is explicit in each trial and summary. WebSocket reuses one socket after a completed response, with full bounded input on each turn.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem": "Version 26.5.1 (Build 25F80)",
+  "processorCount": 10,
+  "summaries": [
+    {
+      "condition": "unused-warmup-idle-180s",
+      "failures": 1,
+      "model": "gpt-6.1-sol",
+      "transport": "websocket",
+      "trials": 1
+    }
+  ],
+  "timestamp": "2026-10-28T22:24:15Z",
+  "trials": [
+    {
+      "completed": false,
+      "completionMs": 50.97545846365392,
+      "condition": "unused-warmup-idle-180s",
+      "error": "The operation couldn\u2019t be completed. Socket is not connected",
+      "inputCharacters": 2076,
+      "model": "gpt-6.1-sol",
+      "output": "",
+      "transport": "websocket"
+    }
+  ],
+  "qualificationSource": "b4ab4ac8e969",
+  "qualificationNotes": [
+    "The pre-send URLSession state/close-code guard did not detect this server-closed idle socket. No model output was received and the sent request was not replayed.",
+    "The reported model was the saved selection at the time; failure occurred before any output. This is failure evidence, not a speed benchmark."
+  ]
+}

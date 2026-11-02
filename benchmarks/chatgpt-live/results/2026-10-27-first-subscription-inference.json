@@ -1,0 +1,36 @@
+{
+  "notes" : [
+    "First sentence timing uses punctuation after 20 characters; inspect stored outputs for usefulness.",
+    "First-process requests are labeled cold; this does not reset the server's cache or OS network cache.",
+    "Provider timings exclude microphone, transcription, hotkey dispatch and UI rendering. Live Ask measures those separately.",
+    "p95 uses nearest-rank sampling. Small trial counts are exploratory, not a service guarantee."
+  ],
+  "operatingSystem" : "Version 26.5.1 (Build 25F80)",
+  "processorCount" : 10,
+  "summaries" : [
+    {
+      "condition" : "first-process-cold",
+      "failures" : 0,
+      "medianCompletionMs" : 5776.146458461881,
+      "medianFirstSentenceMs" : 4319.001541705802,
+      "medianFirstTextMs" : 3215.9573750104755,
+      "model" : "gpt-6.1-sol",
+      "p95CompletionMs" : 5776.146458461881,
+      "p95FirstSentenceMs" : 4319.001541705802,
+      "p95FirstTextMs" : 3215.9573750104755,
+      "trials" : 1
+    }
+  ],
+  "timestamp" : "2026-10-28T02:37:03Z",
+  "trials" : [
+    {
+      "completed" : true,
+      "completionMs" : 5776.146458461881,
+      "condition" : "first-process-cold",
+      "firstSentenceMs" : 4319.001541705802,
+      "firstTextMs" : 3215.9573750104755,
+      "model" : "gpt-6.1-sol",
+      "output" : "“A two-week security review could put the timeline at risk, but we haven’t confirmed that yet; in the meantime, I’d propose aligning on the measurement plan and preparing the pilot without connecting the account.”\n\n- Confirm whether the six weeks includes the review, and establish how we’ll measure a 20% reduction in median response time while maintaining quality.\n- Keep the security review as a prerequisite to connecting; the integration is read-only, and no production rollout is approved."
+    }
+  ]
+}

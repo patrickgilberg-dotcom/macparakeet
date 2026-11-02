@@ -140,7 +140,19 @@ public struct MeetingRecordingOutput: Sendable, Equatable {
         self.meetingTypeId = meetingTypeId
         self.startedAt = startedAt
         self.audioRetentionStartedAt = audioRetentionStartedAt
-        self.titleOverride = Transcription.normalizedTitleOverride(from: titleOverride)
+        let explicitTitle = titleOverride ?? Self.matchingCalendarTitle(displayName, snapshot: calendarEventSnapshot)
+        self.titleOverride = Transcription.protectedTitleOverride(
+            from: explicitTitle, calendarEventSnapshot: calendarEventSnapshot)
+    }
+
+    /// Archived calendar recordings predate explicit-title locks. Their saved
+    /// calendar name is still authoritative when it matches the displayed title.
+    private static func matchingCalendarTitle(_ title: String, snapshot: MeetingCalendarSnapshot?) -> String? {
+        guard let snapshot,
+            Transcription.normalizedTitleOverride(from: title)
+                == Transcription.normalizedTitleOverride(from: snapshot.title)
+        else { return nil }
+        return snapshot.title
     }
 
     /// The microphone audio to transcribe for the local ("Me") track: the

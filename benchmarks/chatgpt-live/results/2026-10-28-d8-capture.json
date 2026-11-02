@@ -1,0 +1,148 @@
+{
+  "verifiedAt": "2026-10-28T23:45:06.256405+00:00",
+  "scope": "Content-free finalization and signing qualification. No transcript, notes, questions or answers inspected; no audio playback/export. Full selected audio decoded only to null with aggregate signal metrics; DB returns role counts only.",
+  "signing": {
+    "installed": {
+      "commit": "d8d6477875b5",
+      "buildSource": "live-xcodebuild-release",
+      "bundleIdentifier": "com.patrickgilberg.macparakeet-live",
+      "strictDeepSignatureVerified": true,
+      "appleDevelopmentAuthority": true,
+      "teamIdentifier": "3G3BKNXU3A",
+      "certificateBasedDR": true,
+      "designatedRequirementSHA256": "fb8a138711ba236cf8510167aeaff55bbd76fa6d1cebcbb805979df16593c514",
+      "executableSHA256": "c8e0ed0f847095c04ac868f6da1f9c6b36d58cc1f2676fdf7647f322b9187cf3"
+    },
+    "cachedReleaseBuild": {
+      "commit": "d8d6477875b5",
+      "buildSource": "live-xcodebuild-release",
+      "bundleIdentifier": "com.patrickgilberg.macparakeet-live",
+      "strictDeepSignatureVerified": true,
+      "appleDevelopmentAuthority": true,
+      "teamIdentifier": "3G3BKNXU3A",
+      "certificateBasedDR": true,
+      "designatedRequirementSHA256": "4222dae9fd6a91ff17faabc919a915493790df783c8d3ce32a6aa5618f197a32",
+      "executableSHA256": "c8e0ed0f847095c04ac868f6da1f9c6b36d58cc1f2676fdf7647f322b9187cf3"
+    },
+    "sourceHEAD": "d8d6477875b5",
+    "installedMatchesCachedExecutable": true,
+    "installedStableDRUnchanged": true
+  },
+  "captureID": "E6C84F56-7AEA-4AFC-85C1-2C02D42F5431",
+  "transcriptionID": "6001A7F4-CEE4-412A-A2BB-006CAAF708B2",
+  "status": "completed",
+  "durationMs": 323177,
+  "sourceMode": "microphone_and_system",
+  "quality": "healthy",
+  "captureReport": {
+    "captureFailed": false,
+    "capturedDurationMs": 323200,
+    "elapsedDurationMs": 323057,
+    "interruptedSources": [],
+    "quality": "healthy",
+    "sourceMode": "microphone_and_system",
+    "sources": [
+      {
+        "coverageRatio": 1,
+        "source": "microphone",
+        "status": "complete",
+        "writtenDurationMs": 323200
+      },
+      {
+        "coverageRatio": 0.9990806575929325,
+        "source": "system",
+        "status": "complete",
+        "writtenDurationMs": 322760
+      }
+    ]
+  },
+  "manifestCaptureReportMatchesMetadata": true,
+  "sourceAlignment": {
+    "microphone": {
+      "sampleRate": 48000,
+      "startOffsetMs": 0,
+      "timelineFrameCount": 15513600,
+      "writtenFrameCount": 15513600
+    },
+    "system": {
+      "sampleRate": 48000,
+      "startOffsetMs": 386,
+      "timelineFrameCount": 15492480,
+      "writtenFrameCount": 15492480
+    }
+  },
+  "lockFilesPresent": [],
+  "durableFiles": {
+    "manifest.json": {
+      "exists": true,
+      "bytes": 3254
+    },
+    "meeting-recording-metadata.json": {
+      "exists": true,
+      "bytes": 1514
+    },
+    "transcript.json": {
+      "exists": true,
+      "bytes": 174099
+    },
+    "meeting.md": {
+      "exists": true,
+      "bytes": 7642
+    }
+  },
+  "ffmpegVersion": "ffmpeg version 9.0.2-https://www.martin-riedl.de Copyright (c) 2000-2026 the FFmpeg developers",
+  "audioFiles": [
+    {
+      "name": "microphone-raw.m4a",
+      "bytes": 2777223,
+      "selected": true,
+      "decodeExitCode": 0,
+      "decodedDurationSeconds": 323.2,
+      "nonzeroAudioSamples": true,
+      "maximumPeakDb": 5.778108,
+      "progressCompleted": true,
+      "errorOutputPresent": false
+    },
+    {
+      "name": "system-raw.m4a",
+      "bytes": 247717,
+      "selected": true,
+      "decodeExitCode": 0,
+      "decodedDurationSeconds": 322.76,
+      "nonzeroAudioSamples": true,
+      "maximumPeakDb": -4.491928,
+      "progressCompleted": true,
+      "errorOutputPresent": false
+    },
+    {
+      "name": "meeting-playback.m4a",
+      "bytes": 5231821,
+      "selected": true,
+      "decodeExitCode": 0,
+      "decodedDurationSeconds": 323.2,
+      "nonzeroAudioSamples": true,
+      "maximumPeakDb": 2.478368,
+      "progressCompleted": true,
+      "errorOutputPresent": false
+    }
+  ],
+  "originalUpstream": {
+    "executableSHA256": "55e7a110c6c952fbeb876cd60e576a605d7a45af5f45b2bb205595769219fc70",
+    "baselineMatched": true
+  },
+  "savedSyntheticSelections": [
+    {
+      "model": "gpt-6-luna",
+      "reasoningEffort": "none"
+    }
+  ],
+  "allSelectedAudioFilesDecodeNonzero": true,
+  "savedChatCounts": {
+    "conversationCount": 1,
+    "messageCount": 7,
+    "userMessages": 4,
+    "assistantMessages": 3,
+    "otherRoleMessages": 0
+  },
+  "finalizedArtifactsComplete": true
+}

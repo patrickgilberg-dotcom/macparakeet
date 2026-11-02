@@ -1,0 +1,441 @@
+{
+  "schema_version": 1,
+  "verified_at_utc": "2026-10-28T23:20:41.005165+00:00",
+  "production_source": "a4a73f90205a",
+  "scope": "Content-free structured diagnostic and controlled-fixture playback metadata only. No transcript, prompt, custom question, answer, notes or audio content read or exported.",
+  "log_path": "/Users/patrickgilberg/Library/Logs/MacParakeet-Live/dictation-audio.log",
+  "process_id": 68812,
+  "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+  "capture_id": "9DA86E5A-6AA4-4C2D-BDC3-5995ABEC7001",
+  "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+  "capture_metric_records": [
+    {
+      "timestamp": "2026-10-28T23:07:28.216Z",
+      "event": "meeting_recording_started",
+      "fields": {
+        "session": "9DA86E5A-6AA4-4C2D-BDC3-5995ABEC7001",
+        "source_mode": "Optional(MacParakeetCore.MeetingAudioSourceMode.microphoneAndSystem)",
+        "requested_mic_mode": "raw",
+        "effective_mic_mode": "raw",
+        "process_id": "68812",
+        "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+        "uptime_ns": "1920788712392416",
+        "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:18:36.458Z",
+      "event": "meeting_recording_stopping",
+      "fields": {
+        "session": "9DA86E5A-6AA4-4C2D-BDC3-5995ABEC7001",
+        "process_id": "68812",
+        "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+        "uptime_ns": "1921456984795666",
+        "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+        "consumer": "meeting"
+      }
+    },
+    {
+      "timestamp": "2026-10-28T23:18:42.064Z",
+      "event": "meeting_recording_stopped",
+      "fields": {
+        "session": "9DA86E5A-6AA4-4C2D-BDC3-5995ABEC7001",
+        "duration_s": "668.331",
+        "process_id": "68812",
+        "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+        "uptime_ns": "1921462590877333",
+        "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+        "consumer": "meeting"
+      }
+    }
+  ],
+  "shortcut_registration_records": [
+    {
+      "timestamp": "2026-10-28T23:07:27.720Z",
+      "event": "live_answer_hotkey_registration",
+      "fields": {
+        "outcome": "registered",
+        "control": "false",
+        "status": "0",
+        "process_id": "68812",
+        "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+        "uptime_ns": "1920788216492916"
+      }
+    }
+  ],
+  "trials": [
+    {
+      "ordinal": 1,
+      "request_id": "4814E7DC-75C2-4D43-8915-9F4BD0D43B82",
+      "input_route": "physical-shortcut-focused-panel-possibly-local",
+      "global_delivery_verified": false,
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 320.6,
+        "hotkey_to_request_ms": 321.0,
+        "request_to_first_text_ms": 5149.7,
+        "first_text_ms": 5470.8,
+        "first_sentence_ms": 5559.4,
+        "completion_ms": 5622.2
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:08:47.381Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "4814E7DC-75C2-4D43-8915-9F4BD0D43B82",
+          "outcome": "completed",
+          "transcript_ready_ms": "320.6",
+          "hotkey_to_request_ms": "321.0",
+          "request_to_first_text_ms": "5149.7",
+          "first_text_ms": "5470.8",
+          "first_sentence_ms": "5559.4",
+          "completion_ms": "5622.2",
+          "process_id": "68812",
+          "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+          "uptime_ns": "1920867877161166",
+          "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:08:42.075Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "254.1",
+            "outcome": "ready",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1920862571003875",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        }
+      ],
+      "fixture_playback_records": [
+        {
+          "boundary": "AVAudioPlayer playback-end proxy, not independent acoustic speech end",
+          "event": "playback_started",
+          "fixture_id": 1,
+          "schema_version": 1,
+          "success": true,
+          "trial_id": "F0A37FFF-6135-47E6-9C65-F2B345851427",
+          "uptime_ns": 1920846985263458,
+          "wall_time_unix_ns": 1793228906488761856,
+          "wall_time_utc": "2026-10-28T23:08:26.489Z"
+        },
+        {
+          "boundary": "AVAudioPlayer playback-end proxy, not independent acoustic speech end",
+          "event": "playback_finished",
+          "fixture_id": 1,
+          "schema_version": 1,
+          "success": true,
+          "trial_id": "F0A37FFF-6135-47E6-9C65-F2B345851427",
+          "uptime_ns": 1920855243309625,
+          "wall_time_unix_ns": 1793228914746844928,
+          "wall_time_utc": "2026-10-28T23:08:34.747Z"
+        }
+      ],
+      "playback_end_proxy_analysis": {
+        "trial_id": "F0A37FFF-6135-47E6-9C65-F2B345851427",
+        "end_uptime_ns": 1920855243309625,
+        "approx_invocation_uptime_ns": 1920862254961166,
+        "approx_playback_end_to_invocation_ms": 7011.651541,
+        "approx_playback_end_to_request_handoff_ms": 7332.651541,
+        "approx_playback_end_to_first_text_ms": 12482.451541,
+        "approx_playback_end_to_first_sentence_ms": 12571.051541,
+        "playback_end_to_terminal_log_ms": 12633.851541,
+        "derivation": "Subtract recorded completion duration from terminal log uptime, then add the requested stage duration. Stage clocks are derived, not independently emitted timestamps; logging/rounding overhead remains.",
+        "boundary": "AVAudioPlayer completion is a playback-end proxy, not an independently measured acoustic speech end."
+      }
+    },
+    {
+      "ordinal": 2,
+      "request_id": "890CC204-5861-4B31-8143-5AFBFD084E2D",
+      "input_route": "help-button",
+      "global_delivery_verified": false,
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 424.2,
+        "hotkey_to_request_ms": 424.4,
+        "request_to_first_text_ms": 3662.6,
+        "first_text_ms": 4087.0,
+        "first_sentence_ms": 4164.5,
+        "completion_ms": 4204.4
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:10:00.430Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "890CC204-5861-4B31-8143-5AFBFD084E2D",
+          "outcome": "completed",
+          "transcript_ready_ms": "424.2",
+          "hotkey_to_request_ms": "424.4",
+          "request_to_first_text_ms": "3662.6",
+          "first_text_ms": "4087.0",
+          "first_sentence_ms": "4164.5",
+          "completion_ms": "4204.4",
+          "process_id": "68812",
+          "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+          "uptime_ns": "1920940926166458",
+          "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:09:56.619Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "354.8",
+            "outcome": "ready",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1920937114804125",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        }
+      ],
+      "fixture_playback_records": [
+        {
+          "boundary": "AVAudioPlayer playback-end proxy, not independent acoustic speech end",
+          "event": "playback_started",
+          "fixture_id": 2,
+          "schema_version": 1,
+          "success": true,
+          "trial_id": "5A246643-D429-482B-B3B5-00C1E900C4A9",
+          "uptime_ns": 1920928115631708,
+          "wall_time_unix_ns": 1793228987619482880,
+          "wall_time_utc": "2026-10-28T23:09:47.619Z"
+        },
+        {
+          "boundary": "AVAudioPlayer playback-end proxy, not independent acoustic speech end",
+          "event": "playback_finished",
+          "fixture_id": 2,
+          "schema_version": 1,
+          "success": true,
+          "trial_id": "5A246643-D429-482B-B3B5-00C1E900C4A9",
+          "uptime_ns": 1920936445641833,
+          "wall_time_unix_ns": 1793228995949527040,
+          "wall_time_utc": "2026-10-28T23:09:55.950Z"
+        }
+      ],
+      "playback_end_proxy_analysis": {
+        "trial_id": "5A246643-D429-482B-B3B5-00C1E900C4A9",
+        "end_uptime_ns": 1920936445641833,
+        "approx_invocation_uptime_ns": 1920936721766458,
+        "approx_playback_end_to_invocation_ms": 276.124625,
+        "approx_playback_end_to_request_handoff_ms": 700.524625,
+        "approx_playback_end_to_first_text_ms": 4363.124625,
+        "approx_playback_end_to_first_sentence_ms": 4440.624625,
+        "playback_end_to_terminal_log_ms": 4480.524625,
+        "derivation": "Subtract recorded completion duration from terminal log uptime, then add the requested stage duration. Stage clocks are derived, not independently emitted timestamps; logging/rounding overhead remains.",
+        "boundary": "AVAudioPlayer completion is a playback-end proxy, not an independently measured acoustic speech end."
+      }
+    },
+    {
+      "ordinal": 3,
+      "request_id": "F8F20DBE-E05C-4343-9CE0-3B4FD6B6F82D",
+      "input_route": "custom-question",
+      "global_delivery_verified": false,
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 489.0,
+        "hotkey_to_request_ms": 489.9,
+        "request_to_first_text_ms": 2585.2,
+        "first_text_ms": 3075.1,
+        "first_sentence_ms": 3465.8,
+        "completion_ms": 3486.0
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:15:36.061Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "F8F20DBE-E05C-4343-9CE0-3B4FD6B6F82D",
+          "outcome": "completed",
+          "transcript_ready_ms": "489.0",
+          "hotkey_to_request_ms": "489.9",
+          "request_to_first_text_ms": "2585.2",
+          "first_text_ms": "3075.1",
+          "first_sentence_ms": "3465.8",
+          "completion_ms": "3486.0",
+          "process_id": "68812",
+          "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+          "uptime_ns": "1921276555112958",
+          "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:15:33.061Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "437.5",
+            "outcome": "ready",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1921273555962916",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        }
+      ]
+    },
+    {
+      "ordinal": 4,
+      "request_id": "8CB36498-6F44-4618-8B4B-9B3922DCED22",
+      "input_route": "native-global-registered-hotkey",
+      "global_delivery_verified": true,
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 242.4,
+        "hotkey_to_request_ms": 242.5,
+        "request_to_first_text_ms": 1845.5,
+        "first_text_ms": 2088.0,
+        "first_sentence_ms": 2409.2,
+        "completion_ms": 2435.8
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:15:52.548Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "8CB36498-6F44-4618-8B4B-9B3922DCED22",
+          "outcome": "completed",
+          "transcript_ready_ms": "242.4",
+          "hotkey_to_request_ms": "242.5",
+          "request_to_first_text_ms": "1845.5",
+          "first_text_ms": "2088.0",
+          "first_sentence_ms": "2409.2",
+          "completion_ms": "2435.8",
+          "process_id": "68812",
+          "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+          "uptime_ns": "1921293042902875",
+          "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:15:50.113Z",
+          "event": "live_answer_hotkey",
+          "fields": {
+            "outcome": "triggered",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1921290607235583",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:15:50.354Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "231.8",
+            "outcome": "ready",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1921290848958000",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        }
+      ]
+    },
+    {
+      "ordinal": 5,
+      "request_id": "5C222993-407F-4F67-BB63-9E93E7DB4630",
+      "input_route": "native-global-registered-hotkey",
+      "global_delivery_verified": true,
+      "outcome": "completed",
+      "metrics_ms": {
+        "transcript_ready_ms": 526.2,
+        "hotkey_to_request_ms": 526.3,
+        "request_to_first_text_ms": 4070.2,
+        "first_text_ms": 4596.5,
+        "first_sentence_ms": 5308.9,
+        "completion_ms": 5357.5
+      },
+      "terminal_record": {
+        "timestamp": "2026-10-28T23:16:16.468Z",
+        "event": "live_answer_timing",
+        "fields": {
+          "request": "5C222993-407F-4F67-BB63-9E93E7DB4630",
+          "outcome": "completed",
+          "transcript_ready_ms": "526.2",
+          "hotkey_to_request_ms": "526.3",
+          "request_to_first_text_ms": "4070.2",
+          "first_text_ms": "4596.5",
+          "first_sentence_ms": "5308.9",
+          "completion_ms": "5357.5",
+          "process_id": "68812",
+          "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+          "uptime_ns": "1921316962768083",
+          "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+          "consumer": "meeting"
+        }
+      },
+      "correlated_metric_records": [
+        {
+          "timestamp": "2026-10-28T23:16:11.111Z",
+          "event": "live_answer_hotkey",
+          "fields": {
+            "outcome": "triggered",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1921311605342333",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        },
+        {
+          "timestamp": "2026-10-28T23:16:11.630Z",
+          "event": "meeting_live_answer_flush",
+          "fields": {
+            "elapsed_ms": "306.4",
+            "outcome": "ready",
+            "process_id": "68812",
+            "process_session": "36a34425-78fb-4423-a542-1b147e11e93e",
+            "uptime_ns": "1921312124448708",
+            "workflow_id": "0B229BBA-1CAF-4A71-AA22-93178254732A",
+            "consumer": "meeting"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_answers": 5,
+    "completed_answers": 5,
+    "native_carbon_trigger_records": 2,
+    "global_delivery_verified_trials": 2,
+    "first_text_min_max_ms": [
+      2088.0,
+      5470.8
+    ],
+    "first_sentence_min_max_ms": [
+      2409.2,
+      5559.4
+    ],
+    "all_observed_invocation_to_first_text_above_1000ms": true,
+    "all_observed_invocation_to_first_sentence_above_2000ms": true
+  },
+  "route_evidence": [
+    "Parent observed the two fixture playback trials and the immediate second Help button action through native UI.",
+    "User confirmed the first physical Option-Command-Space press; Ask may have been focused, and no Carbon marker accompanies that request. It is not global-delivery proof.",
+    "Parent observed a custom question between the second button trial and the two global trials. Its wording and output are excluded.",
+    "The two global trials have explicit native Carbon trigger records. Parent did not interact with Live UI after prompting a physical press from Codex foreground, and the user confirmed that press.",
+    "Parent normally ended and confirmed the recording after the tests. No recording or playback controls were operated by this log-review agent."
+  ],
+  "limitations": [
+    "The hotkey_to_request_ms field is generic invocation-to-direct-stream handoff for button and custom routes as well as shortcuts.",
+    "First text is the first observed letter/number; first sentence is a punctuation/newline proxy after 12 characters. Useful content and actual pixel presentation require native observation.",
+    "The five trials use different inputs and trigger conditions. No population median/p95 or guaranteed speed is inferred.",
+    "The two controlled playback comparisons are playback-end proxies; independent acoustic speech-end timing remains unmeasured.",
+    "Structured freshness-ready events establish that the preparation barrier completed, not independent lexical coverage of every question word.",
+    "The observed invocation-to-text and sentence timings do not achieve the stated 1s/2s speed targets in these trials."
+  ]
+}
