@@ -10,16 +10,18 @@ import XCTest
 @MainActor
 final class MeetingOrganizationControlsSmokeTests: XCTestCase {
     func testOrganizationControlsFitCompactNativeViewports() async throws {
-        let fixture = try await fixture()
-        for width in [360.0, 420.0] {
-            let host = NSHostingView(
-                rootView: LiveMeetingOrganizationControls(viewModel: fixture.viewModel).frame(width: width))
-            let window = mount(host, width: width, onScreen: false)
-            defer { window.orderOut(nil); window.close() }
-            XCTAssertEqual(host.bounds.width, width, accuracy: 1)
-            XCTAssertTrue(host.fittingSize.height.isFinite)
-            XCTAssertGreaterThan(host.fittingSize.height, 0)
-            XCTAssertLessThan(host.fittingSize.height, 220)
+        for longNames in [false, true] {
+            let fixture = try await fixture(longNames: longNames)
+            for width in [360.0, 420.0] {
+                let host = NSHostingView(
+                    rootView: LiveMeetingOrganizationControls(viewModel: fixture.viewModel).frame(width: width))
+                let window = mount(host, width: width, onScreen: false)
+                defer { window.orderOut(nil); window.close() }
+                XCTAssertEqual(host.bounds.width, width, accuracy: 1)
+                XCTAssertTrue(host.fittingSize.height.isFinite)
+                XCTAssertGreaterThan(host.fittingSize.height, 0)
+                XCTAssertLessThan(host.fittingSize.height, 220)
+            }
         }
     }
 
@@ -65,15 +67,17 @@ final class MeetingOrganizationControlsSmokeTests: XCTestCase {
         let viewModel: LiveMeetingOrganizationViewModel
     }
 
-    private func fixture() async throws -> Fixture {
+    private func fixture(longNames: Bool = false) async throws -> Fixture {
         let manager = try DatabaseManager()
         let companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
         let projects = MeetingProjectRepository(dbQueue: manager.dbQueue)
-        let first = MeetingCompany(name: "Synthetic Cedar", attendeeDomains: ["cedar.example"])
-        let second = MeetingCompany(name: "Synthetic Zephyr", attendeeDomains: ["zephyr.example"])
+        let prefix = longNames ? String(repeating: "Long synthetic organization name ", count: 5) : "Synthetic "
+        let first = MeetingCompany(name: prefix + "Cedar", attendeeDomains: ["cedar.example"])
+        let second = MeetingCompany(name: prefix + "Zephyr", attendeeDomains: ["zephyr.example"])
         try companies.save(first); try companies.save(second)
-        try projects.save(MeetingProject(name: "Cedar review", companyID: first.id))
-        let secondProject = MeetingProject(name: "Zephyr renewal", companyID: second.id)
+        let projectPrefix = longNames ? String(repeating: "Long workstream name ", count: 8) : ""
+        try projects.save(MeetingProject(name: projectPrefix + "Cedar review", companyID: first.id))
+        let secondProject = MeetingProject(name: projectPrefix + "Zephyr renewal", companyID: second.id)
         try projects.save(secondProject)
         let selections = Selections()
         let viewModel = LiveMeetingOrganizationViewModel(
@@ -117,6 +121,20 @@ final class MeetingOrganizationControlsSmokeTests: XCTestCase {
             return
         }
         application.finishLaunching()
+        let deadline = ContinuousClock.now.advanced(by: .seconds(seconds))
+        while ContinuousClock.now < deadline {
+            try Task.checkCancellation()
+            runNativePreviewSlice(seconds: 0.08)
+            // A continuous nested NSApp.run() prevents XCTest's MainActor
+            // job from suspending. Yield between event-dispatch slices so
+            // the production view model can finish its awaited repository
+            // work and publish enabled controls normally.
+            try await Task.sleep(for: .milliseconds(20))
+        }
+    }
+
+    private func runNativePreviewSlice(seconds: TimeInterval) {
+        let application = NSApplication.shared
         let timer = Timer(timeInterval: seconds, repeats: false) { _ in
             MainActor.assumeIsolated {
                 let application = NSApplication.shared
@@ -130,9 +148,11 @@ final class MeetingOrganizationControlsSmokeTests: XCTestCase {
                 }
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
+        // Native pop-up menus track in their own mode. Do not stop AppKit
+        // while that menu is open; resume the bounded slice and actor yield
+        // after the user selects an item or dismisses the menu.
+        RunLoop.main.add(timer, forMode: .default)
         defer { timer.invalidate() }
         application.run()
-        try Task.checkCancellation()
     }
 }

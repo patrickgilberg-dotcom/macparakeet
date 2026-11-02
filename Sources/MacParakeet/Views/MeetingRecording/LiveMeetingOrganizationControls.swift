@@ -11,38 +11,51 @@ struct LiveMeetingOrganizationControls: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Company").font(.caption2).foregroundStyle(.secondary)
-                    Picker("Company", selection: companySelection) {
-                        Text("No company").tag(Optional<UUID>.none)
-                        ForEach(viewModel.companies) { company in Text(company.name).tag(Optional(company.id)) }
-                        if let id = viewModel.companyID, !viewModel.companies.contains(where: { $0.id == id }) {
-                            Text("Saved company unavailable").tag(Optional(id))
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    rowLabel("Company")
+                    Menu {
+                        Button("No company") { viewModel.selectCompany(nil) }
+                        ForEach(viewModel.companies) { company in
+                            Button(company.name) { viewModel.selectCompany(company.id) }
                         }
+                    } label: {
+                        selectionLabel(companyName)
                     }
-                    .labelsHidden().accessibilityLabel("Recording company")
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .accessibilityLabel("Recording company")
+                    .accessibilityValue(companyName)
+                    .help(companyName)
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Project (optional)").font(.caption2).foregroundStyle(.secondary)
-                    Picker("Project", selection: projectSelection) {
-                        Text("Choose later").tag(Optional<UUID>.none)
-                        ForEach(viewModel.availableProjects) { project in Text(project.name).tag(Optional(project.id)) }
-                        if let id = viewModel.projectID, !viewModel.availableProjects.contains(where: { $0.id == id }) {
-                            Text("Saved project unavailable").tag(Optional(id))
+                HStack(spacing: 8) {
+                    rowLabel("Project")
+                    Menu {
+                        Button("Choose later") { viewModel.selectProject(nil) }
+                        ForEach(viewModel.availableProjects) { project in
+                            Button(project.name) { viewModel.selectProject(project.id) }
                         }
+                    } label: {
+                        selectionLabel(selectedProjectName)
                     }
-                    .labelsHidden().accessibilityLabel("Recording project")
+                    .menuStyle(.borderlessButton).menuIndicator(.hidden)
+                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .accessibilityLabel("Recording project")
+                    .accessibilityValue(selectedProjectName)
+                    .help(selectedProjectName)
+                    Button {
+                        isAddingProject.toggle()
+                    } label: {
+                        Image(systemName: "folder.badge.plus")
+                    }
+                    .parakeetAction(.subtle)
+                    .fixedSize()
+                    .accessibilityLabel("New project for this company")
+                    .help("Create a project within the selected company")
+                    if viewModel.isSaving {
+                        ProgressView().controlSize(.mini).accessibilityLabel("Saving meeting folders")
+                    }
                 }
-                Button {
-                    isAddingProject.toggle()
-                } label: {
-                    Image(systemName: "folder.badge.plus")
-                }
-                .parakeetAction(.subtle)
-                .accessibilityLabel("New project for this company")
-                .help("Create a project within the selected company")
-                if viewModel.isSaving { ProgressView().controlSize(.mini).accessibilityLabel("Saving meeting folders") }
             }
             .disabled(viewModel.isLoading || viewModel.isFinishing)
             if isAddingProject {
@@ -63,16 +76,35 @@ struct LiveMeetingOrganizationControls: View {
             }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
+        .frame(minWidth: 0, maxWidth: .infinity)
         .task { await viewModel.load() }
         .onDisappear { creationTask?.cancel() }
     }
 
-    private var companySelection: Binding<UUID?> {
-        Binding(get: { viewModel.companyID }, set: { viewModel.selectCompany($0) })
+    private var companyName: String {
+        guard let id = viewModel.companyID else { return "No company" }
+        return viewModel.companies.first(where: { $0.id == id })?.name ?? "Saved company unavailable"
     }
 
-    private var projectSelection: Binding<UUID?> {
-        Binding(get: { viewModel.projectID }, set: { viewModel.selectProject($0) })
+    private var selectedProjectName: String {
+        guard let id = viewModel.projectID else { return "Choose later" }
+        return viewModel.availableProjects.first(where: { $0.id == id })?.name ?? "Saved project unavailable"
+    }
+
+    private func rowLabel(_ value: String) -> some View {
+        Text(value).font(.caption).foregroundStyle(.secondary)
+            .frame(width: 52, alignment: .leading)
+    }
+
+    private func selectionLabel(_ value: String) -> some View {
+        HStack(spacing: 6) {
+            Text(value).lineLimit(1).truncationMode(.middle)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.down").font(.caption2).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 4)
+        .background(DesignSystem.Colors.contentBackground, in: RoundedRectangle(cornerRadius: 5))
+        .contentShape(Rectangle())
     }
 
     private func createProject() {
