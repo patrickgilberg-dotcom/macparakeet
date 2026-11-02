@@ -19,6 +19,25 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         super.tearDown()
     }
 
+    func testOrganizationControlsSlotExistsBeforeCaptureStartsAndStaysAfterPickerLoads() async throws {
+        let fixture = try await CompanyFlowFixture(blocksStart: true)
+        let coordinator = fixture.makeCoordinator()
+        let event = fixture.event()
+        XCTAssertNotNil(
+            coordinator.startFromCalendar(calendarEventSnapshot: .init(event: event, confidence: .confirmed)))
+        await fixture.recording.waitUntilStartCalled()
+        let panel = try XCTUnwrap(coordinator.testHook_panelViewModel)
+        XCTAssertEqual(panel.state, .starting)
+        XCTAssertTrue(panel.showsOrganizationControls, "Reserve the controls geometry on the initial panel frame.")
+        XCTAssertNil(panel.organization, "The slot exists before the recording's editable organization loads.")
+        await fixture.recording.releaseStart()
+        try await waitForLiveRecording(coordinator)
+        XCTAssertTrue(coordinator.testHook_panelViewModel === panel)
+        XCTAssertTrue(panel.showsOrganizationControls)
+        XCTAssertNotNil(panel.organization)
+        await coordinator.discardRecordingAndWaitForCompletion()
+    }
+
     func testCalendarCompanyMatchFreezesCompanyWithoutChoosingAnyProject() async throws {
         let fixture = try await CompanyFlowFixture()
         let company = MeetingCompany(name: "Customer", attendeeDomains: ["customer.example"])
@@ -862,6 +881,7 @@ final class MeetingRecordingFlowCoordinatorTests: XCTestCase {
         let panel = try XCTUnwrap(coordinator.testHook_panelViewModel)
         XCTAssertEqual(pill.state, .starting)
         XCTAssertEqual(panel.state, .starting)
+        XCTAssertFalse(panel.showsOrganizationControls, "The upstream-style path has no company picker capability.")
         XCTAssertFalse(pill.canTogglePause)
         XCTAssertFalse(panel.canTogglePause)
         XCTAssertFalse(panel.canToggleMicrophoneMute)
@@ -2207,7 +2227,7 @@ private final class CompanyFlowFixture {
     let recording: MeetingRecordingServiceSpy
     let transcriptionService = MockTranscriptionService()
 
-    init() async throws {
+    init(blocksStart: Bool = false) async throws {
         let manager = try DatabaseManager()
         companies = MeetingCompanyRepository(dbQueue: manager.dbQueue)
         projects = MeetingProjectRepository(dbQueue: manager.dbQueue)
@@ -2220,7 +2240,7 @@ private final class CompanyFlowFixture {
             microphoneAudioURL: folder.appendingPathComponent("microphone-raw.m4a"),
             systemAudioURL: folder.appendingPathComponent("system-raw.m4a"), durationSeconds: 30,
             sourceAlignment: .init(meetingOriginHostTime: nil, microphone: nil, system: nil))
-        recording = MeetingRecordingServiceSpy(output: output)
+        recording = MeetingRecordingServiceSpy(output: output, blocksStart: blocksStart)
         await transcriptionService.persistFinalizedMeetings(to: transcriptions)
     }
 

@@ -17,8 +17,8 @@ struct MeetingRecordingPanelView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            if let organization = viewModel.organization {
-                LiveMeetingOrganizationControls(viewModel: organization)
+            if viewModel.showsOrganizationControls || viewModel.organization != nil {
+                LiveMeetingOrganizationSlot(viewModel: viewModel.organization)
                 Divider()
             }
             if let preparation = viewModel.chatViewModel.generatedMeetingPreparation {
@@ -74,6 +74,7 @@ struct MeetingRecordingPanelView: View {
         }
         .padding(.horizontal, DesignSystem.Spacing.sm)
         .padding(.vertical, 4)
+        .accessibilityIdentifier("live-meeting-tabs")
     }
 
     private func tabButton(_ tab: MeetingRecordingPanelViewModel.LivePanelTab) -> some View {

@@ -71,6 +71,8 @@ public final class MeetingRecordingPanelViewModel {
     public let notesViewModel: MeetingNotesViewModel = MeetingNotesViewModel()
     public let quickPromptsViewModel: QuickPromptsViewModel = QuickPromptsViewModel()
     public var organization: LiveMeetingOrganizationViewModel?
+    /// Reserves the organization rows before their recording-scoped model is available.
+    public var showsOrganizationControls = false
     public private(set) var meetingTypes: [MeetingType] = []
     public private(set) var activeMeetingTypeID: UUID?
     public var onStop: (() -> Void)?
@@ -244,6 +246,7 @@ public final class MeetingRecordingPanelViewModel {
         activeMeetingTypeID = nil
         onMeetingTypeChange = nil
         organization = nil
+        showsOrganizationControls = false
         notesViewModel.reset()
         chatViewModel.loadTranscript("", transcriptionId: nil)
     }

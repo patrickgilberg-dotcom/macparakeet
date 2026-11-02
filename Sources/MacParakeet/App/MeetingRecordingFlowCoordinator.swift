@@ -773,6 +773,8 @@ final class MeetingRecordingFlowCoordinator {
             vm.captureHealth = initialCaptureHealth
             vm.state = .starting
             let panelVM = panelViewModel ?? MeetingRecordingPanelViewModel()
+            panelVM.showsOrganizationControls =
+                companyRepository != nil && projectRepository != nil && preparationRepository != nil
             panelVM.state = .starting
             panelVM.elapsedSeconds = 0
             panelVM.micLevel = 0

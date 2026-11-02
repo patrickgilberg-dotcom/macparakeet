@@ -6,6 +6,10 @@ Live organizes upcoming meetings under companies before capture. The company
 is suggested automatically; a project within that company is optional. The user
 can record immediately, select/create a project during the call, or organize a
 saved meeting later. Names, domains and selections are editable local data.
+The recording panel reserves its company/project rows before its first visible
+frame; loading organization values must not shift the live Notes flower or
+restart its animation. Placeholder controls stay inactive until organization
+is available. Panels without this capability keep their original layout.
 
 ## Discovery and matching
 
